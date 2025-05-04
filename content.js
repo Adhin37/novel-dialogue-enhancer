@@ -8,6 +8,8 @@ let settings = {
   fixPronouns: true
 };
 let characterMap = {};
+let isEnhancing = false; // Flag to prevent recursive enhancement
+let pendingEnhancement = false; // Flag to track if another enhancement was requested while one is in progress
 
 // Initialize
 function init() {
@@ -86,10 +88,30 @@ function findContentElement() {
 
 // Enhance the page content
 function enhancePage() {
+  // Guard against recursive enhancement
+  if (isEnhancing) {
+    pendingEnhancement = true;
+    return false;
+  }
+  
+  isEnhancing = true;
+  
+  // Temporarily disconnect observer to prevent triggering while we update content
+  if (typeof observer !== 'undefined' && observer) {
+    observer.disconnect();
+  }
+  
   contentElement = findContentElement();
   
   if (!contentElement) {
     console.log("Novel Dialogue Enhancer: Couldn't find content element");
+    isEnhancing = false;
+    
+    // Reconnect observer
+    if (typeof observer !== 'undefined' && observer && contentElement) {
+      observer.observe(contentElement, { childList: true, subtree: true });
+    }
+    
     return false;
   }
   
@@ -118,6 +140,21 @@ function enhancePage() {
   // Log enhancement statistics
   const stats = window.enhancerIntegration.getEnhancementStats();
   console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
+  
+  // Reconnect observer after enhancement
+  if (typeof observer !== 'undefined' && observer && contentElement) {
+    setTimeout(() => {
+      observer.observe(contentElement, { childList: true, subtree: true });
+    }, 100);
+  }
+  
+  isEnhancing = false;
+  
+  // If another enhancement was requested while this one was in progress, do it now
+  if (pendingEnhancement) {
+    pendingEnhancement = false;
+    setTimeout(enhancePage, 10);
+  }
   
   return true;
 }
@@ -297,19 +334,30 @@ init();
 
 // Add mutation observer to handle dynamic content
 const observer = new MutationObserver(function(mutations) {
-  if (settings.enhancerEnabled) {
+  if (settings.enhancerEnabled && !isEnhancing) {
     // Check if new paragraphs were added
     let newContentAdded = false;
     
     mutations.forEach(mutation => {
       if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-        newContentAdded = true;
+        // Check if the added nodes are actual content, not our own modifications
+        let hasRealContent = false;
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            hasRealContent = true;
+          }
+        });
+        
+        if (hasRealContent) {
+          newContentAdded = true;
+        }
       }
     });
     
     if (newContentAdded) {
       // Wait a bit for all content to be loaded
-      setTimeout(enhancePage, 500);
+      clearTimeout(window.enhancementTimer);
+      window.enhancementTimer = setTimeout(enhancePage, 500);
     }
   }
 });

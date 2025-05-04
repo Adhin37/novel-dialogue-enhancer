@@ -12,28 +12,46 @@ function fixDialoguePatterns(text) {
   // Normalize quotation marks first
   text = normalizeQuotes(text);
   
+  // Create a copy to apply changes incrementally and check each step
+  let processedText = text;
+  
   // 1. Fix dialogue attribution patterns
-  text = fixDialogueAttribution(text);
+  const attributionFixed = fixDialogueAttribution(processedText);
+  if (attributionFixed.length >= processedText.length * 0.95) {
+    processedText = attributionFixed;
+  }
   
   // 2. Fix awkward narrative expressions
-  text = fixNarrativeExpressions(text);
+  const narrativeFixed = fixNarrativeExpressions(processedText);
+  if (narrativeFixed.length >= processedText.length * 0.95) {
+    processedText = narrativeFixed;
+  }
   
   // 3. Fix cultural idioms that are often mistranslated
-  text = fixCulturalIdioms(text);
+  const idiomsFixed = fixCulturalIdioms(processedText);
+  if (idiomsFixed.length >= processedText.length * 0.95) {
+    processedText = idiomsFixed;
+  }
   
   // 4. Fix overly formal or stiff language in dialogue
-  text = relaxDialogueFormality(text);
+  const formalityFixed = relaxDialogueFormality(processedText);
+  if (formalityFixed.length >= processedText.length * 0.95) {
+    processedText = formalityFixed;
+  }
   
   // 5. Fix punctuation spacing and format
-  text = fixPunctuation(text);
+  const punctuationFixed = fixPunctuation(processedText);
+  if (punctuationFixed.length >= processedText.length * 0.95) {
+    processedText = punctuationFixed;
+  }
   
   // Return original text if we somehow made it worse (significantly shorter)
-  if (text.length < originalText.length * 0.9) {
+  if (processedText.length < originalText.length * 0.9) {
     console.warn("DialogueUtils: Significant text reduction detected. Reverting changes.");
     return originalText;
   }
   
-  return text;
+  return processedText;
 }
 
 /**
