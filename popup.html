@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Novel Dialogue Enhancer</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <h1>Novel Dialogue Enhancer</h1>
+  
+  <div class="toggle-container">
+    <span>Enable Enhancement</span>
+    <label class="toggle">
+      <input type="checkbox" id="enhancerToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  
+  <div class="toggle-container">
+    <span>Preserve Names</span>
+    <label class="toggle">
+      <input type="checkbox" id="preserveNamesToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  
+  <div class="toggle-container">
+    <span>Fix Pronouns</span>
+    <label class="toggle">
+      <input type="checkbox" id="fixPronounsToggle" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <button id="enhanceNowBtn">Enhance Current Page</button>
+  
+  <div class="status" id="statusMessage">Ready</div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

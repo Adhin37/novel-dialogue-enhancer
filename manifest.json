@@ -1,0 +1,26 @@
+{
+  "name": "Novel Dialogue Enhancer",
+  "version": "1.0",
+  "description": "Enhances translated novel dialogues to sound more natural",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["*://*/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.fanmtl.com/*", "*://*.novelupdates.com/*", "*://*.wuxiaworld.com/*", "*://*.webnovel.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "manifest_version": 3
+}
