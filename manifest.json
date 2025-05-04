@@ -2,8 +2,16 @@
   "name": "Novel Dialogue Enhancer",
   "version": "1.0",
   "description": "Enhances translated novel dialogues to sound more natural",
-  "permissions": ["activeTab", "storage"],
-  "host_permissions": ["*://*.fanmtl.com/*", "*://*.novelupdates.com/*", "*://*.wuxiaworld.com/*", "*://*.webnovel.com/*"],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "*://*.fanmtl.com/*",
+    "*://*.novelupdates.com/*",
+    "*://*.wuxiaworld.com/*",
+    "*://*.webnovel.com/*"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -14,8 +22,19 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://*.fanmtl.com/*", "*://*.novelupdates.com/*", "*://*.wuxiaworld.com/*", "*://*.webnovel.com/*", "<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "*://*.fanmtl.com/*",
+        "*://*.novelupdates.com/*",
+        "*://*.wuxiaworld.com/*",
+        "*://*.webnovel.com/*",
+        "<all_urls>"
+      ],
+      "js": [
+        "genderUtils.js",
+        "dialogueUtils.js",
+        "enhancerIntegration.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

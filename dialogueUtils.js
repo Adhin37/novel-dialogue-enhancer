@@ -161,7 +161,32 @@ function fixCulturalIdioms(text) {
     { from: /how can there be such a person/gi, to: 'how can someone be like this' },
     { from: /eat vinegar/gi, to: 'be jealous' },
     { from: /give color/gi, to: 'flirt' },
-    { from: /not know good from bad/gi, to: 'lack judgment' }
+    { from: /not know good from bad/gi, to: 'lack judgment' },
+    // Additional East Asian idioms and expressions
+    { from: /eyes open as wide as bells/gi, to: 'eyes wide with surprise' },
+    { from: /eyes spewing fire/gi, to: 'glaring angrily' },
+    { from: /climbing a tree to catch fish/gi, to: 'using the wrong approach' },
+    { from: /drawing a snake and adding legs/gi, to: 'ruining something by overdoing it' },
+    { from: /a frog at the bottom of a well/gi, to: 'someone with a limited perspective' },
+    { from: /covering ears to steal a bell/gi, to: 'fooling oneself' },
+    { from: /after the lips are gone, the teeth are cold/gi, to: 'realizing the value of something after it\'s gone' },
+    { from: /pulling chestnuts out of the fire/gi, to: 'doing the dirty work for someone else' },
+    { from: /playing the lute to a cow/gi, to: 'wasting effort on someone who doesn\'t appreciate it' },
+    { from: /the winds and clouds are changing/gi, to: 'the situation is changing rapidly' },
+    { from: /looking at flowers from horseback/gi, to: 'taking only a superficial look' },
+    { from: /beating the grass to startle the snake/gi, to: 'showing one\'s hand prematurely' },
+    { from: /hanging sheep's head but selling dog meat/gi, to: 'false advertising' },
+    { from: /old woman losing her only son/gi, to: 'extremely distressed' },
+    { from: /breaking the wok and sinking the boat/gi, to: 'burning one\'s bridges' },
+    { from: /chicken feathers and garlic skin/gi, to: 'trivial matters' },
+    { from: /treating a headache by foot massage/gi, to: 'treating symptoms instead of the cause' },
+    { from: /draw a tiger but resemble a dog/gi, to: 'poor imitation' },
+    { from: /a stone from another mountain/gi, to: 'outside perspective' },
+    { from: /borrowing a knife to kill someone/gi, to: 'using someone else to do your dirty work' },
+    { from: /three days without being whipped, no good can come/gi, to: 'needs strict supervision' },
+    { from: /standing on tiptoes and looking into the distance/gi, to: 'eagerly anticipating' },
+    { from: /carving insects on the beams/gi, to: 'excessive attention to detail' },
+    { from: /tying a bell to a tiger/gi, to: 'dangerous task' }
   ];
   
   // Apply all idiom patterns

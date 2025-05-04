@@ -1,7 +1,7 @@
 // genderUtils.js - Advanced gender detection functions for Novel Dialogue Enhancer
 
 /**
- * Advanced character gender detection
+ * Advanced character gender detection with improved accuracy and context awareness
  * @param {string} name - The character name
  * @param {string} text - Surrounding text context
  * @param {object} characterMap - Existing character data (optional)
@@ -20,7 +20,7 @@ function guessGender(name, text, characterMap = {}) {
   let maleScore = 0;
   let femaleScore = 0;
 
-  // 1. Check for titles and honorifics
+  // 1. Check for titles and honorifics - high confidence indicators
   const titleResult = checkTitlesAndHonorifics(name);
   if (titleResult === "male") return "male";
   if (titleResult === "female") return "female";
@@ -30,7 +30,7 @@ function guessGender(name, text, characterMap = {}) {
   if (namePatternResult === "male") maleScore += 2;
   if (namePatternResult === "female") femaleScore += 2;
 
-  // 3. Check for pronouns in context
+  // 3. Check for pronouns in context - strong indicator
   const pronounResult = analyzePronounContext(name, text);
   maleScore += pronounResult.maleScore;
   femaleScore += pronounResult.femaleScore;
@@ -49,11 +49,21 @@ function guessGender(name, text, characterMap = {}) {
   const referencesResult = analyzeCharacterReferences(name, text);
   maleScore += referencesResult.maleScore;
   femaleScore += referencesResult.femaleScore;
+  
+  // 7. Analyze actions performed by the character
+  const actionsResult = analyzeCharacterActions(name, text);
+  maleScore += actionsResult.maleScore;
+  femaleScore += actionsResult.femaleScore;
+  
+  // 8. Check for appearance descriptions
+  const appearanceResult = analyzeAppearanceDescriptions(name, text);
+  maleScore += appearanceResult.maleScore;
+  femaleScore += appearanceResult.femaleScore;
 
-  // Make decision based on scores
-  if (maleScore > femaleScore && maleScore >= 2) {
+  // Make decision based on scores - require stronger evidence for certainty
+  if (maleScore > femaleScore && maleScore >= 3) {
     return "male";
-  } else if (femaleScore > maleScore && femaleScore >= 2) {
+  } else if (femaleScore > maleScore && femaleScore >= 3) {
     return "female";
   } else {
     return "unknown";
@@ -66,81 +76,43 @@ function guessGender(name, text, characterMap = {}) {
 function checkTitlesAndHonorifics(name) {
   // Common titles, by gender
   const maleTitles = [
-    "Mr",
-    "Mr.",
-    "Sir",
-    "Lord",
-    "Master",
-    "Prince",
-    "King",
-    "Duke",
-    "Count",
-    "Baron",
-    "Emperor",
-    "Brother",
-    "Uncle",
-    "Father",
-    "Grandpa",
-    "Grandfather",
-    "Boy",
-    "Son",
+    "Mr", "Mr.", "Sir", "Lord", "Master", "Prince", "King", "Duke", "Count", "Baron", 
+    "Emperor", "Brother", "Uncle", "Father", "Dad", "Daddy", "Papa", "Grandpa", "Grandfather", 
+    "Boy", "Son", "Husband", "Mister", "Gentleman", "Lad", "Fellow",
     // Common Eastern honorifics
-    "Dage",
-    "Gege",
-    "Oppa",
-    "Hyung",
-    "Nii",
-    "Oniisan",
-    "Otouto",
+    "Dage", "Gege", "Oppa", "Hyung", "Nii", "Oniisan", "Otouto", "Aniki", "-kun", 
+    "Shixiong", "Shidi", "Shizun", "Shifu", "Taoist", "Monk", "Young Master"
   ];
 
   const femaleTitles = [
-    "Mrs",
-    "Mrs.",
-    "Ms",
-    "Ms.",
-    "Miss",
-    "Lady",
-    "Princess",
-    "Queen",
-    "Duchess",
-    "Countess",
-    "Baroness",
-    "Empress",
-    "Sister",
-    "Aunt",
-    "Mother",
-    "Mom",
-    "Grandma",
-    "Grandmother",
-    "Girl",
-    "Daughter",
+    "Mrs", "Mrs.", "Ms", "Ms.", "Miss", "Lady", "Princess", "Queen", "Duchess", "Countess", 
+    "Baroness", "Empress", "Sister", "Aunt", "Mother", "Mom", "Mommy", "Mama", "Grandma", 
+    "Grandmother", "Girl", "Daughter", "Wife", "Madam", "Madame", "Mistress", "Dame",
     // Common Eastern honorifics
-    "Jiejie",
-    "Meimei",
-    "Unni",
-    "Nuna",
-    "Nee",
-    "Oneesan",
-    "Imouto",
+    "Jiejie", "Meimei", "Unni", "Nuna", "Nee", "Oneesan", "Imouto", "Aneue", "-chan", 
+    "Shimei", "Shijie", "Young Lady", "Young Miss"
   ];
 
-  // Check for title at the beginning of the name
+  // Check for title at the beginning or end of the name
   for (const title of maleTitles) {
-    if (name.startsWith(title + " ")) return "male";
+    if (name.startsWith(title + " ") || name.endsWith(" " + title) || name === title) {
+      return "male";
+    }
   }
 
   for (const title of femaleTitles) {
-    if (name.startsWith(title + " ")) return "female";
+    if (name.startsWith(title + " ") || name.endsWith(" " + title) || name === title) {
+      return "female";
+    }
   }
 
-  // Check for title in the name (for cases like "Young Master Li" or "Princess Anna")
+  // Check for title within the name (for cases like "Young Master Li" or "Princess Anna")
   for (const title of maleTitles) {
-    if (name.includes(" " + title + " ") || name === title) return "male";
+    if (name.includes(" " + title + " ")) return "male";
   }
 
   for (const title of femaleTitles) {
-    if (name.includes(" " + title + " ") || name === title) return "female";
+    if (name.includes(" " + title + " ")) return "female";
   }
 
   return "unknown";
@@ -150,42 +122,49 @@ function checkTitlesAndHonorifics(name) {
  * Check name patterns (endings, etc.) for gender clues
  */
 function checkNamePatterns(name) {
-  // This is a simplified approach - real implementation would be more comprehensive
-  // and might use datasets for different language names
-
-  // Some common female name endings in English
+  // Extract the first name if it's a full name
+  const firstName = name.split(' ')[0];
+  const nameLower = firstName.toLowerCase();
+  
+  // Some common female name endings in English and other languages
   const femaleEndings = [
-    "a",
-    "ie",
-    "y",
-    "ey",
-    "i",
-    "elle",
-    "ette",
-    "ine",
-    "ell",
+    "a", "ia", "ie", "y", "ey", "i", "elle", "ette", "ine", "ell", "lyn", "ina", "ah", 
+    "ella", "anna", "enna", "anne", "ette", "issa", "ara", "lyn", "lynn", "lee"
   ];
 
-  // Some common male name endings in English
-  const maleEndings = ["o", "er", "on", "en", "us", "or", "k", "d", "t"];
+  // Some common male name endings in English and other languages
+  const maleEndings = [
+    "o", "er", "on", "en", "us", "or", "k", "d", "t", "io", "ian", "im", "am", 
+    "ik", "to", "ro", "hn", "il", "rt", "ng", "ez", "an"
+  ];
 
-  // Use only for single names (not for full names like "John Smith")
-  if (!name.includes(" ")) {
-    // Get the ending of the name (last 1-3 characters)
-    const nameLower = name.toLowerCase();
-
-    // Check female endings
-    for (const ending of femaleEndings) {
-      if (nameLower.endsWith(ending)) {
-        return "female";
-      }
+  // Check female endings
+  for (const ending of femaleEndings) {
+    if (nameLower.endsWith(ending)) {
+      return "female";
     }
+  }
 
-    // Check male endings
-    for (const ending of maleEndings) {
-      if (nameLower.endsWith(ending)) {
-        return "male";
-      }
+  // Check male endings
+  for (const ending of maleEndings) {
+    if (nameLower.endsWith(ending)) {
+      return "male";
+    }
+  }
+  
+  // Check for strongly gendered first syllables or prefixes
+  const maleStarts = ["jo", "ja", "mi", "da", "al", "ro", "wi", "ra", "br", "st"];
+  const femaleStarts = ["sa", "ma", "la", "ka", "em", "li", "el", "be", "je", "vi"];
+  
+  for (const start of maleStarts) {
+    if (nameLower.startsWith(start)) {
+      return "male";
+    }
+  }
+  
+  for (const start of femaleStarts) {
+    if (nameLower.startsWith(start)) {
+      return "female";
     }
   }
 
@@ -218,16 +197,22 @@ function analyzePronounContext(name, text) {
     );
 
     // Count gendered pronouns in the nearby context
-    const malePronouns = (followingText.match(/\b(he|him|his)\b/gi) || [])
-      .length;
-    const femalePronouns = (followingText.match(/\b(she|her|hers)\b/gi) || [])
-      .length;
+    const malePronouns = (followingText.match(/\b(he|him|his)\b/gi) || []).length;
+    const femalePronouns = (followingText.match(/\b(she|her|hers)\b/gi) || []).length;
 
     // Add weighted scores based on pronoun counts
     if (malePronouns > femalePronouns) {
-      maleScore += Math.min(3, malePronouns);
+      maleScore += Math.min(4, malePronouns); // Stronger signal
     } else if (femalePronouns > malePronouns) {
-      femaleScore += Math.min(3, femalePronouns);
+      femaleScore += Math.min(4, femalePronouns); // Stronger signal
+    }
+    
+    // Check for possessive pronouns in specific patterns that strongly indicate gender
+    if (followingText.match(new RegExp(`\\b${escapeRegExp(name)}\\b[^.!?]*\\bhis\\b`, 'i'))) {
+      maleScore += 2;
+    }
+    if (followingText.match(new RegExp(`\\b${escapeRegExp(name)}\\b[^.!?]*\\bher\\b`, 'i'))) {
+      femaleScore += 2;
     }
   });
 
@@ -258,6 +243,9 @@ function analyzeCharacterReferences(name, text) {
     `lord ${name}`,
     `master ${name}`,
     `brother ${name}`,
+    `his name is ${name}`,
+    `${name}, a man`,
+    `${name}, a boy`,
   ];
 
   const femaleReferences = [
@@ -277,6 +265,9 @@ function analyzeCharacterReferences(name, text) {
     `lady ${name}`,
     `mistress ${name}`,
     `sister ${name}`,
+    `her name is ${name}`,
+    `${name}, a woman`,
+    `${name}, a girl`,
   ];
 
   // Check for matches in a case-insensitive way
@@ -284,13 +275,13 @@ function analyzeCharacterReferences(name, text) {
 
   maleReferences.forEach((ref) => {
     if (textLower.includes(ref.toLowerCase())) {
-      maleScore += 2;
+      maleScore += 3; // Strong indicator
     }
   });
 
   femaleReferences.forEach((ref) => {
     if (textLower.includes(ref.toLowerCase())) {
-      femaleScore += 2;
+      femaleScore += 3; // Strong indicator
     }
   });
 
@@ -301,10 +292,8 @@ function analyzeCharacterReferences(name, text) {
  * Helper function to escape regex special characters
  */
 function escapeRegExp(string) {
-  return string.replace(
-    /[.*+?^${}()|[\]\\]/g,
-    "\\  return { maleScore, femaleScore };"
-  );
+  // Escape characters with special meaning either inside or outside character sets.
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
 }
 
 /**
@@ -330,6 +319,10 @@ function checkRelationships(name, text) {
     `${name} was the emperor`,
     `${name} was the lord`,
     `${name} was the duke`,
+    `${name} was the boyfriend`,
+    `${name}, the husband`,
+    `${name}, the father`,
+    `${name}, the brother`,
   ];
 
   // Female relationship indicators (when name is the subject)
@@ -348,18 +341,22 @@ function checkRelationships(name, text) {
     `${name} was the empress`,
     `${name} was the lady`,
     `${name} was the duchess`,
+    `${name} was the girlfriend`,
+    `${name}, the wife`,
+    `${name}, the mother`,
+    `${name}, the sister`,
   ];
 
   // Check for male relationship indicators
   maleRelationships.forEach((relation) => {
-    if (text.includes(relation)) {
+    if (text.toLowerCase().includes(relation.toLowerCase())) {
       maleScore += 3; // Strong indicator
     }
   });
 
   // Check for female relationship indicators
   femaleRelationships.forEach((relation) => {
-    if (text.includes(relation)) {
+    if (text.toLowerCase().includes(relation.toLowerCase())) {
       femaleScore += 3; // Strong indicator
     }
   });
@@ -374,62 +371,52 @@ function analyzeDescriptions(name, text) {
   let maleScore = 0;
   let femaleScore = 0;
 
-  // Look for gendered descriptions within approximately 60 characters of the name
+  // Look for gendered descriptions near the character name
   const nameContext = new RegExp(
-    `\\b${escapeRegExp(name)}\\b[^.!?]{0,60}`,
+    `\\b${escapeRegExp(name)}\\b[^.!?]{0,100}`,
     "gi"
   );
   const contextMatches = Array.from(text.matchAll(nameContext));
+  let contextText = "";
+  
+  // Combine all the context matches into a single string for analysis
+  contextMatches.forEach(match => {
+    contextText += match[0] + " ";
+  });
 
   // Male-associated words
   const maleWords = [
-    "handsome",
-    "muscular",
-    "beard",
-    "moustache",
-    "stubble",
-    "broad-shouldered",
-    "rugged",
-    "masculine",
-    "gentleman",
-    "fellow",
-    "stocky",
-    "paternal",
+    "handsome", "muscular", "beard", "moustache", "stubble", "broad-shouldered",
+    "rugged", "masculine", "gentleman", "fellow", "stocky", "paternal", "strong",
+    "manly", "chiseled", "goatee", "sideburns", "chest hair", "adam's apple", "baritone",
+    "bass voice", "gruff", "virile", "brawny", "husky"
   ];
 
   // Female-associated words
   const femaleWords = [
-    "beautiful",
-    "pretty",
-    "gorgeous",
-    "lovely",
-    "she was pregnant",
-    "her makeup",
-    "slender",
-    "feminine",
-    "graceful",
-    "voluptuous",
-    "maternal",
-    "lady",
-    "slim",
-    "elegant",
-    "petite",
-    "curvy",
-    "her dress",
-    "her gown",
-    "her hair",
+    "beautiful", "pretty", "gorgeous", "lovely", "pregnant", "makeup", "slender", 
+    "feminine", "graceful", "voluptuous", "maternal", "lady", "slim", "elegant",
+    "petite", "curvy", "dress", "gown", "skirt", "blouse", "heels", "lipstick",
+    "eyeliner", "mascara", "bosom", "breasts", "cleavage", "hips", "waist",
+    "motherly", "womanly", "soft-spoken", "gentle", "dainty"
   ];
 
   // Check for male-associated words
   maleWords.forEach((word) => {
-    if (text.includes(word)) {
+    const regex = new RegExp(`\\b${escapeRegExp(name)}[^.!?]*\\b${escapeRegExp(word)}\\b|\\b${escapeRegExp(word)}\\b[^.!?]*\\b${escapeRegExp(name)}\\b`, "i");
+    if (regex.test(contextText)) {
+      maleScore += 2;
+    } else if (contextText.toLowerCase().includes(word)) {
       maleScore += 1;
     }
   });
 
   // Check for female-associated words
   femaleWords.forEach((word) => {
-    if (text.includes(word)) {
+    const regex = new RegExp(`\\b${escapeRegExp(name)}[^.!?]*\\b${escapeRegExp(word)}\\b|\\b${escapeRegExp(word)}\\b[^.!?]*\\b${escapeRegExp(name)}\\b`, "i");
+    if (regex.test(contextText)) {
+      femaleScore += 2;
+    } else if (contextText.toLowerCase().includes(word)) {
       femaleScore += 1;
     }
   });
@@ -438,68 +425,111 @@ function analyzeDescriptions(name, text) {
 }
 
 /**
- * Analyze how other characters refer to this character
- * @param {string} name - The character name
- * @param {string} text - Surrounding text context
- * @return {object} - Male and female scores
+ * Analyze character actions that may be gender-indicative
  */
-function analyzeCharacterReferences(name, text) {
+function analyzeCharacterActions(name, text) {
   let maleScore = 0;
   let femaleScore = 0;
-
-  // Common reference patterns
-  const maleReferences = [
-    `the man named ${name}`,
-    `the gentleman named ${name}`,
-    `the young man named ${name}`,
-    `the old man named ${name}`,
-    `the boy named ${name}`,
-    `the male ${name}`,
-    `the man, ${name}`,
-    `mister ${name}`,
-    `mr. ${name}`,
-    `sir ${name}`,
-    `king ${name}`,
-    `prince ${name}`,
-    `lord ${name}`,
-    `master ${name}`,
-    `brother ${name}`,
+  
+  // Create a regex to find sentences containing the character name performing actions
+  const nameActionRegex = new RegExp(
+    `\\b${escapeRegExp(name)}\\b[^.!?]*(\\bwent\\b|\\bcame\\b|\\bdid\\b|\\bperformed\\b|\\btook\\b|\\bgrabbed\\b|\\bpicked\\b|\\blifted\\b|\\bcarried\\b|\\bmoved\\b|\\bwore\\b|\\bput\\b|\\bapplied\\b)[^.!?]*[.!?]`,
+    "gi"
+  );
+  
+  const actionMatches = Array.from(text.matchAll(nameActionRegex));
+  let actionText = "";
+  
+  // Combine all action sentences for analysis
+  actionMatches.forEach(match => {
+    actionText += match[0] + " ";
+  });
+  
+  // Male-typical actions
+  const maleActions = [
+    "sword", "blade", "axe", "shield", "armor", "punched", "fought", "trained", 
+    "military", "battle", "war", "soldier", "commander", "general", "martial",
+    "kung fu", "wrestling", "boxed", "sparred", "beard", "stubble", "shaved his",
+    "tied his tie", "adjusted his cuffs", "suit", "tuxedo", "bowtie"
   ];
-
-  const femaleReferences = [
-    `the woman named ${name}`,
-    `the lady named ${name}`,
-    `the young woman named ${name}`,
-    `the old woman named ${name}`,
-    `the girl named ${name}`,
-    `the female ${name}`,
-    `the woman, ${name}`,
-    `miss ${name}`,
-    `ms. ${name}`,
-    `mrs. ${name}`,
-    `madam ${name}`,
-    `queen ${name}`,
-    `princess ${name}`,
-    `lady ${name}`,
-    `mistress ${name}`,
-    `sister ${name}`,
+  
+  // Female-typical actions
+  const femaleActions = [
+    "dress", "skirt", "gown", "makeup", "lipstick", "rouge", "blush", "eyeshadow",
+    "mascara", "perfume", "earrings", "necklace", "jewelry", "braided", "styled her hair",
+    "brushed her hair", "high heels", "purse", "handbag", "pregnant", 
+    "breastfeed", "nursed the baby", "curtsy", "curtseyed"
   ];
-
-  // Check for matches in a case-insensitive way
-  const textLower = text.toLowerCase();
-
-  maleReferences.forEach((ref) => {
-    if (textLower.includes(ref.toLowerCase())) {
+  
+  // Check for male actions
+  maleActions.forEach(action => {
+    if (actionText.toLowerCase().includes(action)) {
       maleScore += 1;
     }
   });
-
-  femaleReferences.forEach((ref) => {
-    if (textLower.includes(ref.toLowerCase())) {
+  
+  // Check for female actions
+  femaleActions.forEach(action => {
+    if (actionText.toLowerCase().includes(action)) {
       femaleScore += 1;
     }
   });
+  
+  return { maleScore, femaleScore };
+}
 
+/**
+ * Analyze appearance descriptions for gender clues
+ */
+function analyzeAppearanceDescriptions(name, text) {
+  let maleScore = 0;
+  let femaleScore = 0;
+  
+  // Create a regex to find appearance descriptions
+  const appearanceRegex = new RegExp(
+    `\\b${escapeRegExp(name)}(?:'s)?\\b[^.!?]*(\\bappearance\\b|\\blooked\\b|\\bdressed\\b|\\bwore\\b|\\bfigure\\b|\\bface\\b|\\bhair\\b|\\bfeatures\\b)[^.!?]*[.!?]`,
+    "gi"
+  );
+  
+  const appearanceMatches = Array.from(text.matchAll(appearanceRegex));
+  let appearanceText = "";
+  
+  // Combine all appearance descriptions
+  appearanceMatches.forEach(match => {
+    appearanceText += match[0] + " ";
+  });
+  
+  // Male appearance indicators
+  const maleAppearance = [
+    "short hair", "crew cut", "buzz cut", "flat chest", "broad shoulders", "tall and strong",
+    "muscular build", "chiseled jaw", "square jaw", "strong jaw", "adam's apple", "facial hair",
+    "stubble", "large hands", "barrel chest", "deep voice", "baritone", "bass voice",
+    "men's clothing", "men's fashion", "suit and tie", "tuxedo", "male uniform", "his physique"
+  ];
+  
+  // Female appearance indicators
+  const femaleAppearance = [
+    "long hair", "flowing hair", "braided hair", "ponytail", "bun", "curves", "slender waist",
+    "hourglass figure", "feminine figure", "soft features", "delicate features", "full lips",
+    "long lashes", "high cheekbones", "smooth skin", "small hands", "narrow shoulders",
+    "ample bosom", "bust", "breast", "cleavage", "hips", "women's clothing", "women's fashion", 
+    "dress", "skirt", "blouse", "her physique", "makeup", "painted nails", "manicure"
+  ];
+  
+  // Check for male appearance indicators
+  maleAppearance.forEach(indicator => {
+    if (appearanceText.toLowerCase().includes(indicator)) {
+      maleScore += 2; // Strong indicators
+    }
+  });
+  
+  // Check for female appearance indicators
+  femaleAppearance.forEach(indicator => {
+    if (appearanceText.toLowerCase().includes(indicator)) {
+      femaleScore += 2; // Strong indicators
+    }
+  });
+  
   return { maleScore, femaleScore };
 }
 

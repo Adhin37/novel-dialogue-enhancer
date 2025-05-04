@@ -133,39 +133,135 @@ function enhanceText(text) {
   return result.enhancedText;
 }
 
-// The following legacy functions are kept for backward compatibility
-// but their implementation is delegated to the new utility modules
-
-// Extract character names from text - now delegated to integration module
-function extractCharacterNames(text) {
-  const result = window.enhancerIntegration.enhanceTextIntegrated(text, { preserveNames: true }, characterMap);
-  characterMap = result.characterMap;
+// FIXED: Removed the recursive call to enhancerIntegration
+// This function now uses a direct implementation instead of calling back to enhancerIntegration
+function extractCharacterNames(text, existingMap = {}) {
+  const characterMap = {...existingMap};
+  
+  // Pattern to match potential character names
+  // Looks for capitalized words followed by dialogue or speech verbs
+  const namePatterns = [
+    /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
+    /"([^"]+)"\s*,?\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered)/g,
+    /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s*:\s*"([^"]+)"/g
+  ];
+  
+  // Process each pattern
+  for (const pattern of namePatterns) {
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      // The name is either in group 1 or 2 depending on the pattern
+      const name = match[1].includes('"') ? match[2] : match[1];
+      
+      // Skip if it's not a name (common false positives)
+      if (isCommonNonName(name)) continue;
+      
+      // Add to character map if not already present
+      if (!characterMap[name]) {
+        const gender = guessGender(name, text);
+        characterMap[name] = {
+          gender,
+          appearances: 1
+        };
+      } else {
+        // Update existing character data
+        characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
+      }
+    }
+  }
+  
+  return characterMap;
 }
 
-// Guess gender based on name patterns and context - now delegated to genderUtils
+// Check if a potential name is actually a common word or phrase
+// that shouldn't be considered a character name
+function isCommonNonName(word) {
+  const commonNonNames = [
+    "The", "Then", "This", "That", "These", "Those", "There", "Their", "They",
+    "However", "Suddenly", "Finally", "Eventually", "Certainly", "Perhaps",
+    "Maybe", "While", "When", "After", "Before", "During", "Within", "Without",
+    "Also", "Thus", "Therefore", "Hence", "Besides", "Moreover", "Although",
+    "Despite", "Since", "Because", "Nonetheless", "Nevertheless", "Regardless",
+    "Consequently", "Accordingly", "Meanwhile", "Afterwards", "Beforehand",
+    "Likewise", "Similarly", "Alternatively", "Conversely", "Instead",
+    "Otherwise", "Particularly", "Specifically", "Generally", "Usually",
+    "Typically", "Rarely", "Frequently", "Occasionally", "Normally"
+  ];
+  
+  return commonNonNames.includes(word);
+}
+
+// Guess gender based on name patterns and context - relies on genderUtils
 function guessGender(name, text) {
   return window.genderUtils.guessGender(name, text, characterMap);
 }
 
-// Fix dialogue patterns to be more natural - now delegated to dialogueUtils
+// Fix dialogue patterns to be more natural - delegated to dialogueUtils
 function fixDialoguePatterns(text) {
   return window.dialogueUtils.fixDialoguePatterns(text);
 }
 
-// Enhance dialogue to be more natural - now delegated to dialogueUtils
+// Enhance dialogue to be more natural - delegated to dialogueUtils
 function enhanceDialogue(dialogue) {
   return window.dialogueUtils.enhanceDialogue(dialogue);
 }
 
-// Fix pronouns based on character map - now handled by integration module
+// Fix pronouns based on character map
 function fixPronouns(text) {
-  const result = window.enhancerIntegration.enhanceTextIntegrated(
-    text, 
-    { fixPronouns: true }, 
-    characterMap
-  );
+  // Direct implementation to avoid circular dependency
+  let fixedText = text;
   
-  return result.enhancedText;
+  // Process each character in the map
+  Object.keys(characterMap).forEach(name => {
+    const character = characterMap[name];
+    
+    // Skip if gender is unknown
+    if (character.gender === "unknown") return;
+    
+    // Create a regex to find sentences with the character name
+    const nameRegex = new RegExp(`([^.!?]*\\b${escapeRegExp(name)}\\b[^.!?]*(?:[.!?]))`, "g");
+    
+    // Find all sentences containing the character name
+    const matches = Array.from(fixedText.matchAll(nameRegex));
+    
+    // For each match, check the following text for pronoun consistency
+    matches.forEach(match => {
+      const sentence = match[0];
+      const sentenceIndex = match.index;
+      
+      // Look at the text after this sentence
+      const followingText = fixedText.substring(sentenceIndex + sentence.length);
+      
+      // Apply pronoun fixes based on gender
+      if (character.gender === "male") {
+        // Fix instances where female pronouns are used for male characters
+        const fixedFollowing = followingText
+          .replace(/\b(She|she)\b(?=\s)(?![^<]*>)/g, "He")
+          .replace(/\b(Her|her)\b(?=\s)(?![^<]*>)/g, match => {
+            // Determine if it's a possessive or object pronoun
+            return /\b(Her|her)\b\s+([\w-]+)/i.test(match) ? "His" : "Him";
+          })
+          .replace(/\b(herself)\b(?=\s)(?![^<]*>)/g, "himself");
+        
+        if (followingText !== fixedFollowing) {
+          fixedText = fixedText.substring(0, sentenceIndex + sentence.length) + fixedFollowing;
+        }
+      } else if (character.gender === "female") {
+        // Fix instances where male pronouns are used for female characters
+        const fixedFollowing = followingText
+          .replace(/\b(He|he)\b(?=\s)(?![^<]*>)/g, "She")
+          .replace(/\b(His|his)\b(?=\s)(?![^<]*>)/g, "Her")
+          .replace(/\b(Him|him)\b(?=\s)(?![^<]*>)/g, "Her")
+          .replace(/\b(himself)\b(?=\s)(?![^<]*>)/g, "herself");
+        
+        if (followingText !== fixedFollowing) {
+          fixedText = fixedText.substring(0, sentenceIndex + sentence.length) + fixedFollowing;
+        }
+      }
+    });
+  });
+  
+  return fixedText;
 }
 
 // Helper to escape regex special characters
