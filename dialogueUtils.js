@@ -155,7 +155,7 @@ function fixCulturalIdioms(text) {
     { from: /heaven's will/gi, to: 'fate' },
     { from: /doesn't know whether to laugh or cry/gi, to: 'was speechless' },
     { from: /wearing a different pair of trousers/gi, to: 'playing for a different team' },
-    { from: /the eagle doesn't prey on the chick/gi, to: 'I won't bully someone weaker' },
+    { from: /the eagle doesn't prey on the chick/gi, to: 'I won\'t bully someone weaker' },
     { from: /smash the pot and sink the boat/gi, to: 'burn all bridges' },
     { from: /turn over the sky/gi, to: 'cause chaos' },
     { from: /how can there be such a person/gi, to: 'how can someone be like this' },
