@@ -120,54 +120,68 @@ async function enhancePage() {
     return false;
   }
 
-  // Process the content
-  if (settings.useLLM) {
-    // If LLM is enabled, we'll use it to enhance the content
-    await enhancePageWithLLM();
-  } else {
-    // Standard rule-based enhancement
-    const paragraphs = contentElement.querySelectorAll('p');
-    if (paragraphs.length === 0) {
-      // If there are no paragraph elements, split by newlines
-      const text = contentElement.innerHTML;
-      const enhancedText = enhanceText(text);
-      contentElement.innerHTML = enhancedText;
+  try {
+    // Process the content
+    if (settings.useLLM) {
+      // If LLM is enabled, we'll use it to enhance the content
+      await enhancePageWithLLM();
     } else {
-      // Process each paragraph
-      paragraphs.forEach(paragraph => {
-        const originalText = paragraph.innerHTML;
-        const enhancedText = enhanceText(originalText);
-        paragraph.innerHTML = enhancedText;
-      });
+      // Standard rule-based enhancement
+      enhancePageWithRules();
+    }
+    
+    // Update character map in storage
+    chrome.runtime.sendMessage({
+      action: "updateCharacterMap",
+      characters: characterMap
+    });
+    
+    // Log enhancement statistics
+    const stats = window.enhancerIntegration.getEnhancementStats();
+    console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
+  } catch (error) {
+    console.error("Novel Dialogue Enhancer: Enhancement error", error);
+    // If there was an error with LLM enhancement, fall back to rule-based
+    if (settings.useLLM) {
+      console.log("Novel Dialogue Enhancer: Falling back to rule-based enhancement");
+      enhancePageWithRules();
+    }
+  } finally {
+    // Reconnect observer after enhancement
+    if (typeof observer !== 'undefined' && observer && contentElement) {
+      setTimeout(() => {
+        observer.observe(contentElement, { childList: true, subtree: true });
+      }, 100);
+    }
+    
+    isEnhancing = false;
+    
+    // If another enhancement was requested while this one was in progress, do it now
+    if (pendingEnhancement) {
+      pendingEnhancement = false;
+      setTimeout(enhancePage, 10);
     }
   }
   
-  // Update character map in storage
-  chrome.runtime.sendMessage({
-    action: "updateCharacterMap",
-    characters: characterMap
-  });
-  
-  // Log enhancement statistics
-  const stats = window.enhancerIntegration.getEnhancementStats();
-  console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
-  
-  // Reconnect observer after enhancement
-  if (typeof observer !== 'undefined' && observer && contentElement) {
-    setTimeout(() => {
-      observer.observe(contentElement, { childList: true, subtree: true });
-    }, 100);
-  }
-  
-  isEnhancing = false;
-  
-  // If another enhancement was requested while this one was in progress, do it now
-  if (pendingEnhancement) {
-    pendingEnhancement = false;
-    setTimeout(enhancePage, 10);
-  }
-  
   return true;
+}
+
+// Standard rule-based enhancement
+function enhancePageWithRules() {
+  const paragraphs = contentElement.querySelectorAll('p');
+  if (paragraphs.length === 0) {
+    // If there are no paragraph elements, split by newlines
+    const text = contentElement.innerHTML;
+    const enhancedText = enhanceText(text);
+    contentElement.innerHTML = enhancedText;
+  } else {
+    // Process each paragraph
+    paragraphs.forEach(paragraph => {
+      const originalText = paragraph.innerHTML;
+      const enhancedText = enhanceText(originalText);
+      paragraph.innerHTML = enhancedText;
+    });
+  }
 }
 
 // New function to enhance content using Ollama LLM
@@ -186,12 +200,17 @@ async function enhancePageWithLLM() {
       const initialEnhancedText = enhanceText(originalText);
       
       // Then apply LLM enhancement
-      const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
-      contentElement.innerHTML = llmEnhancedText;
+      try {
+        const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
+        contentElement.innerHTML = llmEnhancedText;
+      } catch (error) {
+        console.warn("LLM enhancement failed, using rule-based result:", error);
+        contentElement.innerHTML = initialEnhancedText;
+      }
     } else {
       // Process each paragraph with batching for efficiency
-      // We'll process paragraphs in batches of 5 to avoid too many API calls
-      const batchSize = 5;
+      // We'll process paragraphs in batches of 3 to avoid too many API calls
+      const batchSize = 3;
       
       for (let i = 0; i < paragraphs.length; i += batchSize) {
         const batch = Array.from(paragraphs).slice(i, i + batchSize);
@@ -206,14 +225,29 @@ async function enhancePageWithLLM() {
         const initialEnhanced = enhanceText(batchText);
         
         // Then apply LLM enhancement
-        const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
+        try {
+          const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
+          
+          // Split the enhanced text back into paragraphs
+          const enhancedParagraphs = llmEnhanced.split('\n\n');
+          
+          // Apply the enhanced text to each paragraph
+          for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
+            batch[j].innerHTML = enhancedParagraphs[j];
+          }
+        } catch (error) {
+          console.warn(`LLM enhancement failed for batch ${i}-${i+batchSize}, using rule-based result:`, error);
+          
+          // Apply rule-based enhancements instead
+          const enhancedParagraphs = initialEnhanced.split('\n\n');
+          for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
+            batch[j].innerHTML = enhancedParagraphs[j];
+          }
+        }
         
-        // Split the enhanced text back into paragraphs
-        const enhancedParagraphs = llmEnhanced.split('\n\n');
-        
-        // Apply the enhanced text to each paragraph
-        for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
-          batch[j].innerHTML = enhancedParagraphs[j];
+        // Add a small delay between batches to avoid overwhelming the API
+        if (i + batchSize < paragraphs.length) {
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
     }
@@ -223,25 +257,9 @@ async function enhancePageWithLLM() {
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
     
   } catch (error) {
-    console.error("Novel Dialogue Enhancer: LLM enhancement failed", error);
-    
-    // Fallback to standard enhancement
-    console.log("Novel Dialogue Enhancer: Falling back to standard enhancement");
-    
-    const paragraphs = contentElement.querySelectorAll('p');
-    if (paragraphs.length === 0) {
-      // If there are no paragraph elements, split by newlines
-      const text = contentElement.innerHTML;
-      const enhancedText = enhanceText(text);
-      contentElement.innerHTML = enhancedText;
-    } else {
-      // Process each paragraph
-      paragraphs.forEach(paragraph => {
-        const originalText = paragraph.innerHTML;
-        const enhancedText = enhanceText(originalText);
-        paragraph.innerHTML = enhancedText;
-      });
-    }
+    console.error("Novel Dialogue Enhancer: LLM enhancement failed completely", error);
+    // Fall back to standard enhancement
+    enhancePageWithRules();
   }
 }
 
@@ -403,18 +421,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     chrome.storage.sync.get({ useLLM: false }, function(data) {
       settings.useLLM = data.useLLM;
       
-      const success = enhancePage();
-      
-      if (success) {
+      // Start the enhancement process
+      enhancePage().then(() => {
         const stats = window.enhancerIntegration.getEnhancementStats();
         sendResponse({
           status: "enhanced",
           stats: stats,
           usedLLM: settings.useLLM
         });
-      } else {
-        sendResponse({status: "failed"});
-      }
+      }).catch(error => {
+        console.error("Enhancement failed:", error);
+        sendResponse({
+          status: "failed", 
+          error: error.message
+        });
+      });
     });
   }
   // Return true to indicate we'll respond asynchronously
