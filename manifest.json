@@ -2,15 +2,21 @@
   "name": "Novel Dialogue Enhancer",
   "version": "1.0",
   "description": "Enhances translated novel dialogues to sound more natural",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "permissions": [
+    "storage",
     "activeTab",
-    "storage"
+    "scripting"
   ],
   "host_permissions": [
     "*://*.fanmtl.com/*",
     "*://*.novelupdates.com/*",
     "*://*.wuxiaworld.com/*",
-    "*://*.webnovel.com/*"
+    "*://*.webnovel.com/*",
+    "http://localhost:11434/*"
   ],
   "action": {
     "default_popup": "popup.html",
