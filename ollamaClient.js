@@ -1,5 +1,4 @@
 // ollamaClient.js
-
 async function getModelName() {
     return new Promise(resolve =>
         chrome.storage.sync.get({ modelName: 'qwen3' }, data => resolve(data.modelName))
@@ -8,7 +7,7 @@ async function getModelName() {
 
 async function enhanceWithLLM(text) {
     const model = await getModelName();
-    const max_tokens=512;
+    const max_tokens = 512;
     const prompt = `You are the **Novel Dialogue Enhancer**, a Chrome extension that improves the quality of translated web novels.
 Objectives:
 - Natural Dialogue Enhancement: Automatically convert stiff, literally-translated dialogue or narration into more natural English
@@ -42,4 +41,13 @@ Enhance the following text to meet these objectives:
 }
 
 // Export for use in content or background scripts
-export { enhanceWithLLM };
+if (typeof module !== 'undefined') {
+    module.exports = {
+        enhanceWithLLM
+    };
+} else {
+    // For direct browser usage
+    window.ollamaClient = {
+        enhanceWithLLM
+    };
+}

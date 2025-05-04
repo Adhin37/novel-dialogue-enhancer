@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const enhancerToggle = document.getElementById('enhancerToggle');
   const preserveNamesToggle = document.getElementById('preserveNamesToggle');
   const fixPronounsToggle = document.getElementById('fixPronounsToggle');
+  const useLLMToggle = document.getElementById('use-llm-checkbox');
   const enhanceNowBtn = document.getElementById('enhanceNowBtn');
   const statusMessage = document.getElementById('statusMessage');
 
@@ -9,11 +10,13 @@ document.addEventListener('DOMContentLoaded', function() {
   chrome.storage.sync.get({
     enhancerEnabled: true,
     preserveNames: true,
-    fixPronouns: true
+    fixPronouns: true,
+    useLLM: false
   }, function(items) {
     enhancerToggle.checked = items.enhancerEnabled;
     preserveNamesToggle.checked = items.preserveNames;
     fixPronounsToggle.checked = items.fixPronouns;
+    useLLMToggle.checked = items.useLLM;
   });
 
   // Save settings when toggles change
@@ -28,6 +31,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
   fixPronounsToggle.addEventListener('change', function() {
     chrome.storage.sync.set({ fixPronouns: this.checked });
+  });
+
+  useLLMToggle.addEventListener('change', function() {
+    chrome.storage.sync.set({ useLLM: this.checked });
   });
 
   // Handle enhance now button

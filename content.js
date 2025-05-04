@@ -1,11 +1,12 @@
-// Content script for Novel Dialogue Enhancer - Modified to use advanced modules
+// Content script for Novel Dialogue Enhancer - Modified to use advanced modules including Ollama LLM
 
 // Global variables
 let contentElement = null;
 let settings = {
   enhancerEnabled: true,
   preserveNames: true,
-  fixPronouns: true
+  fixPronouns: true,
+  useLLM: false // Added LLM setting
 };
 let characterMap = {};
 let isEnhancing = false; // Flag to prevent recursive enhancement
@@ -18,12 +19,14 @@ function init() {
     'enhancerEnabled',
     'preserveNames',
     'fixPronouns',
+    'useLLM', // Added LLM setting
     'characterMap'
   ], function(data) {
     settings = {
       enhancerEnabled: data.enhancerEnabled !== undefined ? data.enhancerEnabled : true,
       preserveNames: data.preserveNames !== undefined ? data.preserveNames : true,
-      fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true
+      fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true,
+      useLLM: data.useLLM !== undefined ? data.useLLM : false // Load LLM setting
     };
     
     characterMap = data.characterMap || {};
@@ -87,7 +90,7 @@ function findContentElement() {
 }
 
 // Enhance the page content
-function enhancePage() {
+async function enhancePage() {
   // Guard against recursive enhancement
   if (isEnhancing) {
     pendingEnhancement = true;
@@ -109,26 +112,34 @@ function enhancePage() {
     
     // Reconnect observer
     if (typeof observer !== 'undefined' && observer && contentElement) {
-      observer.observe(contentElement, { childList: true, subtree: true });
+      setTimeout(() => {
+        observer.observe(contentElement, { childList: true, subtree: true });
+      }, 100);
     }
     
     return false;
   }
-  
+
   // Process the content
-  const paragraphs = contentElement.querySelectorAll('p');
-  if (paragraphs.length === 0) {
-    // If there are no paragraph elements, split by newlines
-    const text = contentElement.innerHTML;
-    const enhancedText = enhanceText(text);
-    contentElement.innerHTML = enhancedText;
+  if (settings.useLLM) {
+    // If LLM is enabled, we'll use it to enhance the content
+    await enhancePageWithLLM();
   } else {
-    // Process each paragraph
-    paragraphs.forEach(paragraph => {
-      const originalText = paragraph.innerHTML;
-      const enhancedText = enhanceText(originalText);
-      paragraph.innerHTML = enhancedText;
-    });
+    // Standard rule-based enhancement
+    const paragraphs = contentElement.querySelectorAll('p');
+    if (paragraphs.length === 0) {
+      // If there are no paragraph elements, split by newlines
+      const text = contentElement.innerHTML;
+      const enhancedText = enhanceText(text);
+      contentElement.innerHTML = enhancedText;
+    } else {
+      // Process each paragraph
+      paragraphs.forEach(paragraph => {
+        const originalText = paragraph.innerHTML;
+        const enhancedText = enhanceText(originalText);
+        paragraph.innerHTML = enhancedText;
+      });
+    }
   }
   
   // Update character map in storage
@@ -157,6 +168,81 @@ function enhancePage() {
   }
   
   return true;
+}
+
+// New function to enhance content using Ollama LLM
+async function enhancePageWithLLM() {
+  console.log("Novel Dialogue Enhancer: Using LLM enhancement");
+  
+  try {
+    // Process with paragraphs if available
+    const paragraphs = contentElement.querySelectorAll('p');
+    
+    if (paragraphs.length === 0) {
+      // If there are no paragraph elements, enhance the whole content
+      const originalText = contentElement.innerHTML;
+      
+      // First apply rule-based enhancements
+      const initialEnhancedText = enhanceText(originalText);
+      
+      // Then apply LLM enhancement
+      const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
+      contentElement.innerHTML = llmEnhancedText;
+    } else {
+      // Process each paragraph with batching for efficiency
+      // We'll process paragraphs in batches of 5 to avoid too many API calls
+      const batchSize = 5;
+      
+      for (let i = 0; i < paragraphs.length; i += batchSize) {
+        const batch = Array.from(paragraphs).slice(i, i + batchSize);
+        
+        // Combine the batch into a single text
+        let batchText = '';
+        batch.forEach(p => {
+          batchText += p.innerHTML + '\n\n';
+        });
+        
+        // First apply rule-based enhancements
+        const initialEnhanced = enhanceText(batchText);
+        
+        // Then apply LLM enhancement
+        const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
+        
+        // Split the enhanced text back into paragraphs
+        const enhancedParagraphs = llmEnhanced.split('\n\n');
+        
+        // Apply the enhanced text to each paragraph
+        for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
+          batch[j].innerHTML = enhancedParagraphs[j];
+        }
+      }
+    }
+    
+    // Update enhancement stats
+    window.enhancerIntegration.enhancementStats.totalDialoguesEnhanced += paragraphs.length || 1;
+    console.log("Novel Dialogue Enhancer: LLM enhancement complete");
+    
+  } catch (error) {
+    console.error("Novel Dialogue Enhancer: LLM enhancement failed", error);
+    
+    // Fallback to standard enhancement
+    console.log("Novel Dialogue Enhancer: Falling back to standard enhancement");
+    
+    const paragraphs = contentElement.querySelectorAll('p');
+    if (paragraphs.length === 0) {
+      // If there are no paragraph elements, split by newlines
+      const text = contentElement.innerHTML;
+      const enhancedText = enhanceText(text);
+      contentElement.innerHTML = enhancedText;
+    } else {
+      // Process each paragraph
+      paragraphs.forEach(paragraph => {
+        const originalText = paragraph.innerHTML;
+        const enhancedText = enhanceText(originalText);
+        paragraph.innerHTML = enhancedText;
+      });
+    }
+  }
 }
 
 // Enhance text by improving dialogues - updated to use integration module
@@ -313,17 +399,23 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     sendResponse({status: "ok"});
   } else if (request.action === "enhanceNow") {
     settings = request.settings;
-    const success = enhancePage();
-    
-    if (success) {
-      const stats = window.enhancerIntegration.getEnhancementStats();
-      sendResponse({
-        status: "enhanced",
-        stats: stats
-      });
-    } else {
-      sendResponse({status: "failed"});
-    }
+    // Also get the LLM setting since it might have been updated
+    chrome.storage.sync.get({ useLLM: false }, function(data) {
+      settings.useLLM = data.useLLM;
+      
+      const success = enhancePage();
+      
+      if (success) {
+        const stats = window.enhancerIntegration.getEnhancementStats();
+        sendResponse({
+          status: "enhanced",
+          stats: stats,
+          usedLLM: settings.useLLM
+        });
+      } else {
+        sendResponse({status: "failed"});
+      }
+    });
   }
   // Return true to indicate we'll respond asynchronously
   return true;

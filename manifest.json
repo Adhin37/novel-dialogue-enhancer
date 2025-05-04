@@ -39,6 +39,7 @@
         "genderUtils.js",
         "dialogueUtils.js",
         "enhancerIntegration.js",
+        "ollamaClient.js",
         "content.js"
       ],
       "run_at": "document_idle"

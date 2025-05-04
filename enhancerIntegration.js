@@ -1,7 +1,6 @@
 // enhancerIntegration.js - Integration module for Novel Dialogue Enhancer
 // This module combines the functionality of dialogueUtils and genderUtils
 // to provide a unified interface for text enhancement
-import { enhanceWithLLM } from './ollamaClient.js';
 
 // Enhancement statistics tracking
 const enhancementStats = {
@@ -220,23 +219,6 @@ function getEnhancementStats() {
     processingTime: Math.round(enhancementStats.processingTime)
   };
 }
-
-// async function processDialogueBlock(node) {
-//   const original = node.innerText;
-
-//   // First, apply rule-based fixes
-//   const fixed = applyRuleBasedEnhancements(original);
-
-//   // Then, if user enabled LLM mode, call local model
-//   const finalText = userSettings.useLLM
-//     ? await enhanceWithLLM(fixed)
-//     : fixed;
-
-//   node.innerText = finalText;
-// }
-
-// // Iterate through all dialogue nodes
-// document.querySelectorAll('.dialogue').forEach(processDialogueBlock);
 
 // Export functions for content script
 if (typeof module !== 'undefined') {
