@@ -1,0 +1,12 @@
+.vscode
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.swn
+*.swx
+*.sw~
+manifest.json.bak
+dist/
+build/
