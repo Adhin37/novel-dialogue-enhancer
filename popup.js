@@ -32,52 +32,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Handle enhance now button
   enhanceNowBtn.addEventListener('click', function() {
-    statusMessage.textContent = "Applying enhancement...";
-    
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       if (!tabs || tabs.length === 0) {
-        updateStatusWithError("No active tab found");
+        statusMessage.textContent = "Error: No active tab found";
         return;
       }
       
-      const activeTab = tabs[0];
-      
-      // Check if we can access this tab (depends on permissions in manifest)
-      const url = new URL(activeTab.url);
-      const canAccess = [
-        "fanmtl.com",
-        "novelupdates.com",
-        "wuxiaworld.com",
-        "webnovel.com"
-      ].some(domain => url.hostname.includes(domain));
-      
-      if (!canAccess) {
-        updateStatusWithError("Extension not enabled for this site");
-        return;
-      }
-      
-      // Send message with error handling
+      // Try to send message to content script with error handling
       try {
+        // First check if connection is possible
         chrome.tabs.sendMessage(
-          activeTab.id,
-          {
-            action: "enhanceNow",
-            settings: {
-              enhancerEnabled: enhancerToggle.checked,
-              preserveNames: preserveNamesToggle.checked,
-              fixPronouns: fixPronounsToggle.checked
-            }
-          },
-          // Add response callback
+          tabs[0].id, 
+          { action: "ping" }, 
           function(response) {
+            // If there's an error in the messaging, handle it here
             if (chrome.runtime.lastError) {
-              // Handle error if content script isn't ready
-              console.error(chrome.runtime.lastError.message);
-              updateStatusWithError("Content script not ready. Try reloading the page.");
+              statusMessage.textContent = "Extension not ready on this page";
+              setTimeout(() => {
+                statusMessage.textContent = "Ready";
+              }, 2000);
               return;
             }
             
-            // Only update status on successful response
+            // If we got here, connection works, so send the main message
+            chrome.tabs.sendMessage(tabs[0].id, {
+              action: "enhanceNow",
+              settings: {
+                enhancerEnabled: enhancerToggle.checked,
+                preserveNames: preserveNamesToggle.checked,
+                fixPronouns: fixPronounsToggle.checked
+              }
+            });
+            
+            // Update UI
             statusMessage.textContent = "Enhancement applied!";
             setTimeout(() => {
               statusMessage.textContent = "Ready";
@@ -85,7 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         );
       } catch (error) {
-        updateStatusWithError("Error: " + error.message);
+        statusMessage.textContent = "Error: " + error.message;
+        setTimeout(() => {
+          statusMessage.textContent = "Ready";
+        }, 2000);
       }
     });
   });
@@ -96,15 +86,6 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
       statusMessage.textContent = "Extension disabled";
     }
-  }
-  
-  function updateStatusWithError(message) {
-    statusMessage.textContent = message;
-    statusMessage.style.color = "red";
-    setTimeout(() => {
-      statusMessage.style.color = "";
-      updateStatus();
-    }, 3000);
   }
 
   updateStatus();

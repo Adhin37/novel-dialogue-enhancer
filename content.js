@@ -1,4 +1,4 @@
-// Content script for Novel Dialogue Enhancer
+// Content script for Novel Dialogue Enhancer - Modified to use advanced modules
 
 // Global variables
 let contentElement = null;
@@ -25,6 +25,9 @@ function init() {
     };
     
     characterMap = data.characterMap || {};
+    
+    // Initialize the integration module
+    window.enhancerIntegration.initEnhancerIntegration();
     
     // If enabled, enhance the page
     if (settings.enhancerEnabled) {
@@ -112,190 +115,57 @@ function enhancePage() {
     characters: characterMap
   });
   
+  // Log enhancement statistics
+  const stats = window.enhancerIntegration.getEnhancementStats();
+  console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
+  
   return true;
 }
 
-// Enhance text by improving dialogues
+// Enhance text by improving dialogues - updated to use integration module
 function enhanceText(text) {
-  // 1. Extract character names
-  if (settings.preserveNames || settings.fixPronouns) {
-    extractCharacterNames(text);
-  }
+  // Use the integrated enhancer function
+  const result = window.enhancerIntegration.enhanceTextIntegrated(text, settings, characterMap);
   
-  // 2. Fix dialogue patterns
-  text = fixDialoguePatterns(text);
+  // Update the character map
+  characterMap = result.characterMap;
   
-  // 3. Fix pronouns if enabled
-  if (settings.fixPronouns) {
-    text = fixPronouns(text);
-  }
-  
-  return text;
+  return result.enhancedText;
 }
 
-// Extract character names from text
+// The following legacy functions are kept for backward compatibility
+// but their implementation is delegated to the new utility modules
+
+// Extract character names from text - now delegated to integration module
 function extractCharacterNames(text) {
-  // Pattern to match: "Character name" followed by speech patterns
-  const namePatterns = [
-    /([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)(?:\s*said|\s*replied|\s*asked|\s*shouted|\s*exclaimed|\s*whispered|\s*spoke|\s*muttered)/g,
-    /"([^"]+)"\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\s*said/g,
-    /([A-Z][a-z]+(?:\s[A-Z][a-z]+)*):.*?"/g
-  ];
-  
-  namePatterns.forEach(pattern => {
-    const matches = [...text.matchAll(pattern)];
-    matches.forEach(match => {
-      const name = match[1].trim();
-      if (name.length > 1 && !characterMap[name]) {
-        // Guess gender based on common name endings or context
-        const gender = guessGender(name, text);
-        characterMap[name] = { gender };
-      }
-    });
-  });
+  const result = window.enhancerIntegration.enhanceTextIntegrated(text, { preserveNames: true }, characterMap);
+  characterMap = result.characterMap;
 }
 
-// Guess gender based on name patterns and context
+// Guess gender based on name patterns and context - now delegated to genderUtils
 function guessGender(name, text) {
-  // Common Chinese, Korean, Japanese name patterns
-  // This is an oversimplification, but can help in many cases
-  const malePrefixes = ['Mr', 'Mr.', 'Lord', 'Master', 'Brother', 'Uncle', 'Father', 'King', 'Prince', 'Duke'];
-  const femalePrefixes = ['Mrs', 'Mrs.', 'Ms', 'Ms.', 'Miss', 'Lady', 'Sister', 'Aunt', 'Mother', 'Queen', 'Princess', 'Duchess'];
-  
-  // Check for titles
-  for (const prefix of malePrefixes) {
-    if (name.startsWith(prefix + ' ')) return 'male';
-  }
-  
-  for (const prefix of femalePrefixes) {
-    if (name.startsWith(prefix + ' ')) return 'female';
-  }
-  
-  // Check context for pronouns used with this character
-  const contextRegex = new RegExp(`${name}[^.!?]*?\\s(he|she|his|her|him)\\s`, 'i');
-  const contextMatch = text.match(contextRegex);
-  
-  if (contextMatch) {
-    const pronoun = contextMatch[1].toLowerCase();
-    if (['he', 'his', 'him'].includes(pronoun)) return 'male';
-    if (['she', 'her'].includes(pronoun)) return 'female';
-  }
-  
-  // Check for common pronouns in subsequent sentences
-  const paragraphWithName = text.split('.').find(sentence => sentence.includes(name));
-  if (paragraphWithName) {
-    const nextSentences = text.split('.').slice(text.split('.').indexOf(paragraphWithName) + 1, text.split('.').indexOf(paragraphWithName) + 3).join('.');
-    
-    if (nextSentences.match(/\bhe\b|\bhis\b|\bhim\b/i)) return 'male';
-    if (nextSentences.match(/\bshe\b|\bher\b/i)) return 'female';
-  }
-  
-  // Default to unknown
-  return 'unknown';
+  return window.genderUtils.guessGender(name, text, characterMap);
 }
 
-// Fix dialogue patterns to be more natural
+// Fix dialogue patterns to be more natural - now delegated to dialogueUtils
 function fixDialoguePatterns(text) {
-  // Replace awkward dialogue patterns
-  text = text.replace(/"([^"]+)"\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\s*said/g, (match, dialogue, name) => {
-    // Enhance the dialogue
-    const enhancedDialogue = enhanceDialogue(dialogue);
-    return `"${enhancedDialogue}" ${name} said`;
-  });
-  
-  // Fix patterns like "Ye Tian said coldly"
-  text = text.replace(/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\s*said\s*coldly\s*[.,]/g, (match, name) => {
-    return `${name} said coldly,`;
-  });
-  
-  // Fix patterns like "Character snorted coldly"
-  text = text.replace(/([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)\s*snorted\s*coldly/g, (match, name) => {
-    const options = [
-      `${name} scoffed`,
-      `${name} sneered`,
-      `${name} laughed derisively`,
-      `${name} gave a cold snort`
-    ];
-    return options[Math.floor(Math.random() * options.length)];
-  });
-  
-  // Fix awkward exaggerated punctuation
-  text = text.replace(/!{2,}/g, '!');
-  text = text.replace(/\?{2,}/g, '?');
-  
-  // Fix spacing around punctuation
-  text = text.replace(/([.,!?;:])(\w)/g, '$1 $2');
-  
-  // Fix common awkward phrasings
-  text = text.replace(/not small/g, 'significant');
-  text = text.replace(/let out an? ([a-z]+)/g, (match, emotion) => {
-    if (['angry', 'furious', 'rage'].includes(emotion)) {
-      return 'let out a roar of anger';
-    } else if (['cold', 'chill'].includes(emotion)) {
-      return 'spoke with cold disdain';
-    } else {
-      return `let out a ${emotion}`;
-    }
-  });
-  
-  return text;
+  return window.dialogueUtils.fixDialoguePatterns(text);
 }
 
-// Enhance dialogue to be more natural
+// Enhance dialogue to be more natural - now delegated to dialogueUtils
 function enhanceDialogue(dialogue) {
-  // Remove excessive punctuation
-  dialogue = dialogue.replace(/!{2,}/g, '!');
-  dialogue = dialogue.replace(/\?{2,}/g, '?');
-  
-  // Fix common awkward translations
-  dialogue = dialogue.replace(/look for death/i, 'you\'re seeking death');
-  dialogue = dialogue.replace(/seeking for death/i, 'seeking death');
-  dialogue = dialogue.replace(/no way/i, 'impossible');
-  dialogue = dialogue.replace(/it's not good/i, 'this is bad');
-  dialogue = dialogue.replace(/you guys are not small/i, 'you guys are bold');
-  
-  // Fix common speech patterns
-  dialogue = dialogue.replace(/^([A-Za-z]+),\s*([a-z])/g, '$1, $2');
-  
-  return dialogue;
+  return window.dialogueUtils.enhanceDialogue(dialogue);
 }
 
-// Fix pronouns based on character map
+// Fix pronouns based on character map - now handled by integration module
 function fixPronouns(text) {
-  Object.keys(characterMap).forEach(name => {
-    if (characterMap[name].gender === 'unknown') return;
-    
-    const gender = characterMap[name].gender;
-    const incorrectPronouns = gender === 'male' ? ['she', 'her'] : ['he', 'his', 'him'];
-    const correctPronouns = gender === 'male' ? ['he', 'his', 'him'] : ['she', 'her', 'her'];
-    
-    // Find sentences with character name
-    const nameSentenceRegex = new RegExp(`([^.!?]*${name}[^.!?]*)[.!?]`, 'g');
-    const nameSentences = [...text.matchAll(nameSentenceRegex)];
-    
-    nameSentences.forEach(match => {
-      const sentence = match[1];
-      const sentenceIndex = match.index;
-      
-      // Check next few sentences for pronouns
-      const followingSentences = text.substring(sentenceIndex, sentenceIndex + sentence.length + 200);
-      
-      // Fix incorrect pronouns
-      incorrectPronouns.forEach((incorrect, i) => {
-        const correct = correctPronouns[i];
-        const pronounRegex = new RegExp(`\\b${incorrect}\\b`, 'g');
-        
-        if (followingSentences.match(pronounRegex)) {
-          text = text.replace(
-            new RegExp(`${escapeRegExp(sentence)}([^.!?]*${incorrect}\\b)`, 'g'),
-            `${sentence}$1`.replace(pronounRegex, correct)
-          );
-        }
-      });
-    });
-  });
+  const result = window.enhancerIntegration.enhanceTextIntegrated(
+    text, 
+    { fixPronouns: true }, 
+    characterMap
+  );
   
-  return text;
+  return result.enhancedText;
 }
 
 // Helper to escape regex special characters
@@ -305,11 +175,22 @@ function escapeRegExp(string) {
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  if (request.action === "enhanceNow") {
+  if (request.action === "ping") {
+    // Respond to ping to check if content script is ready
+    sendResponse({status: "ok"});
+  } else if (request.action === "enhanceNow") {
     settings = request.settings;
     const success = enhancePage();
-    // Send a response back to the popup
-    sendResponse({ success: success });
+    
+    if (success) {
+      const stats = window.enhancerIntegration.getEnhancementStats();
+      sendResponse({
+        status: "enhanced",
+        stats: stats
+      });
+    } else {
+      sendResponse({status: "failed"});
+    }
   }
   // Return true to indicate we'll respond asynchronously
   return true;
