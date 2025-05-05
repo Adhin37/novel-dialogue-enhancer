@@ -1,7 +1,7 @@
 // toaster.js - Snackbar/toaster notification system for Novel Dialogue Enhancer
 
 // Create and manage a snackbar/toaster notification at the top of the page
-class EnhancementToaster {
+class Toaster {
   constructor() {
     this.toasterId = 'novel-enhancer-toaster';
     this.progressId = 'novel-enhancer-progress';
@@ -247,5 +247,9 @@ class EnhancementToaster {
   }
 }
 
-// Export the toaster as a singleton
-window.enhancementToaster = new EnhancementToaster();
+// Export for use in content or background scripts
+if (typeof module !== 'undefined') {
+  module.exports = Toaster;
+} else {
+  window.toaster = Toaster;
+}
