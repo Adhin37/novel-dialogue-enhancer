@@ -1,4 +1,5 @@
 // Content script for Novel Dialogue Enhancer - Modified to use advanced modules including Ollama LLM
+// Added improved LLM integration and error handling
 
 // Global variables
 let contentElement = null;
@@ -34,11 +35,39 @@ function init() {
     // Initialize the integration module
     window.enhancerIntegration.initEnhancerIntegration();
     
+    // Check Ollama availability if LLM is enabled
+    if (settings.useLLM) {
+      checkOllamaStatus();
+    }
+  
     // If enabled, enhance the page
     if (settings.enhancerEnabled) {
       enhancePage();
     }
+    
   });
+}
+
+// Check if Ollama is running and working properly
+async function checkOllamaStatus() {
+  try {
+    const status = await window.ollamaClient.checkOllamaAvailability();
+    if (status.available) {
+      console.log(`Ollama is running (v${status.version})`);
+    } else {
+      console.warn(`Ollama is not available: ${status.reason}`);
+      // Notify user if they have LLM enabled but Ollama isn't working
+      chrome.runtime.sendMessage({
+        action: "showNotification",
+        data: {
+          title: "Ollama Not Available",
+          message: `LLM enhancement is enabled but Ollama is not available (${status.reason}). Rule-based enhancement will be used instead.`
+        }
+      });
+    }
+  } catch (err) {
+    console.error("Failed to check Ollama status:", err);
+  }
 }
 
 // Find the content element based on the website
@@ -91,9 +120,13 @@ function findContentElement() {
 
 // Enhance the page content
 async function enhancePage() {
+  console.log("Novel Dialogue Enhancer: Starting enhancement process");
+  console.time('enhancePage');
+  
   // Guard against recursive enhancement
   if (isEnhancing) {
     pendingEnhancement = true;
+    console.log("Enhancement already in progress, queuing request");
     return false;
   }
   
@@ -117,6 +150,7 @@ async function enhancePage() {
       }, 100);
     }
     
+    console.timeEnd('enhancePage');
     return false;
   }
 
@@ -155,6 +189,7 @@ async function enhancePage() {
     }
     
     isEnhancing = false;
+    console.timeEnd('enhancePage');
     
     // If another enhancement was requested while this one was in progress, do it now
     if (pendingEnhancement) {
@@ -168,6 +203,9 @@ async function enhancePage() {
 
 // Standard rule-based enhancement
 function enhancePageWithRules() {
+  console.log("Novel Dialogue Enhancer: Using rule-based enhancement");
+  console.time('ruleBasedEnhancement');
+  
   const paragraphs = contentElement.querySelectorAll('p');
   if (paragraphs.length === 0) {
     // If there are no paragraph elements, split by newlines
@@ -176,17 +214,25 @@ function enhancePageWithRules() {
     contentElement.innerHTML = enhancedText;
   } else {
     // Process each paragraph
-    paragraphs.forEach(paragraph => {
+    paragraphs.forEach((paragraph, index) => {
       const originalText = paragraph.innerHTML;
       const enhancedText = enhanceText(originalText);
       paragraph.innerHTML = enhancedText;
+      
+      // Log progress for large pages
+      if (paragraphs.length > 20 && index % 10 === 0) {
+        console.log(`Rule-based enhancement progress: ${index}/${paragraphs.length} paragraphs`);
+      }
     });
   }
+  
+  console.timeEnd('ruleBasedEnhancement');
 }
 
 // New function to enhance content using Ollama LLM
 async function enhancePageWithLLM() {
   console.log("Novel Dialogue Enhancer: Using LLM enhancement");
+  console.time('llmEnhancement');
   
   try {
     // Process with paragraphs if available
@@ -201,6 +247,7 @@ async function enhancePageWithLLM() {
       
       // Then apply LLM enhancement
       try {
+        console.log("Sending content to LLM for full-content enhancement");
         const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
         contentElement.innerHTML = llmEnhancedText;
       } catch (error) {
@@ -213,6 +260,11 @@ async function enhancePageWithLLM() {
       const batchSize = 3;
       
       for (let i = 0; i < paragraphs.length; i += batchSize) {
+        // Log progress for large pages
+        if (paragraphs.length > 10) {
+          console.log(`LLM enhancement progress: ${i}/${paragraphs.length} paragraphs`);
+        }
+        
         const batch = Array.from(paragraphs).slice(i, i + batchSize);
         
         // Combine the batch into a single text
@@ -226,6 +278,7 @@ async function enhancePageWithLLM() {
         
         // Then apply LLM enhancement
         try {
+          console.log(`Sending batch ${i}-${i+batch.length-1} to LLM (${batchText.length} chars)`);
           const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
           
           // Split the enhanced text back into paragraphs
@@ -260,6 +313,8 @@ async function enhancePageWithLLM() {
     console.error("Novel Dialogue Enhancer: LLM enhancement failed completely", error);
     // Fall back to standard enhancement
     enhancePageWithRules();
+  } finally {
+    console.timeEnd('llmEnhancement');
   }
 }
 
@@ -272,137 +327,6 @@ function enhanceText(text) {
   characterMap = result.characterMap;
   
   return result.enhancedText;
-}
-
-// FIXED: Removed the recursive call to enhancerIntegration
-// This function now uses a direct implementation instead of calling back to enhancerIntegration
-function extractCharacterNames(text, existingMap = {}) {
-  const characterMap = {...existingMap};
-  
-  // Pattern to match potential character names
-  // Looks for capitalized words followed by dialogue or speech verbs
-  const namePatterns = [
-    /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
-    /"([^"]+)"\s*,?\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered)/g,
-    /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s*:\s*"([^"]+)"/g
-  ];
-  
-  // Process each pattern
-  for (const pattern of namePatterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      // The name is either in group 1 or 2 depending on the pattern
-      const name = match[1].includes('"') ? match[2] : match[1];
-      
-      // Skip if it's not a name (common false positives)
-      if (isCommonNonName(name)) continue;
-      
-      // Add to character map if not already present
-      if (!characterMap[name]) {
-        const gender = guessGender(name, text);
-        characterMap[name] = {
-          gender,
-          appearances: 1
-        };
-      } else {
-        // Update existing character data
-        characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
-      }
-    }
-  }
-  
-  return characterMap;
-}
-
-// Check if a potential name is actually a common word or phrase
-// that shouldn't be considered a character name
-function isCommonNonName(word) {
-  const commonNonNames = [
-    "The", "Then", "This", "That", "These", "Those", "There", "Their", "They",
-    "However", "Suddenly", "Finally", "Eventually", "Certainly", "Perhaps",
-    "Maybe", "While", "When", "After", "Before", "During", "Within", "Without",
-    "Also", "Thus", "Therefore", "Hence", "Besides", "Moreover", "Although",
-    "Despite", "Since", "Because", "Nonetheless", "Nevertheless", "Regardless",
-    "Consequently", "Accordingly", "Meanwhile", "Afterwards", "Beforehand",
-    "Likewise", "Similarly", "Alternatively", "Conversely", "Instead",
-    "Otherwise", "Particularly", "Specifically", "Generally", "Usually",
-    "Typically", "Rarely", "Frequently", "Occasionally", "Normally"
-  ];
-  
-  return commonNonNames.includes(word);
-}
-
-// Guess gender based on name patterns and context - relies on genderUtils
-function guessGender(name, text) {
-  return window.genderUtils.guessGender(name, text, characterMap);
-}
-
-// Fix dialogue patterns to be more natural - delegated to dialogueUtils
-function fixDialoguePatterns(text) {
-  return window.dialogueUtils.fixDialoguePatterns(text);
-}
-
-// Enhance dialogue to be more natural - delegated to dialogueUtils
-function enhanceDialogue(dialogue) {
-  return window.dialogueUtils.enhanceDialogue(dialogue);
-}
-
-// Fix pronouns based on character map
-function fixPronouns(text) {
-  // Direct implementation to avoid circular dependency
-  let fixedText = text;
-  
-  // Process each character in the map
-  Object.keys(characterMap).forEach(name => {
-    const character = characterMap[name];
-    
-    // Skip if gender is unknown
-    if (character.gender === "unknown") return;
-    
-    // Create a regex to find sentences with the character name
-    const nameRegex = new RegExp(`([^.!?]*\\b${escapeRegExp(name)}\\b[^.!?]*(?:[.!?]))`, "g");
-    
-    // Find all sentences containing the character name
-    const matches = Array.from(fixedText.matchAll(nameRegex));
-    
-    // For each match, check the following text for pronoun consistency
-    matches.forEach(match => {
-      const sentence = match[0];
-      const sentenceIndex = match.index;
-      
-      // Look at the text after this sentence
-      const followingText = fixedText.substring(sentenceIndex + sentence.length);
-      
-      // Apply pronoun fixes based on gender
-      if (character.gender === "male") {
-        // Fix instances where female pronouns are used for male characters
-        const fixedFollowing = followingText
-          .replace(/\b(She|she)\b(?=\s)(?![^<]*>)/g, "He")
-          .replace(/\b(Her|her)\b(?=\s)(?![^<]*>)/g, match => {
-            // Determine if it's a possessive or object pronoun
-            return /\b(Her|her)\b\s+([\w-]+)/i.test(match) ? "His" : "Him";
-          })
-          .replace(/\b(herself)\b(?=\s)(?![^<]*>)/g, "himself");
-        
-        if (followingText !== fixedFollowing) {
-          fixedText = fixedText.substring(0, sentenceIndex + sentence.length) + fixedFollowing;
-        }
-      } else if (character.gender === "female") {
-        // Fix instances where male pronouns are used for female characters
-        const fixedFollowing = followingText
-          .replace(/\b(He|he)\b(?=\s)(?![^<]*>)/g, "She")
-          .replace(/\b(His|his)\b(?=\s)(?![^<]*>)/g, "Her")
-          .replace(/\b(Him|him)\b(?=\s)(?![^<]*>)/g, "Her")
-          .replace(/\b(himself)\b(?=\s)(?![^<]*>)/g, "herself");
-        
-        if (followingText !== fixedFollowing) {
-          fixedText = fixedText.substring(0, sentenceIndex + sentence.length) + fixedFollowing;
-        }
-      }
-    });
-  });
-  
-  return fixedText;
 }
 
 // Helper to escape regex special characters
