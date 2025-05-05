@@ -12,6 +12,7 @@ let settings = {
 let characterMap = {};
 let isEnhancing = false; // Flag to prevent recursive enhancement
 let pendingEnhancement = false; // Flag to track if another enhancement was requested while one is in progress
+let terminateRequested = false; // Flag to track if termination was requested
 
 // Initialize
 function init() {
@@ -131,6 +132,7 @@ async function enhancePage() {
   }
   
   isEnhancing = true;
+  terminateRequested = false; // Reset termination flag
   
   // Temporarily disconnect observer to prevent triggering while we update content
   if (typeof observer !== 'undefined' && observer) {
@@ -192,7 +194,7 @@ async function enhancePage() {
     console.timeEnd('enhancePage');
     
     // If another enhancement was requested while this one was in progress, do it now
-    if (pendingEnhancement) {
+    if (pendingEnhancement && !terminateRequested) {
       pendingEnhancement = false;
       setTimeout(enhancePage, 10);
     }
@@ -215,6 +217,12 @@ function enhancePageWithRules() {
   } else {
     // Process each paragraph
     paragraphs.forEach((paragraph, index) => {
+      // Check if termination was requested during processing
+      if (terminateRequested) {
+        console.log("Rule-based enhancement terminated by user");
+        return;
+      }
+      
       const originalText = paragraph.innerHTML;
       const enhancedText = enhanceText(originalText);
       paragraph.innerHTML = enhancedText;
@@ -251,8 +259,23 @@ async function enhancePageWithLLM() {
       
       // Then apply LLM enhancement
       try {
+        // Check if termination was requested
+        if (terminateRequested) {
+          console.log("LLM enhancement terminated by user before processing");
+          contentElement.innerHTML = initialEnhancedText;
+          return;
+        }
+        
         console.log("Sending content to LLM for full-content enhancement");
         const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
+        
+        // Check again if termination was requested during LLM processing
+        if (terminateRequested) {
+          console.log("LLM enhancement terminated by user after processing");
+          contentElement.innerHTML = initialEnhancedText;
+          return;
+        }
+        
         contentElement.innerHTML = llmEnhancedText;
       } catch (error) {
         console.warn("LLM enhancement failed, using rule-based result:", error);
@@ -268,6 +291,12 @@ async function enhancePageWithLLM() {
       console.log(`Processing ${totalParagraphs} paragraphs in chunks of ${chunkSize}`);
       
       for (let i = 0; i < paragraphs.length; i += chunkSize) {
+        // Check if termination was requested before processing this batch
+        if (terminateRequested) {
+          console.log(`LLM enhancement terminated by user at batch ${i}/${paragraphs.length}`);
+          break;
+        }
+        
         // Log progress
         console.log(`LLM enhancement progress: ${i}/${paragraphs.length} paragraphs`);
         
@@ -288,6 +317,12 @@ async function enhancePageWithLLM() {
           console.log(`Sending large batch ${i}-${i+batch.length-1} to LLM (${batchText.length} chars)`);
           const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
           
+          // Check if termination was requested during LLM processing
+          if (terminateRequested) {
+            console.log(`LLM enhancement terminated by user during batch ${i}-${i+batch.length-1}`);
+            break;
+          }
+          
           // Split the enhanced text back into paragraphs
           const enhancedParagraphs = llmEnhanced.split('\n\n');
           
@@ -306,7 +341,7 @@ async function enhancePageWithLLM() {
         }
         
         // Add a small delay between batches to avoid overwhelming the API
-        if (i + chunkSize < paragraphs.length) {
+        if (i + chunkSize < paragraphs.length && !terminateRequested) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
@@ -325,8 +360,39 @@ async function enhancePageWithLLM() {
   }
 }
 
+// Function to handle termination requests
+function handleTerminationRequest() {
+  if (isEnhancing) {
+    console.log("Termination requested while enhancement in progress");
+    terminateRequested = true;
+    
+    // Notify the background script to terminate any pending LLM requests
+    chrome.runtime.sendMessage({
+      action: "terminateAllRequests"
+    });
+    
+    // Set a timeout to reset the flag if the enhancement process doesn't end
+    setTimeout(() => {
+      if (isEnhancing) {
+        console.warn("Enhancement process didn't terminate properly, forcing reset");
+        isEnhancing = false;
+        pendingEnhancement = false;
+      }
+    }, 2000);
+  } else {
+    console.log("Termination requested but no enhancement in progress");
+    terminateRequested = false;
+    pendingEnhancement = false;
+  }
+}
+
 // Enhance text by improving dialogues - updated to use integration module
 function enhanceText(text) {
+  // Check if termination was requested
+  if (terminateRequested) {
+    return text; // Return the original text without enhancement
+  }
+  
   // Use the integrated enhancer function
   const result = window.enhancerIntegration.enhanceTextIntegrated(text, settings, characterMap);
   
@@ -368,6 +434,21 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         });
       });
     });
+  } else if (request.action === "terminateOperations") {
+    // NEW: Handle termination requests from popup
+    console.log("Termination request received from popup");
+    handleTerminationRequest();
+    sendResponse({status: "terminating"});
+  } else if (request.action === "updatePageStatus") {
+    // Handle page status updates
+    console.log(`Page status updated: disabled=${request.disabled}`);
+    
+    // If page is being disabled, terminate any operations
+    if (request.disabled) {
+      handleTerminationRequest();
+    }
+    
+    sendResponse({status: "updated"});
   }
   // Return true to indicate we'll respond asynchronously
   return true;
@@ -378,7 +459,7 @@ init();
 
 // Add mutation observer to handle dynamic content
 const observer = new MutationObserver(function(mutations) {
-  if (settings.enhancerEnabled && !isEnhancing) {
+  if (settings.enhancerEnabled && !isEnhancing && !terminateRequested) {
     // Check if new paragraphs were added
     let newContentAdded = false;
     

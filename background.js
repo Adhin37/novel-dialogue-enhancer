@@ -2,6 +2,9 @@
 // Keep track of character maps across pages
 let globalCharacterMap = {};
 
+// Track active AbortControllers to allow terminating requests
+let activeRequestControllers = new Map();
+
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateCharacterMap") {
@@ -30,6 +33,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       
       // Create an AbortController for timeout handling
       const controller = new AbortController();
+      const requestId = Date.now().toString();
+      activeRequestControllers.set(requestId, controller);
+      
       const timeoutId = setTimeout(() => controller.abort(), OLLAMA_REQUEST_TIMEOUT);
       
       // Handle streamed responses if enabled
@@ -90,7 +96,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           return processStream();
         })
         .catch(error => {
-          if (error.name === 'AbortError') {
+          const isAborted = error.name === 'AbortError';
+          
+          if (isAborted && controller.signal.reason === 'USER_TERMINATED') {
+            console.log("Ollama request was manually terminated");
+            sendResponse({ 
+              error: "Request was terminated",
+              terminated: true,
+              enhancedText: responseStarted ? fullResponse : null
+            });
+          } else if (isAborted) {
             console.error("Ollama request timed out after", OLLAMA_REQUEST_TIMEOUT, "ms");
             sendResponse({ 
               error: `Request timed out after ${OLLAMA_REQUEST_TIMEOUT/1000} seconds`,
@@ -104,6 +119,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })
         .finally(() => {
           clearTimeout(timeoutId);
+          activeRequestControllers.delete(requestId);
         });
       } else {
         // Non-streaming implementation
@@ -158,10 +174,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           }
         })
         .catch(error => {
-          // Check if this is a timeout
+          // Check if this is a timeout or user-initiated abort
           if (error.name === 'AbortError') {
-            console.error("Ollama request timed out after", OLLAMA_REQUEST_TIMEOUT, "ms");
-            sendResponse({ error: `Request timed out after ${OLLAMA_REQUEST_TIMEOUT/1000} seconds` });
+            const isUserTerminated = controller.signal.reason === 'USER_TERMINATED';
+            
+            if (isUserTerminated) {
+              console.log("Ollama request was manually terminated");
+              sendResponse({ 
+                error: "Request was terminated",
+                terminated: true
+              });
+            } else {
+              console.error("Ollama request timed out after", OLLAMA_REQUEST_TIMEOUT, "ms");
+              sendResponse({ error: `Request timed out after ${OLLAMA_REQUEST_TIMEOUT/1000} seconds` });
+            }
           } else {
             console.error("Ollama request failed:", error);
             sendResponse({ error: error.message });
@@ -169,12 +195,26 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         })
         .finally(() => {
           clearTimeout(timeoutId);
+          activeRequestControllers.delete(requestId);
         });
       }
     });
     
     // Return true to indicate we'll send the response asynchronously
     return true;
+  } else if (request.action === "terminateAllRequests") {
+    // Terminate all active requests
+    console.log(`Terminating ${activeRequestControllers.size} active requests`);
+    
+    for (const controller of activeRequestControllers.values()) {
+      // Set reason so we can distinguish from timeouts
+      controller.abort('USER_TERMINATED');
+    }
+    
+    // Clear the collection
+    activeRequestControllers.clear();
+    
+    sendResponse({ status: "terminated", count: activeRequestControllers.size });
   } else if (request.action === "checkOllamaAvailability") {
     // Handler for checking Ollama availability
     fetch('http://localhost:11434/api/version', {

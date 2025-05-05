@@ -42,6 +42,28 @@ document.addEventListener('DOMContentLoaded', function() {
   // Save settings when toggles change
   enhancerToggle.addEventListener('change', function() {
     chrome.storage.sync.set({ enhancerEnabled: this.checked });
+    
+    // If turning off the extension, send signal to terminate any in-progress LLM operations
+    if (!this.checked) {
+      chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (tabs && tabs.length > 0) {
+          try {
+            chrome.tabs.sendMessage(tabs[0].id, {
+              action: "terminateOperations"
+            });
+            statusMessage.textContent = "Extension disabled, operations terminated";
+          } catch (error) {
+            console.error("Failed to send termination signal:", error);
+          }
+        }
+      });
+      
+      // Also notify background script to abort any pending requests
+      chrome.runtime.sendMessage({
+        action: "terminateAllRequests"
+      });
+    }
+    
     updateStatus();
   });
 
@@ -52,6 +74,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!disabledPages.includes(currentTabUrl)) {
           disabledPages.push(currentTabUrl);
         }
+        
+        // If disabling on current page, also terminate operations
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+          if (tabs && tabs.length > 0) {
+            try {
+              chrome.tabs.sendMessage(tabs[0].id, {
+                action: "terminateOperations"
+              });
+            } catch (error) {
+              console.error("Failed to send termination signal:", error);
+            }
+          }
+        });
       } else {
         // Remove current page from disabled list
         disabledPages = disabledPages.filter(page => page !== currentTabUrl);
