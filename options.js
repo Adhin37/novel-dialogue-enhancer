@@ -1,16 +1,16 @@
 // options.js
 document.addEventListener('DOMContentLoaded', function () {
-  const modelNameInput = document.getElementById('modelName');
+  const modelNameInput = document.getElementById('model-name');
   const saveButton = document.getElementById('save');
-  const maxChunkSizeSlider = document.getElementById('maxChunkSize');
-  const maxChunkSizeValue = document.getElementById('maxChunkSizeValue');
+  const maxChunkSizeSlider = document.getElementById('max-chunk-size');
+  const maxChunkSizeValue = document.getElementById('max-chunk-size-value');
   const timeoutSlider = document.getElementById('timeout');
-  const timeoutValue = document.getElementById('timeoutValue');
-  const testOllamaButton = document.getElementById('testOllama');
-  const ollamaStatus = document.getElementById('ollamaStatus');
-  const whitelistItemsContainer = document.getElementById('whitelistItems');
-  const clearAllBtn = document.getElementById('clearAll');
-  const closeBtn = document.getElementById('closeBtn');
+  const timeoutValue = document.getElementById('timeout-value');
+  const testOllamaButton = document.getElementById('test-ollama');
+  const ollamaStatus = document.getElementById('ollama-status');
+  const whitelistItemsContainer = document.getElementById('whitelist-items');
+  const clearAllBtn = document.getElementById('clear-all');
+  const closeBtn = document.getElementById('close-btn');
 
   // Load whitelist data
   loadWhitelist();

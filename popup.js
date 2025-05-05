@@ -1,15 +1,16 @@
 document.addEventListener('DOMContentLoaded', function() {
   // Get all UI elements
-  const pauseButton = document.getElementById('pauseButton');
-  const pauseIcon = document.getElementById('pauseIcon');
-  const whitelistButton = document.getElementById('whitelistButton');
-  const whitelistText = document.getElementById('whitelistText');
-  const preserveNamesToggle = document.getElementById('preserveNamesToggle');
-  const fixPronounsToggle = document.getElementById('fixPronounsToggle');
+  const pauseButton = document.getElementById('pause-button');
+  const pauseIcon = document.getElementById('pause-icon');
+  const whitelistButton = document.getElementById('whitelist-button');
+  const whitelistText = document.getElementById('whitelist-text');
+  const preserveNamesToggle = document.getElementById('preserve-names-toggle');
+  const fixPronounsToggle = document.getElementById('fix-pronouns-toggle');
   const useLLMToggle = document.getElementById('use-llm-checkbox');
-  const enhanceNowBtn = document.getElementById('enhanceNowBtn');
-  const statusMessage = document.getElementById('statusMessage');
-  const currentSite = document.getElementById('currentSite');
+  const enhanceNowBtn = document.getElementById('enhance-now-btn');
+  const statusMessage = document.getElementById('status-message');
+  const currentSite = document.getElementById('current-site');
+  const pauseBtn = document.getElementById('pause-button');
 
   // Store current tab URL for whitelist functionality
   let currentTabUrl = '';
@@ -76,7 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
     updateStatus();
   });
 
-  document.getElementById("pauseButton").addEventListener("click", function () {
+  pauseBtn.addEventListener("click", function () {
     document.getElementById("header").classList.toggle("paused");
   });
 

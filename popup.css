@@ -69,7 +69,7 @@ body {
   align-items: center;
 }
 
-#currentSite {
+#current-site {
   font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -170,7 +170,7 @@ input:checked + .slider:before {
   margin: 15px 0;
 }
 
-button#enhanceNowBtn {
+button#enhance-now-btn {
   background-color: #4CAF50;
   color: white;
   padding: 12px 15px;
@@ -184,12 +184,12 @@ button#enhanceNowBtn {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-button#enhanceNowBtn:hover {
-  background-color: #45a049;
+button#enhance-now-btn:hover {
+  background-color: #2E7D32;
 }
 
-button#enhanceNowBtn:active {
-  background-color: #3e8e41;
+button#enhance-now-btn:active {
+  background-color: #3a853c;
   transform: translateY(1px);
 }
 
