@@ -10,12 +10,22 @@
   <h1>Novel Dialogue Enhancer</h1>
 
   <div class="toggle-container">
-    <span>Enable Enhancement</span>
+    <span>Enable Extension</span>
     <label class="toggle">
       <input type="checkbox" id="enhancerToggle" checked>
       <span class="slider"></span>
     </label>
   </div>
+
+  <div class="toggle-container">
+    <span>Disable on Current Page</span>
+    <label class="toggle">
+      <input type="checkbox" id="disableOnPageToggle">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div class="divider"></div>
 
   <div class="toggle-container">
     <span>Preserve Names</span>
@@ -44,6 +54,10 @@
   <button id="enhanceNowBtn">Enhance Current Page</button>
 
   <div class="status" id="statusMessage">Ready</div>
+
+  <div class="footer">
+    <a href="options.html" target="_blank">Advanced Settings</a>
+  </div>
 
   <script src="popup.js"></script>
 </body>

@@ -1,60 +1,89 @@
 // options.js
-const input = document.getElementById('modelName');
-const saveBtn = document.getElementById('save');
+document.addEventListener('DOMContentLoaded', function() {
+  const modelNameInput = document.getElementById('modelName');
+  const saveButton = document.getElementById('save');
+  const maxChunkSizeSlider = document.getElementById('maxChunkSize');
+  const maxChunkSizeValue = document.getElementById('maxChunkSizeValue');
+  const timeoutSlider = document.getElementById('timeout');
+  const timeoutValue = document.getElementById('timeoutValue');
+  const testOllamaButton = document.getElementById('testOllama');
+  const ollamaStatus = document.getElementById('ollamaStatus');
 
-// Load existing value
-chrome.storage.sync.get({ modelName: 'qwen3:8b' }, ({ modelName }) => {
-    input.value = modelName;
-});
+  // Load saved settings
+  chrome.storage.sync.get({
+    modelName: 'qwen3:8b',
+    maxChunkSize: 8000,
+    timeout: 120
+  }, function(data) {
+    modelNameInput.value = data.modelName;
+    maxChunkSizeSlider.value = data.maxChunkSize;
+    maxChunkSizeValue.textContent = data.maxChunkSize;
+    timeoutSlider.value = data.timeout;
+    timeoutValue.textContent = data.timeout;
+  });
 
-saveBtn.onclick = () => {
-    chrome.storage.sync.set({ modelName: input.value.trim() || 'qwen3:8b' });
-};
+  // Update value displays for sliders
+  maxChunkSizeSlider.addEventListener('input', function() {
+    maxChunkSizeValue.textContent = this.value;
+  });
 
-document.getElementById('testOllama').addEventListener('click', async function() {
-  const statusElement = document.getElementById('ollamaStatus');
-  statusElement.textContent = 'Testing Ollama connection...';
-  statusElement.className = 'status-message pending';
-  
-  try {
-    // Send a message to the background script to check Ollama
-    chrome.runtime.sendMessage({
-      action: "checkOllamaAvailability"
-    }, response => {
-      if (chrome.runtime.lastError) {
-        statusElement.textContent = `Error: ${chrome.runtime.lastError.message}`;
-        statusElement.className = 'status-message error';
-        return;
-      }
+  timeoutSlider.addEventListener('input', function() {
+    timeoutValue.textContent = this.value;
+  });
+
+  // Save settings
+  saveButton.addEventListener('click', function() {
+    const maxChunkSize = parseInt(maxChunkSizeSlider.value);
+    const timeout = parseInt(timeoutSlider.value);
+    
+    chrome.storage.sync.set({
+      modelName: modelNameInput.value.trim() || 'qwen3:8b',
+      maxChunkSize: maxChunkSize,
+      timeout: timeout
+    }, function() {
+      // Show temporary save confirmation
+      const saveButton = document.getElementById('save');
+      const originalText = saveButton.textContent;
+      saveButton.textContent = 'Settings Saved!';
+      saveButton.style.backgroundColor = '#4CAF50';
       
-      if (response.available) {
-        statusElement.textContent = `Connected successfully! Ollama version: ${response.version}`;
-        if (response.models && response.models.length > 0) {
-          statusElement.textContent += `\nAvailable models: ${response.models.join(', ')}`;
-        }
-        statusElement.className = 'status-message success';
-      } else {
-        statusElement.textContent = `Ollama not available: ${response.reason}`;
-        statusElement.className = 'status-message error';
-      }
+      setTimeout(function() {
+        saveButton.textContent = originalText;
+        saveButton.style.backgroundColor = '#2196F3';
+      }, 1500);
     });
-  } catch (err) {
-    statusElement.textContent = `Error: ${err.message}`;
-    statusElement.className = 'status-message error';
-  }
-});
+  });
 
-// Load the maxChunkSize setting
-chrome.storage.sync.get(['maxChunkSize'], function(data) {
-  if (data.maxChunkSize) {
-    document.getElementById('maxChunkSize').value = data.maxChunkSize;
-  }
-});
-
-// Save the maxChunkSize setting when changed
-document.getElementById('maxChunkSize').addEventListener('change', function() {
-  const value = parseInt(this.value);
-  if (value >= 500 && value <= 8000) {
-    chrome.storage.sync.set({ maxChunkSize: value });
-  }
+  // Test Ollama connection
+  testOllamaButton.addEventListener('click', async function() {
+    ollamaStatus.textContent = 'Testing Ollama connection...';
+    ollamaStatus.className = 'status-message pending';
+    
+    try {
+      // Send a message to the background script to check Ollama
+      chrome.runtime.sendMessage({
+        action: "checkOllamaAvailability"
+      }, response => {
+        if (chrome.runtime.lastError) {
+          ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
+          ollamaStatus.className = 'status-message error';
+          return;
+        }
+        
+        if (response.available) {
+          ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
+          if (response.models && response.models.length > 0) {
+            ollamaStatus.textContent += `\nAvailable models: ${response.models.join(', ')}`;
+          }
+          ollamaStatus.className = 'status-message success';
+        } else {
+          ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
+          ollamaStatus.className = 'status-message error';
+        }
+      });
+    } catch (err) {
+      ollamaStatus.textContent = `Error: ${err.message}`;
+      ollamaStatus.className = 'status-message error';
+    }
+  });
 });

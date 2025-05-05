@@ -1,44 +1,63 @@
-<!-- options.html -->
-<div class="option-group">
-    <h3>Advanced LLM Settings</h3>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Novel Dialogue Enhancer - Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header>
+    <h1>Novel Dialogue Enhancer</h1>
+    <p>Configure your extension settings for optimal dialogue enhancement</p>
+  </header>
 
-    <div class="option">
-        <label for="maxChunkSize">Maximum chunk size (characters):</label>
-        <input type="number" id="maxChunkSize" min="500" max="8000" step="100" value="2000">
+  <div class="container">
+    <div class="option-group">
+      <h3>General Settings</h3>
+      
+      <div class="option">
+        <label for="modelName">Ollama Model Name:</label>
+        <input id="modelName" type="text" placeholder="qwen3:8b" />
         <div class="option-description">
-            <p>Sets the maximum size of text chunks sent to Ollama.</p>
-            <p class="hint">Lower values are faster but may reduce quality. Higher values may improve quality but
-                require more resources.</p>
+          <p>Specify which Ollama model to use for text enhancement</p>
+          <p class="hint">Common models: qwen3:8b, llama3:8b, phi3:medium</p>
         </div>
+      </div>
     </div>
 
-    <div class="option">
-        <button id="testOllama" class="secondary-button">Test Ollama Connection</button>
-        <div id="ollamaStatus" class="status-message"></div>
-        <div class="option-description">
-            <p>Test if your Ollama setup is working correctly.</p>
-        </div>
-    </div>
+    <div class="option-group">
+      <h3>Advanced LLM Settings</h3>
 
-    <div class="setting-item">
+      <div class="setting-item">
         <label for="maxChunkSize">Maximum Chunk Size:</label>
         <input type="range" id="maxChunkSize" min="2000" max="16000" step="1000" value="8000">
         <span id="maxChunkSizeValue">8000</span> characters
-        <p class="description">Larger chunks provide better context but take longer to process</p>
-    </div>
+        <div class="option-description">
+          <p>Sets the maximum size of text chunks sent to Ollama</p>
+          <p class="hint">Lower values are faster but may reduce quality. Higher values may improve quality but require more resources.</p>
+        </div>
+      </div>
 
-    <div class="setting-item">
+      <div class="setting-item">
         <label for="timeout">LLM Request Timeout:</label>
         <input type="range" id="timeout" min="30" max="300" step="30" value="120">
         <span id="timeoutValue">120</span> seconds
-        <p class="description">Maximum time to wait for LLM responses</p>
+        <div class="option-description">
+          <p>Maximum time to wait for LLM responses</p>
+        </div>
+      </div>
+
+      <div class="option">
+        <button id="testOllama" class="secondary-button">Test Ollama Connection</button>
+        <div id="ollamaStatus" class="status-message"></div>
+        <div class="option-description">
+          <p>Test if your Ollama setup is working correctly</p>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <label>
-        Ollama model name:
-        <input id="modelName" type="text" placeholder="qwen3:8b" />
-    </label>
-    <button id="save">Save</button>
+  <button id="save">Save Settings</button>
 
-</div>
-<script src="options.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
