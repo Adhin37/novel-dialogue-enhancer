@@ -1,10 +1,43 @@
-// ollamaClient.js
+// ollamaClient.js - Improved with chunking and better timeout handling
 // Define a timeout for local Ollama calls (milliseconds)
-const CLIENT_TIMEOUT = 30000;
+const CLIENT_TIMEOUT = 60000; // Increased to 60 seconds
+
 async function getModelName() {
     return new Promise(resolve =>
-        chrome.storage.sync.get({ modelName: 'llama3' }, data => resolve(data.modelName))
+        chrome.storage.sync.get({ modelName: 'qwen3:8b' }, data => resolve(data.modelName))
     );
+}
+
+// Split text into manageable chunks for the LLM
+function splitIntoChunks(text, maxChunkSize = 2000) {
+    // If the text is short enough, return it as a single chunk
+    if (text.length <= maxChunkSize) {
+        return [text];
+    }
+    
+    const chunks = [];
+    
+    // Try to split at paragraph boundaries
+    const paragraphs = text.split(/\n\n|\r\n\r\n/);
+    let currentChunk = '';
+    
+    for (const paragraph of paragraphs) {
+        // If adding this paragraph would exceed the limit
+        if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
+            chunks.push(currentChunk);
+            currentChunk = paragraph;
+        } else {
+            currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+        }
+    }
+    
+    // Add the last chunk if it's not empty
+    if (currentChunk) {
+        chunks.push(currentChunk);
+    }
+    
+    console.log(`Split text into ${chunks.length} chunks (avg size: ${Math.round(text.length / chunks.length)})`);
+    return chunks;
 }
 
 async function enhanceWithLLM(text) {
@@ -13,54 +46,53 @@ async function enhanceWithLLM(text) {
         const model = await getModelName();
         console.log(`Using Ollama model: ${model}`);
         
-        const max_tokens = 4096;
-        const prompt = `You are the **Novel Dialogue Enhancer** that improves the quality of translated web novels.
-Objectives:
-- Natural Dialogue Enhancement: Automatically convert stiff, literally-translated dialogue or narration into more natural English
-- Character Name Preservation: Keep original character names intact (Chinese/Korean/Japanese)
-- Title translation: Translate titles/cities (if not already translated) into English
-- Pronoun Correction: Fix common pronoun mistakes by tracking character genders
-
-Enhance the following text to meet these objectives:
-
-"${text}"`;
-
-        console.log(`Starting LLM enhancement request (text length: ${text.length})`);
+        // Get user's preferred max chunk size
+        const { maxChunkSize = 2000 } = await new Promise(resolve => 
+            chrome.storage.sync.get({ maxChunkSize: 2000 }, resolve)
+        );
         
-        // Create a promise that will reject after timeout
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error(`LLM request timed out after ${CLIENT_TIMEOUT/1000} seconds`)), CLIENT_TIMEOUT);
-        });
+        // Split the text into chunks
+        const chunks = splitIntoChunks(text, maxChunkSize);
+        console.log(`Processing ${chunks.length} chunks with Ollama`);
         
-        // Create the actual request promise
-        const requestPromise = new Promise((resolve, reject) => {
-            chrome.runtime.sendMessage({
-                action: "ollamaRequest",
-                data: {
-                    model,
-                    prompt,
-                    max_tokens,
-                    temperature: 0.2 // Lower temperature for more consistent outputs
-                }
-            }, response => {
-                if (chrome.runtime.lastError) {
-                    console.warn('LLM communication error:', chrome.runtime.lastError);
-                    return reject(chrome.runtime.lastError);
-                }
+        // Process each chunk
+        const enhancedChunks = [];
+        for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            console.log(`Processing chunk ${i+1}/${chunks.length} (size: ${chunk.length})`);
+            
+            const prompt = `You are a dialogue enhancer for translated web novels. Your task is to enhance the following text to make it sound more natural in English.
+INSTRUCTIONS:
+1. Improve dialogue naturalness while preserving the original meaning
+2. Make narration flow better in English
+3. Keep all character names exactly as they are
+4. Fix any pronoun inconsistencies
+5. Briefly translate any foreign titles/terms to English
+6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary
+7. IMPORTANT: Do not use markdown formatting or annotations
+/no_think
+
+TEXT TO ENHANCE:
+
+${chunk}`;
+
+            try {
+                const enhancedChunk = await processChunkWithLLM(model, prompt);
+                enhancedChunks.push(enhancedChunk);
+                console.log(`Successfully enhanced chunk ${i+1}/${chunks.length}`);
                 
-                if (response.error) {
-                    console.warn('LLM request failed:', response.error);
-                    return reject(new Error(response.error));
+                // Small delay between chunks to avoid overwhelming Ollama
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
-                
-                console.log('LLM enhancement successful, result length:', 
-                    response.enhancedText ? response.enhancedText.length : 0);
-                resolve(response.enhancedText || text);
-            });
-        });
+            } catch (chunkError) {
+                console.warn(`Failed to enhance chunk ${i+1}, using original:`, chunkError);
+                enhancedChunks.push(chunk); // Use original chunk if enhancement fails
+            }
+        }
         
-        // Race between the timeout and the actual request
-        const enhancedText = await Promise.race([requestPromise, timeoutPromise]);
+        // Combine all enhanced chunks
+        const enhancedText = enhancedChunks.join('\n\n');
         console.timeEnd('enhanceWithLLM');
         return enhancedText;
     } catch (err) {
@@ -80,6 +112,46 @@ Enhance the following text to meet these objectives:
     }
 }
 
+// Process a single chunk with the LLM
+async function processChunkWithLLM(model, prompt) {
+    // Create a promise that will reject after timeout
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(`LLM request timed out after ${CLIENT_TIMEOUT/1000} seconds`)), CLIENT_TIMEOUT);
+    });
+    
+    // Create the actual request promise
+    const requestPromise = new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({
+            action: "ollamaRequest",
+            data: {
+                model,
+                prompt,
+                max_tokens: 4096,
+                temperature: 0.3,
+                stream: false,
+                options: {
+                    enable_thinking: false
+                }
+            }
+        }, response => {
+            if (chrome.runtime.lastError) {
+                console.warn('LLM communication error:', chrome.runtime.lastError);
+                return reject(chrome.runtime.lastError);
+            }
+            
+            if (response.error) {
+                console.warn('LLM request failed:', response.error);
+                return reject(new Error(response.error));
+            }
+            
+            resolve(response.enhancedText || '');
+        });
+    });
+    
+    // Race between the timeout and the actual request
+    return Promise.race([requestPromise, timeoutPromise]);
+}
+
 // Utility function to check if Ollama is available
 async function checkOllamaAvailability() {
     try {
@@ -92,10 +164,6 @@ async function checkOllamaAvailability() {
                     console.warn('Ollama check communication error:', chrome.runtime.lastError);
                     resolve({ available: false, reason: chrome.runtime.lastError.message });
                     return;
-                }
-                
-                if (response.available) {
-                    console.log(`Ollama is available, version: ${response.version}`);
                 }
                 
                 resolve(response);

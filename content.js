@@ -306,7 +306,7 @@ async function enhancePageWithLLM() {
     }
     
     // Update enhancement stats
-    window.enhancerIntegration.enhancementStats.totalDialoguesEnhanced += paragraphs.length || 1;
+    window.enhancerIntegration.setTotalDialoguesEnhanced(window.enhancerIntegration.getEnhancementStats().totalDialoguesEnhanced + paragraphs.length || 1);
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
     
   } catch (error) {

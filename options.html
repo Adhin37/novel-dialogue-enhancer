@@ -1,7 +1,28 @@
 <!-- options.html -->
-<label>
-    Ollama model name:
-    <input id="modelName" type="text" placeholder="qwen3:8b" />
-</label>
-<button id="save">Save</button>
+<div class="option-group">
+    <h3>Advanced LLM Settings</h3>
+
+    <div class="option">
+        <label for="maxChunkSize">Maximum chunk size (characters):</label>
+        <input type="number" id="maxChunkSize" min="500" max="8000" step="100" value="2000">
+        <div class="option-description">
+            <p>Sets the maximum size of text chunks sent to Ollama.</p>
+            <p class="hint">Lower values are faster but may reduce quality. Higher values may improve quality but
+                require more resources.</p>
+        </div>
+    </div>
+
+    <div class="option">
+        <button id="testOllama" class="secondary-button">Test Ollama Connection</button>
+        <div id="ollamaStatus" class="status-message"></div>
+        <div class="option-description">
+            <p>Test if your Ollama setup is working correctly.</p>
+        </div>
+    </div>
+    <label>
+        Ollama model name:
+        <input id="modelName" type="text" placeholder="qwen3:8b" />
+    </label>
+    <button id="save">Save</button>
+</div>
 <script src="options.js"></script>

@@ -219,23 +219,32 @@ function getEnhancementStats() {
     processingTime: Math.round(enhancementStats.processingTime)
   };
 }
+/**
+ * Set the current enhancement statistics
+ * @return {object} - Enhancement statistics
+ */
+function setTotalDialoguesEnhanced(totalDialoguesEnhanced) {
+  enhancementStats.totalDialoguesEnhanced = totalDialoguesEnhanced;
+}
 
 // Export functions for content script
 if (typeof module !== 'undefined') {
   module.exports = {
     initEnhancerIntegration,
     enhanceTextIntegrated,
-    extractCharacterNamesInternal, // Renamed to avoid confusion
+    extractCharacterNamesInternal,
     fixPronounsIntegrated,
-    getEnhancementStats
+    getEnhancementStats,
+    setTotalDialoguesEnhanced
   };
 } else {
   // For direct browser usage
   window.enhancerIntegration = {
     initEnhancerIntegration,
     enhanceTextIntegrated,
-    extractCharacterNames: extractCharacterNamesInternal, // For backward compatibility 
+    extractCharacterNamesInternal,
     fixPronounsIntegrated,
-    getEnhancementStats
+    getEnhancementStats,
+    setTotalDialoguesEnhanced
   };
 }

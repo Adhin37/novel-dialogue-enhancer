@@ -32,8 +32,7 @@
         "*://*.fanmtl.com/*",
         "*://*.novelupdates.com/*",
         "*://*.wuxiaworld.com/*",
-        "*://*.webnovel.com/*",
-        "<all_urls>"
+        "*://*.webnovel.com/*"
       ],
       "js": [
         "genderUtils.js",
