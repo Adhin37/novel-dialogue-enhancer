@@ -19,10 +19,26 @@
             <p>Test if your Ollama setup is working correctly.</p>
         </div>
     </div>
+
+    <div class="setting-item">
+        <label for="maxChunkSize">Maximum Chunk Size:</label>
+        <input type="range" id="maxChunkSize" min="2000" max="16000" step="1000" value="8000">
+        <span id="maxChunkSizeValue">8000</span> characters
+        <p class="description">Larger chunks provide better context but take longer to process</p>
+    </div>
+
+    <div class="setting-item">
+        <label for="timeout">LLM Request Timeout:</label>
+        <input type="range" id="timeout" min="30" max="300" step="30" value="120">
+        <span id="timeoutValue">120</span> seconds
+        <p class="description">Maximum time to wait for LLM responses</p>
+    </div>
+
     <label>
         Ollama model name:
         <input id="modelName" type="text" placeholder="qwen3:8b" />
     </label>
     <button id="save">Save</button>
+
 </div>
 <script src="options.js"></script>

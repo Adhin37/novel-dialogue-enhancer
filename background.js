@@ -3,8 +3,7 @@
 let globalCharacterMap = {};
 
 // Timeout for Ollama requests (milliseconds)
-const OLLAMA_REQUEST_TIMEOUT = 120000; // Increased to 120 seconds for whole-content enhancement
-
+const OLLAMA_REQUEST_TIMEOUT = 180000;
 // Handle messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateCharacterMap") {

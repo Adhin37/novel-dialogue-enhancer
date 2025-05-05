@@ -229,12 +229,16 @@ function enhancePageWithRules() {
   console.timeEnd('ruleBasedEnhancement');
 }
 
-// New function to enhance content using Ollama LLM
 async function enhancePageWithLLM() {
   console.log("Novel Dialogue Enhancer: Using LLM enhancement");
   console.time('llmEnhancement');
   
   try {
+    // Get batch size setting
+    const { batchSize = 1 } = await new Promise(resolve => 
+      chrome.storage.sync.get({ batchSize: 1 }, resolve)
+    );
+    
     // Process with paragraphs if available
     const paragraphs = contentElement.querySelectorAll('p');
     
@@ -255,17 +259,20 @@ async function enhancePageWithLLM() {
         contentElement.innerHTML = initialEnhancedText;
       }
     } else {
-      // Process each paragraph with batching for efficiency
-      // We'll process paragraphs in batches of 3 to avoid too many API calls
-      const batchSize = 3;
+      // Process in larger chunks for better context
+      // Get paragraphs in larger segments
+      const totalParagraphs = paragraphs.length;
+      const idealChunkSize = Math.max(5, Math.ceil(totalParagraphs / 3)); // Aim for 3 chunks or fewer
+      const chunkSize = Math.min(idealChunkSize, 15); // Cap at 15 paragraphs per chunk
       
-      for (let i = 0; i < paragraphs.length; i += batchSize) {
-        // Log progress for large pages
-        if (paragraphs.length > 10) {
-          console.log(`LLM enhancement progress: ${i}/${paragraphs.length} paragraphs`);
-        }
+      console.log(`Processing ${totalParagraphs} paragraphs in chunks of ${chunkSize}`);
+      
+      for (let i = 0; i < paragraphs.length; i += chunkSize) {
+        // Log progress
+        console.log(`LLM enhancement progress: ${i}/${paragraphs.length} paragraphs`);
         
-        const batch = Array.from(paragraphs).slice(i, i + batchSize);
+        // Get this batch of paragraphs
+        const batch = Array.from(paragraphs).slice(i, i + chunkSize);
         
         // Combine the batch into a single text
         let batchText = '';
@@ -278,7 +285,7 @@ async function enhancePageWithLLM() {
         
         // Then apply LLM enhancement
         try {
-          console.log(`Sending batch ${i}-${i+batch.length-1} to LLM (${batchText.length} chars)`);
+          console.log(`Sending large batch ${i}-${i+batch.length-1} to LLM (${batchText.length} chars)`);
           const llmEnhanced = await window.ollamaClient.enhanceWithLLM(initialEnhanced);
           
           // Split the enhanced text back into paragraphs
@@ -289,7 +296,7 @@ async function enhancePageWithLLM() {
             batch[j].innerHTML = enhancedParagraphs[j];
           }
         } catch (error) {
-          console.warn(`LLM enhancement failed for batch ${i}-${i+batchSize}, using rule-based result:`, error);
+          console.warn(`LLM enhancement failed for batch ${i}-${i+chunkSize}, using rule-based result:`, error);
           
           // Apply rule-based enhancements instead
           const enhancedParagraphs = initialEnhanced.split('\n\n');
@@ -299,8 +306,8 @@ async function enhancePageWithLLM() {
         }
         
         // Add a small delay between batches to avoid overwhelming the API
-        if (i + batchSize < paragraphs.length) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+        if (i + chunkSize < paragraphs.length) {
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
     }
