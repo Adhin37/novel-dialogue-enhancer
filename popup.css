@@ -1,15 +1,107 @@
 body {
-  width: 300px;
-  padding: 15px;
+  width: 320px;
+  padding: 0;
+  margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
+  background-color: #f8f9fa;
 }
 
-h1 {
+.header {
+  padding: 15px;
+  background-color: #2196F3;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #1976D2;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
   font-size: 18px;
-  text-align: center;
-  margin-bottom: 20px;
-  color: #2196F3;
+  margin: 0;
+  font-weight: 600;
+}
+
+.main-content {
+  padding: 15px;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.icon-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.header.paused {
+  background-color: grey;
+}
+
+.paused .fa-pause:before {
+  content: "\f04b"; /* play icon */
+}
+
+.whitelist-section {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.site-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#currentSite {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.whitelist-button {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 6px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+  font-size: 12px;
+}
+
+.whitelist-button.active {
+  background-color: #2196F3;
+  border-color: #1976D2;
+  color: white;
+}
+
+.whitelist-button:hover {
+  background-color: #e0e0e0;
+}
+
+.whitelist-button.active:hover {
+  background-color: #1976D2;
 }
 
 .toggle-container {
@@ -17,13 +109,17 @@ h1 {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
+  background-color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .toggle {
   position: relative;
   display: inline-block;
-  width: 60px;
-  height: 30px;
+  width: 50px;
+  height: 26px;
 }
 
 .toggle input {
@@ -47,8 +143,8 @@ h1 {
 .slider:before {
   position: absolute;
   content: "";
-  height: 22px;
-  width: 22px;
+  height: 18px;
+  width: 18px;
   left: 4px;
   bottom: 4px;
   background-color: white;
@@ -65,7 +161,7 @@ input:focus + .slider {
 }
 
 input:checked + .slider:before {
-  transform: translateX(30px);
+  transform: translateX(24px);
 }
 
 .divider {
@@ -74,25 +170,27 @@ input:checked + .slider:before {
   margin: 15px 0;
 }
 
-button {
+button#enhanceNowBtn {
   background-color: #4CAF50;
   color: white;
-  padding: 10px 15px;
+  padding: 12px 15px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
   width: 100%;
   font-weight: 600;
-  margin-top: 5px;
+  margin-top: 10px;
   transition: background-color 0.2s;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-button:hover {
+button#enhanceNowBtn:hover {
   background-color: #45a049;
 }
 
-button:active {
+button#enhanceNowBtn:active {
   background-color: #3e8e41;
+  transform: translateY(1px);
 }
 
 .status {
@@ -100,15 +198,18 @@ button:active {
   text-align: center;
   font-style: italic;
   color: #666;
-  padding: 5px;
-  border-radius: 4px;
+  padding: 10px;
+  border-radius: 8px;
   font-size: 13px;
+  background-color: #f5f5f5;
 }
 
 .footer {
-  margin-top: 15px;
+  padding: 12px 15px;
+  border-top: 1px solid #e1e1e1;
   text-align: center;
   font-size: 12px;
+  background-color: #fff;
 }
 
 .footer a {

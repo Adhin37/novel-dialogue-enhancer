@@ -93,7 +93,7 @@ INSTRUCTIONS:
 5. Briefly translate any foreign titles/cities/terms to English
 6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary
 7. IMPORTANT: Do not use markdown formatting or annotations
-8. Maintain paragraph breaks as in the original text
+8. Maintain paragraph breaks as in the original text as much as possible
 /no_think
 
 ${contextPrompt}

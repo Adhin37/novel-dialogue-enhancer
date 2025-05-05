@@ -4,56 +4,58 @@
 <head>
   <title>Novel Dialogue Enhancer</title>
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 
 <body>
-  <h1>Novel Dialogue Enhancer</h1>
-
-  <div class="toggle-container">
-    <span>Enable Extension</span>
-    <label class="toggle">
-      <input type="checkbox" id="enhancerToggle" checked>
-      <span class="slider"></span>
-    </label>
+  <div class="header" id="header">
+    <h1>Novel Dialogue Enhancer</h1>
+    <button id="pauseButton" class="icon-button" title="Pause/Resume Extension">
+      <i class="fas fa-pause" id="pauseIcon"></i>
+    </button>
   </div>
 
-  <div class="toggle-container">
-    <span>Disable on Current Page</span>
-    <label class="toggle">
-      <input type="checkbox" id="disableOnPageToggle">
-      <span class="slider"></span>
-    </label>
+  <div class="main-content">
+    <div class="whitelist-section">
+      <div class="site-info">
+        <span id="currentSite">Current site</span>
+        <button id="whitelistButton" class="whitelist-button">
+          <i class="fas fa-bookmark"></i>
+          <span id="whitelistText">Add to Whitelist</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="toggle-container">
+      <span>Preserve Names</span>
+      <label class="toggle">
+        <input type="checkbox" id="preserveNamesToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-container">
+      <span>Fix Pronouns</span>
+      <label class="toggle">
+        <input type="checkbox" id="fixPronounsToggle" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="toggle-container">
+      <span>AI-enhanced Mode</span>
+      <label class="toggle">
+        <input type="checkbox" id="use-llm-checkbox">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <button id="enhanceNowBtn">Enhance Current Page</button>
+
+    <div class="status" id="statusMessage">Ready</div>
   </div>
-
-  <div class="divider"></div>
-
-  <div class="toggle-container">
-    <span>Preserve Names</span>
-    <label class="toggle">
-      <input type="checkbox" id="preserveNamesToggle" checked>
-      <span class="slider"></span>
-    </label>
-  </div>
-
-  <div class="toggle-container">
-    <span>Fix Pronouns</span>
-    <label class="toggle">
-      <input type="checkbox" id="fixPronounsToggle" checked>
-      <span class="slider"></span>
-    </label>
-  </div>
-
-  <div class="toggle-container">
-    <span>Enable AI-enhanced mode</span>
-    <label class="toggle">
-      <input type="checkbox" id="use-llm-checkbox">
-      <span class="slider"></span>
-    </label>
-  </div>
-
-  <button id="enhanceNowBtn">Enhance Current Page</button>
-
-  <div class="status" id="statusMessage">Ready</div>
 
   <div class="footer">
     <a href="options.html" target="_blank">Advanced Settings</a>
