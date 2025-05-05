@@ -124,10 +124,14 @@ async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
   console.time('enhancePage');
   
+  // Show the toaster notification at the start of the process
+  window.enhancementToaster.createToaster();
+  
   // Guard against recursive enhancement
   if (isEnhancing) {
     pendingEnhancement = true;
     console.log("Enhancement already in progress, queuing request");
+    window.enhancementToaster.showMessage("Enhancement already in progress, queued for later", 2000);
     return false;
   }
   
@@ -175,12 +179,18 @@ async function enhancePage() {
     // Log enhancement statistics
     const stats = window.enhancerIntegration.getEnhancementStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
+    
+    // Show success message
+    window.enhancementToaster.finishProgress();
   } catch (error) {
     console.error("Novel Dialogue Enhancer: Enhancement error", error);
     // If there was an error with LLM enhancement, fall back to rule-based
     if (settings.useLLM) {
       console.log("Novel Dialogue Enhancer: Falling back to rule-based enhancement");
+      window.enhancementToaster.showMessage("Falling back to rule-based enhancement", 2000);
       enhancePageWithRules();
+    } else {
+      window.enhancementToaster.showError("Enhancement failed: " + error.message);
     }
   } finally {
     // Reconnect observer after enhancement
@@ -209,23 +219,41 @@ function enhancePageWithRules() {
   console.time('ruleBasedEnhancement');
   
   const paragraphs = contentElement.querySelectorAll('p');
+  const totalParagraphs = paragraphs.length || 1;
+  
+  // Initialize the toaster with 0 progress
+  window.enhancementToaster.updateProgress(0, totalParagraphs, false);
+  
   if (paragraphs.length === 0) {
     // If there are no paragraph elements, split by newlines
     const text = contentElement.innerHTML;
     const enhancedText = enhanceText(text);
     contentElement.innerHTML = enhancedText;
+    
+    // Update toaster to show completion
+    window.enhancementToaster.updateProgress(1, 1, false);
   } else {
     // Process each paragraph
     paragraphs.forEach((paragraph, index) => {
       // Check if termination was requested during processing
       if (terminateRequested) {
         console.log("Rule-based enhancement terminated by user");
+        window.enhancementToaster.showError("Enhancement terminated by user");
         return;
       }
       
       const originalText = paragraph.innerHTML;
       const enhancedText = enhanceText(originalText);
       paragraph.innerHTML = enhancedText;
+      
+      // Update progress in toaster after each paragraph (or every few paragraphs for performance)
+      if (paragraphs.length > 20) {
+        if (index % 5 === 0 || index === paragraphs.length - 1) {
+          window.enhancementToaster.updateProgress(index + 1, totalParagraphs, false);
+        }
+      } else {
+        window.enhancementToaster.updateProgress(index + 1, totalParagraphs, false);
+      }
       
       // Log progress for large pages
       if (paragraphs.length > 20 && index % 10 === 0) {
@@ -249,6 +277,10 @@ async function enhancePageWithLLM() {
     
     // Process with paragraphs if available
     const paragraphs = contentElement.querySelectorAll('p');
+    const totalParagraphs = paragraphs.length || 1;
+    
+    // Initialize the toaster with 0 progress
+    window.enhancementToaster.updateProgress(0, totalParagraphs, true);
     
     if (paragraphs.length === 0) {
       // If there are no paragraph elements, enhance the whole content
@@ -263,23 +295,28 @@ async function enhancePageWithLLM() {
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user before processing");
           contentElement.innerHTML = initialEnhancedText;
+          window.enhancementToaster.showError("Enhancement terminated by user");
           return;
         }
         
         console.log("Sending content to LLM for full-content enhancement");
+        window.enhancementToaster.updateProgress(0, 1, true);
         const llmEnhancedText = await window.ollamaClient.enhanceWithLLM(initialEnhancedText);
         
         // Check again if termination was requested during LLM processing
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user after processing");
           contentElement.innerHTML = initialEnhancedText;
+          window.enhancementToaster.showError("Enhancement terminated by user");
           return;
         }
         
         contentElement.innerHTML = llmEnhancedText;
+        window.enhancementToaster.updateProgress(1, 1, true);
       } catch (error) {
         console.warn("LLM enhancement failed, using rule-based result:", error);
         contentElement.innerHTML = initialEnhancedText;
+        window.enhancementToaster.showError("LLM enhancement failed: " + error.message);
       }
     } else {
       // Process in larger chunks for better context
@@ -294,11 +331,13 @@ async function enhancePageWithLLM() {
         // Check if termination was requested before processing this batch
         if (terminateRequested) {
           console.log(`LLM enhancement terminated by user at batch ${i}/${paragraphs.length}`);
+          window.enhancementToaster.showError("Enhancement terminated by user");
           break;
         }
         
         // Log progress
         console.log(`LLM enhancement progress: ${i}/${paragraphs.length} paragraphs`);
+        window.enhancementToaster.updateProgress(i, totalParagraphs, true);
         
         // Get this batch of paragraphs
         const batch = Array.from(paragraphs).slice(i, i + chunkSize);
@@ -320,6 +359,7 @@ async function enhancePageWithLLM() {
           // Check if termination was requested during LLM processing
           if (terminateRequested) {
             console.log(`LLM enhancement terminated by user during batch ${i}-${i+batch.length-1}`);
+            window.enhancementToaster.showError("Enhancement terminated by user");
             break;
           }
           
@@ -330,6 +370,9 @@ async function enhancePageWithLLM() {
           for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
             batch[j].innerHTML = enhancedParagraphs[j];
           }
+          
+          // Update progress after this batch
+          window.enhancementToaster.updateProgress(Math.min(i + batch.length, totalParagraphs), totalParagraphs, true);
         } catch (error) {
           console.warn(`LLM enhancement failed for batch ${i}-${i+chunkSize}, using rule-based result:`, error);
           
@@ -338,6 +381,9 @@ async function enhancePageWithLLM() {
           for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
             batch[j].innerHTML = enhancedParagraphs[j];
           }
+          
+          // Show warning but continue processing
+          window.enhancementToaster.showMessage(`Batch ${i}-${i+batch.length} failed, using rule-based result. Continuing...`, 2000);
         }
         
         // Add a small delay between batches to avoid overwhelming the API
@@ -354,6 +400,7 @@ async function enhancePageWithLLM() {
   } catch (error) {
     console.error("Novel Dialogue Enhancer: LLM enhancement failed completely", error);
     // Fall back to standard enhancement
+    window.enhancementToaster.showError("LLM enhancement failed: " + error.message);
     enhancePageWithRules();
   } finally {
     console.timeEnd('llmEnhancement');
@@ -366,6 +413,9 @@ function handleTerminationRequest() {
     console.log("Termination requested while enhancement in progress");
     terminateRequested = true;
     
+    // Show termination message in toaster
+    window.enhancementToaster.showMessage("Terminating enhancement...", 2000);
+    
     // Notify the background script to terminate any pending LLM requests
     chrome.runtime.sendMessage({
       action: "terminateAllRequests"
@@ -377,6 +427,9 @@ function handleTerminationRequest() {
         console.warn("Enhancement process didn't terminate properly, forcing reset");
         isEnhancing = false;
         pendingEnhancement = false;
+        
+        // Update toaster to show error
+        window.enhancementToaster.showError("Enhancement process forced to terminate");
       }
     }, 2000);
   } else {

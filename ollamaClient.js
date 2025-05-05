@@ -85,10 +85,10 @@ async function enhanceWithLLM(text) {
 
             const prompt = `You are a dialogue enhancer for translated web novels. Your task is to enhance the following text to make it sound more natural in English.
 INSTRUCTIONS:
-0. Do not omit or remove any sentences or paragraphs. Every original paragraph must appear in the output, even if lightly edited for style or clarity.
-1. Improve dialogue naturalness while preserving the original meaning
-2. Make narration flow better in English
-3. Keep all character names exactly as they are
+0. IMPORTANT: Do not omit or remove any sentences or paragraphs. Every original paragraph must appear in the output, even if lightly edited for style or clarity.
+1. Improve dialogue/narration naturalness while preserving the original meaning
+2. Make dialogue/narration flow better in English
+3. Keep all character names in the same language
 4. Fix any pronoun inconsistencies
 5. Briefly translate any foreign titles/cities/terms to English
 6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary

@@ -39,6 +39,7 @@
         "dialogueUtils.js",
         "enhancerIntegration.js",
         "ollamaClient.js",
+        "toaster.js",
         "content.js"
       ],
       "run_at": "document_idle"
