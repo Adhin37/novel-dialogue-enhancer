@@ -1,65 +1,61 @@
-// options.js
-document.addEventListener('DOMContentLoaded', function () {
-  const modelNameInput = document.getElementById('model-name');
-  const saveButton = document.getElementById('save');
-  const maxChunkSizeSlider = document.getElementById('max-chunk-size');
-  const maxChunkSizeValue = document.getElementById('max-chunk-size-value');
-  const timeoutSlider = document.getElementById('timeout');
-  const timeoutValue = document.getElementById('timeout-value');
-  const testOllamaButton = document.getElementById('test-ollama');
-  const ollamaStatus = document.getElementById('ollama-status');
-  const whitelistItemsContainer = document.getElementById('whitelist-items');
-  const clearAllBtn = document.getElementById('clear-all');
-  const closeBtn = document.getElementById('close-btn');
+document.addEventListener("DOMContentLoaded", function () {
+  const modelNameInput = document.getElementById("model-name");
+  const ollamaUrlInput = document.getElementById("ollama-url");
+  const saveButton = document.getElementById("save");
+  const maxChunkSizeSlider = document.getElementById("max-chunk-size");
+  const maxChunkSizeValue = document.getElementById("max-chunk-size-value");
+  const timeoutSlider = document.getElementById("timeout");
+  const timeoutValue = document.getElementById("timeout-value");
+  const testOllamaButton = document.getElementById("test-ollama");
+  const ollamaStatus = document.getElementById("ollama-status");
+  const whitelistItemsContainer = document.getElementById("whitelist-items");
+  const clearAllBtn = document.getElementById("clear-all");
+  const closeBtn = document.getElementById("close-btn");
+  const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
-  // Load whitelist data
   loadWhitelist();
 
-  // Clear all whitelisted sites
-  clearAllBtn.addEventListener('click', function () {
-    if (confirm('Are you sure you want to remove all sites from the whitelist?')) {
+  clearAllBtn.addEventListener("click", function () {
+    if (
+      confirm("Are you sure you want to remove all sites from the whitelist?")
+    ) {
       chrome.storage.sync.set({ whitelistedSites: [] }, function () {
         loadWhitelist();
       });
     }
   });
 
-  // Close window
-  closeBtn.addEventListener('click', function () {
+  closeBtn.addEventListener("click", function () {
     window.close();
   });
 
-  // Load whitelist from storage
   function loadWhitelist() {
-    chrome.storage.sync.get('whitelistedSites', function (data) {
+    chrome.storage.sync.get("whitelistedSites", function (data) {
       const whitelistedSites = data.whitelistedSites || [];
       renderWhitelistedSites(whitelistedSites);
     });
   }
 
-  // Render whitelist items
   function renderWhitelistedSites(sites) {
-    // Clear existing content
-    whitelistItemsContainer.innerHTML = '';
+    whitelistItemsContainer.innerHTML = "";
 
     if (sites.length === 0) {
-      // Show empty state
-      whitelistItemsContainer.innerHTML = '<div class="empty-list">No sites in whitelist</div>';
+      whitelistItemsContainer.innerHTML =
+        '<div class="empty-list">No sites in whitelist</div>';
       return;
     }
 
-    // Create and append site items
-    sites.forEach(site => {
-      const itemElement = document.createElement('div');
-      itemElement.className = 'whitelist-item';
+    sites.forEach((site) => {
+      const itemElement = document.createElement("div");
+      itemElement.className = "whitelist-item";
 
-      const siteNameElement = document.createElement('span');
+      const siteNameElement = document.createElement("span");
       siteNameElement.textContent = site;
 
-      const removeButton = document.createElement('button');
-      removeButton.className = 'remove-btn';
-      removeButton.textContent = 'Remove';
-      removeButton.addEventListener('click', function () {
+      const removeButton = document.createElement("button");
+      removeButton.className = "remove-btn";
+      removeButton.textContent = "Remove";
+      removeButton.addEventListener("click", function () {
         removeSiteFromWhitelist(site);
       });
 
@@ -69,92 +65,104 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Remove site from whitelist
   function removeSiteFromWhitelist(site) {
-    chrome.storage.sync.get('whitelistedSites', function (data) {
+    chrome.storage.sync.get("whitelistedSites", function (data) {
       let whitelistedSites = data.whitelistedSites || [];
-      whitelistedSites = whitelistedSites.filter(s => s !== site);
+      whitelistedSites = whitelistedSites.filter((s) => s !== site);
 
       chrome.storage.sync.set({ whitelistedSites }, function () {
         renderWhitelistedSites(whitelistedSites);
       });
     });
   }
-  // Load saved settings
-  chrome.storage.sync.get({
-    modelName: 'qwen3:8b',
-    maxChunkSize: 8000,
-    timeout: 120
-  }, function (data) {
-    modelNameInput.value = data.modelName;
-    maxChunkSizeSlider.value = data.maxChunkSize;
-    maxChunkSizeValue.textContent = data.maxChunkSize;
-    timeoutSlider.value = data.timeout;
-    timeoutValue.textContent = data.timeout;
-  });
 
-  // Update value displays for sliders
-  maxChunkSizeSlider.addEventListener('input', function () {
+  chrome.storage.sync.get(
+    {
+      modelName: "qwen3:8b",
+      ollamaUrl: "http://localhost:11434",
+      maxChunkSize: 8000,
+      timeout: 120
+    },
+    function (data) {
+      modelNameInput.value = data.modelName;
+      ollamaUrlInput.value = data.ollamaUrl;
+      maxChunkSizeSlider.value = data.maxChunkSize;
+      maxChunkSizeValue.textContent = data.maxChunkSize;
+      timeoutSlider.value = data.timeout;
+      timeoutValue.textContent = data.timeout;
+    }
+  );
+
+  maxChunkSizeSlider.addEventListener("input", function () {
     maxChunkSizeValue.textContent = this.value;
   });
 
-  timeoutSlider.addEventListener('input', function () {
+  timeoutSlider.addEventListener("input", function () {
     timeoutValue.textContent = this.value;
   });
 
-  // Save settings
-  saveButton.addEventListener('click', function () {
+  saveButton.addEventListener("click", function () {
     const maxChunkSize = parseInt(maxChunkSizeSlider.value);
     const timeout = parseInt(timeoutSlider.value);
+    const ollamaUrl = ollamaUrlInput.value.trim() || DEFAULT_OLLAMA_URL;
 
-    chrome.storage.sync.set({
-      modelName: modelNameInput.value.trim() || 'qwen3:8b',
-      maxChunkSize: maxChunkSize,
-      timeout: timeout
-    }, function () {
-      // Show temporary save confirmation
-      const saveButton = document.getElementById('save');
-      const originalText = saveButton.textContent;
-      saveButton.textContent = 'Settings Saved!';
-      saveButton.style.backgroundColor = '#4CAF50';
+    chrome.storage.sync.set(
+      {
+        modelName: modelNameInput.value.trim() || "qwen3:8b",
+        ollamaUrl: ollamaUrl,
+        maxChunkSize: maxChunkSize,
+        timeout: timeout
+      },
+      function () {
+        const saveButton = document.getElementById("save");
+        const originalText = saveButton.textContent;
+        saveButton.textContent = "Settings Saved!";
+        saveButton.style.backgroundColor = "#4CAF50";
 
-      setTimeout(function () {
-        saveButton.textContent = originalText;
-        saveButton.style.backgroundColor = '#2196F3';
-      }, 1500);
-    });
+        setTimeout(function () {
+          saveButton.textContent = originalText;
+          saveButton.style.backgroundColor = "#2196F3";
+        }, 1500);
+      }
+    );
   });
 
-  // Test Ollama connection
-  testOllamaButton.addEventListener('click', async function () {
-    ollamaStatus.textContent = 'Testing Ollama connection...';
-    ollamaStatus.className = 'status-message pending';
+  testOllamaButton.addEventListener("click", async function () {
+    ollamaStatus.textContent = "Testing Ollama connection...";
+    ollamaStatus.className = "status-message pending";
+
+    const currentOllamaUrl = ollamaUrlInput.value.trim() || DEFAULT_OLLAMA_URL;
 
     try {
-      // Send a message to the background script to check Ollama
-      chrome.runtime.sendMessage({
-        action: "checkOllamaAvailability"
-      }, response => {
-        if (chrome.runtime.lastError) {
-          ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
-          ollamaStatus.className = 'status-message error';
-          return;
-        }
-
-        if (response.available) {
-          ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
-          if (response.models && response.models.length > 0) {
-            ollamaStatus.textContent += `\nAvailable models: ${response.models.join(', ')}`;
+      chrome.runtime.sendMessage(
+        {
+          action: "checkOllamaAvailability",
+          data: { ollamaUrl: currentOllamaUrl }
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
+            ollamaStatus.className = "status-message error";
+            return;
           }
-          ollamaStatus.className = 'status-message success';
-        } else {
-          ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
-          ollamaStatus.className = 'status-message error';
+
+          if (response.available) {
+            ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
+            if (response.models && response.models.length > 0) {
+              ollamaStatus.textContent += `\nAvailable models: ${response.models.join(
+                ", "
+              )}`;
+            }
+            ollamaStatus.className = "status-message success";
+          } else {
+            ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
+            ollamaStatus.className = "status-message error";
+          }
         }
-      });
+      );
     } catch (err) {
       ollamaStatus.textContent = `Error: ${err.message}`;
-      ollamaStatus.className = 'status-message error';
+      ollamaStatus.className = "status-message error";
     }
   });
 });

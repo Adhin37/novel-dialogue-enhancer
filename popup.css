@@ -2,19 +2,19 @@ body {
   width: 320px;
   padding: 0;
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
   background-color: #f8f9fa;
 }
 
 .header {
   padding: 15px;
-  background-color: #2196F3;
+  background-color: #2196f3;
   color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid #1976D2;
+  border-bottom: 2px solid #1976d2;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
@@ -91,8 +91,8 @@ body {
 }
 
 .whitelist-button.active {
-  background-color: #2196F3;
-  border-color: #1976D2;
+  background-color: #2196f3;
+  border-color: #1976d2;
   color: white;
 }
 
@@ -101,7 +101,7 @@ body {
 }
 
 .whitelist-button.active:hover {
-  background-color: #1976D2;
+  background-color: #1976d2;
 }
 
 .toggle-container {
@@ -136,7 +136,7 @@ body {
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .3s;
+  transition: 0.3s;
   border-radius: 34px;
 }
 
@@ -148,16 +148,16 @@ body {
   left: 4px;
   bottom: 4px;
   background-color: white;
-  transition: .3s;
+  transition: 0.3s;
   border-radius: 50%;
 }
 
 input:checked + .slider {
-  background-color: #2196F3;
+  background-color: #2196f3;
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #2196F3;
+  box-shadow: 0 0 1px #2196f3;
 }
 
 input:checked + .slider:before {
@@ -171,7 +171,7 @@ input:checked + .slider:before {
 }
 
 button#enhance-now-btn {
-  background-color: #4CAF50;
+  background-color: #4caf50;
   color: white;
   padding: 12px 15px;
   border: none;
@@ -185,7 +185,7 @@ button#enhance-now-btn {
 }
 
 button#enhance-now-btn:hover {
-  background-color: #2E7D32;
+  background-color: #2e7d32;
 }
 
 button#enhance-now-btn:active {
@@ -213,7 +213,7 @@ button#enhance-now-btn:active {
 }
 
 .footer a {
-  color: #2196F3;
+  color: #2196f3;
   text-decoration: none;
 }
 

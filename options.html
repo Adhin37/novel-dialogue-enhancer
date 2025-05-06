@@ -1,84 +1,114 @@
 <!DOCTYPE html>
 <html>
-
-<head>
+  <head>
     <title>NDE - Settings</title>
-    <link rel="stylesheet" href="options.css">
-    <link rel="icon" href="images/icon128.png">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
+    <link rel="stylesheet" href="options.css" />
+    <link rel="icon" href="images/icon128.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  </head>
 
-<body>
+  <body>
     <header>
-        <h1>Novel Dialogue Enhancer</h1>
-        <p>Configure your extension settings for optimal dialogue enhancement</p>
+      <h1>Novel Dialogue Enhancer</h1>
+      <p>Configure your extension settings for optimal dialogue enhancement</p>
     </header>
 
     <div class="container">
-        <div class="option-group">
-            <h3>General Settings</h3>
+      <div class="option-group">
+        <h3>General Settings</h3>
 
-            <div class="option">
-                <label for="modelName">Ollama Model Name:</label>
-                <input id="model-name" type="text" placeholder="qwen3:8b" />
-                <div class="option-description">
-                    <p>Specify which Ollama model to use for text enhancement</p>
-                    <p class="hint">Common models: qwen3:8b, llama3:8b, phi3:medium</p>
-                </div>
-            </div>
+        <div class="option">
+          <label for="ollamaUrl">Ollama URL:</label>
+          <input
+            id="ollama-url"
+            type="text"
+            placeholder="http://localhost:11434"
+          />
+          <div class="option-description">
+            <p>URL of your Ollama server (include protocol and port)</p>
+            <p class="hint">
+              Example: http://localhost:11434 or http://192.168.1.100:11434
+            </p>
+          </div>
         </div>
 
-        <div class="option-group">
-            <h3>Advanced LLM Settings</h3>
-
-            <div class="setting-item">
-                <label for="maxChunkSize">Maximum Chunk Size:</label>
-                <input type="range" id="max-chunk-size" min="2000" max="16000" step="1000" value="8000">
-                <span id="max-chunk-size-value">8000</span> characters
-                <div class="option-description">
-                    <p>Sets the maximum size of text chunks sent to Ollama</p>
-                    <p class="hint">Lower values are faster but may reduce quality. Higher values may improve quality
-                        but require more resources.</p>
-                </div>
-            </div>
-
-            <div class="setting-item">
-                <label for="timeout">LLM Request Timeout:</label>
-                <input type="range" id="timeout" min="30" max="300" step="30" value="120">
-                <span id="timeout-value">120</span> seconds
-                <div class="option-description">
-                    <p>Maximum time to wait for LLM responses</p>
-                </div>
-            </div>
-
-            <div class="option">
-                <button id="test-ollama" class="secondary-button">Test Ollama Connection</button>
-                <div id="ollama-status" class="status-message"></div>
-                <div class="option-description">
-                    <p>Test if your Ollama setup is working correctly</p>
-                </div>
-            </div>
+        <div class="option">
+          <label for="modelName">Ollama Model Name:</label>
+          <input id="model-name" type="text" placeholder="qwen3:8b" />
+          <div class="option-description">
+            <p>Specify which Ollama model to use for text enhancement</p>
+            <p class="hint">Common models: qwen3:8b, llama3:8b, phi3:medium</p>
+          </div>
         </div>
-        <div class="option-group">
-            <h1>Whitelist Manager</h1>
+      </div>
 
-            <div class="whitelist-container">
-                <div id="whitelist-items">
-                    <!-- Whitelist items will be inserted here -->
-                    <div class="empty-list">No sites in whitelist</div>
-                </div>
-            </div>
+      <div class="option-group">
+        <h3>Advanced LLM Settings</h3>
 
-            <div class="controls">
-                <button id="clear-all">Clear All</button>
-            </div>
+        <div class="setting-item">
+          <label for="maxChunkSize">Maximum Chunk Size:</label>
+          <input
+            type="range"
+            id="max-chunk-size"
+            min="2000"
+            max="16000"
+            step="1000"
+            value="8000"
+          />
+          <span id="max-chunk-size-value">8000</span> characters
+          <div class="option-description">
+            <p>Sets the maximum size of text chunks sent to Ollama</p>
+            <p class="hint">
+              Lower values are faster but may reduce quality. Higher values may
+              improve quality but require more resources.
+            </p>
+          </div>
         </div>
+
+        <div class="setting-item">
+          <label for="timeout">LLM Request Timeout:</label>
+          <input
+            type="range"
+            id="timeout"
+            min="30"
+            max="300"
+            step="30"
+            value="120"
+          />
+          <span id="timeout-value">120</span> seconds
+          <div class="option-description">
+            <p>Maximum time to wait for LLM responses</p>
+          </div>
+        </div>
+
+        <div class="option">
+          <button id="test-ollama" class="secondary-button">
+            Test Ollama Connection
+          </button>
+          <div id="ollama-status" class="status-message"></div>
+          <div class="option-description">
+            <p>Test if your Ollama setup is working correctly</p>
+          </div>
+        </div>
+      </div>
+      <div class="option-group">
+        <h1>Whitelist Manager</h1>
+
+        <div class="whitelist-container">
+          <div id="whitelist-items">
+            <div class="empty-list">No sites in whitelist</div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="clear-all">Clear All</button>
+        </div>
+      </div>
     </div>
     <div class="container-btn">
-        <button id="save">Save Settings</button>
-        <button id="close-btn">Close</button>
+      <button id="save">Save Settings</button>
+      <button id="close-btn">Close</button>
     </div>
     <script src="options.js"></script>
-</body>
-
+  </body>
 </html>
