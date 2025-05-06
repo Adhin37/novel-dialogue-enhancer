@@ -4,7 +4,7 @@ let globalCharacterMap = {};
 
 // Track active AbortControllers to allow terminating requests
 let activeRequestControllers = new Map();
-
+const OLLAMA_BASE_URL = 'http://localhost:11434';
 // Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateCharacterMap") {
@@ -43,7 +43,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let fullResponse = "";
         let responseStarted = false;
         
-        fetch('http://localhost:11434/api/generate', {
+        fetch(OLLAMA_BASE_URL + '/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request.data),
@@ -123,7 +123,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
       } else {
         // Non-streaming implementation
-        fetch('http://localhost:11434/api/generate', {
+        fetch(OLLAMA_BASE_URL + '/api/generate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(request.data),
@@ -217,7 +217,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ status: "terminated", count: activeRequestControllers.size });
   } else if (request.action === "checkOllamaAvailability") {
     // Handler for checking Ollama availability
-    fetch('http://localhost:11434/api/version', {
+    fetch(OLLAMA_BASE_URL + '/api/version', {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(10000)
@@ -226,7 +226,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (response.ok) {
         return response.json().then(data => {
           // Also try to get the list of models to help with troubleshooting
-          fetch('http://localhost:11434/api/tags', {
+          fetch(OLLAMA_BASE_URL + '/api/tags', {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' },
             signal: AbortSignal.timeout(5000)
