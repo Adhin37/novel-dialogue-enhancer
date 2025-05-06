@@ -29,18 +29,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     });
     return false; // No async response needed
   } else if (request.action === "checkOllamaAvailability") {
-    const ollamaUrl = request.data?.ollamaUrl;
-
-    if (ollamaUrl) {
-      checkOllamaAvailability(ollamaUrl, sendResponse);
-    } else {
-      chrome.storage.sync.get(
-        { ollamaUrl: DEFAULT_OLLAMA_URL },
-        function (data) {
-          checkOllamaAvailability(data.ollamaUrl, sendResponse);
-        }
-      );
-    }
+    checkOllamaAvailability(sendResponse);
     return true; // We'll send a response asynchronously
   } else if (request.action === "showNotification") {
     chrome.notifications.create({
@@ -60,11 +49,9 @@ function handleOllamaRequest(request, sendResponse) {
   chrome.storage.sync.get(
     {
       timeout: 180,
-      ollamaUrl: DEFAULT_OLLAMA_URL
     },
     function (data) {
       const OLLAMA_REQUEST_TIMEOUT = data.timeout * 1000;
-      const OLLAMA_BASE_URL = data.ollamaUrl;
 
       console.log("Sending Ollama request:", {
         model: request.data.model,
@@ -72,7 +59,6 @@ function handleOllamaRequest(request, sendResponse) {
         max_tokens: request.data.max_tokens,
         stream: request.data.stream || false,
         timeout: OLLAMA_REQUEST_TIMEOUT / 1000 + " seconds",
-        ollamaUrl: OLLAMA_BASE_URL,
         options: request.data.options || {}
       });
 
@@ -86,7 +72,7 @@ function handleOllamaRequest(request, sendResponse) {
       );
 
       if (request.data.stream == false) {
-        fetch(OLLAMA_BASE_URL + "/api/generate", {
+        fetch(DEFAULT_OLLAMA_URL + "/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(request.data),
@@ -189,10 +175,10 @@ function handleOllamaRequest(request, sendResponse) {
   );
 }
 
-function checkOllamaAvailability(ollamaUrl, sendResponse) {
-  console.log(`Checking Ollama availability at ${ollamaUrl}/api/version`);
+function checkOllamaAvailability(sendResponse) {
+  console.log(`Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`);
   
-  fetch(ollamaUrl + "/api/version", {
+  fetch(DEFAULT_OLLAMA_URL + "/api/version", {
     method: "GET",
     headers: { "Content-Type": "application/json" },
     signal: AbortSignal.timeout(10000)
@@ -202,7 +188,7 @@ function checkOllamaAvailability(ollamaUrl, sendResponse) {
         return response.json().then((data) => {
           console.log(`Ollama version check successful: ${data.version}`);
           
-          fetch(ollamaUrl + "/api/tags", {
+          fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
             method: "GET",
             headers: { "Content-Type": "application/json" },
             signal: AbortSignal.timeout(5000)
@@ -248,7 +234,6 @@ chrome.runtime.onInstalled.addListener(() => {
       "preserveNames",
       "fixPronouns",
       "modelName",
-      "ollamaUrl",
       "maxChunkSize",
       "timeout",
       "disabledPages"
@@ -260,7 +245,6 @@ chrome.runtime.onInstalled.addListener(() => {
       if (data.preserveNames === undefined) defaults.preserveNames = true;
       if (data.fixPronouns === undefined) defaults.fixPronouns = true;
       if (data.modelName === undefined) defaults.modelName = "qwen3:8b";
-      if (data.ollamaUrl === undefined) defaults.ollamaUrl = DEFAULT_OLLAMA_URL;
       if (data.maxChunkSize === undefined) defaults.maxChunkSize = 4000;
       if (data.timeout === undefined) defaults.timeout = 180;
       if (data.disabledPages === undefined) defaults.disabledPages = [];

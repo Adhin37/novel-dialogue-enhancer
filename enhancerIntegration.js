@@ -10,13 +10,15 @@ class EnhancerIntegration {
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
     this.toaster = new Toaster();
-    
+
     this.setTotalDialoguesEnhanced(0);
     this.setTotalPronounsFixed(0);
     this.setTotalCharactersDetected(0);
     this.setProcessingTime(0);
 
-    console.log("Novel Dialogue Enhancer: Integration module initialized with LLM support");
+    console.log(
+      "Novel Dialogue Enhancer: Integration module initialized with LLM support"
+    );
 
     this.setEnhancementStats({
       totalDialoguesEnhanced: this.getTotalDialoguesEnhanced(),
@@ -33,49 +35,57 @@ class EnhancerIntegration {
    */
   async enhanceText(text) {
     const startTime = performance.now();
-    
+
     try {
       // Extract character information
       const characterMap = this.extractCharacterNames(text);
-      const characterArray = Object.entries(characterMap).map(([name, data]) => ({
-        name,
-        gender: data.gender,
-        appearances: data.appearances
-      }));
-      
+      const characterArray = Object.entries(characterMap).map(
+        ([name, data]) => ({
+          name,
+          gender: data.gender,
+          appearances: data.appearances
+        })
+      );
+
       // Get dialogue patterns for statistics
       const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
-      const dialogueCount = dialoguePatterns.quotedDialogue.length + 
-                           dialoguePatterns.colonSeparatedDialogue.length +
-                           dialoguePatterns.actionDialogue.length;
-      
-      this.setTotalDialoguesEnhanced(this.getTotalDialoguesEnhanced() + dialogueCount);
-      
+      const dialogueCount =
+        dialoguePatterns.quotedDialogue.length +
+        dialoguePatterns.colonSeparatedDialogue.length +
+        dialoguePatterns.actionDialogue.length;
+
+      this.setTotalDialoguesEnhanced(
+        this.getTotalDialoguesEnhanced() + dialogueCount
+      );
+
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
         this.toaster.showError(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
-      
+
       // Create character summary for LLM context
-      const characterSummary = this.dialogueUtils.createDialogueSummary(characterArray);
-      
+      const characterSummary =
+        this.dialogueUtils.createDialogueSummary(characterArray);
+
       // Enhance text with LLM
-      const enhancedText = await this.enhanceTextWithLLM(text, characterSummary);
-      
+      const enhancedText = await this.enhanceTextWithLLM(
+        text,
+        characterSummary
+      );
+
       const endTime = performance.now();
       this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
-      
+
       return enhancedText;
-      
     } catch (error) {
       console.error("Error enhancing text:", error);
       this.toaster.showError("Enhancement failed: " + error.message);
-      
+
       const endTime = performance.now();
       this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
-      
+
       return text;
     }
   }
@@ -93,12 +103,13 @@ class EnhancerIntegration {
 
     // Get dialogue patterns
     const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
-    
+
     // Extract characters from dialogue
-    const characterNames = this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
-    
+    const characterNames =
+      this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
+
     // Process each character name
-    characterNames.forEach(name => {
+    characterNames.forEach((name) => {
       if (!characterMap[name]) {
         const gender = this.genderUtils.guessGender(name, text, characterMap);
         characterMap[name] = {
@@ -106,17 +117,23 @@ class EnhancerIntegration {
           appearances: 1
         };
       } else {
-        characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
+        characterMap[name].appearances =
+          (characterMap[name].appearances || 0) + 1;
       }
     });
-    
+
     // Look for additional names using more patterns
     this.extractAdditionalNames(text, characterMap);
-    
+
     const newCharCount = Object.keys(characterMap).length - startCharCount;
-    this.setTotalCharactersDetected(this.getTotalCharactersDetected() + newCharCount);
-    
-    console.log(`Extracted ${Object.keys(characterMap).length} characters:`, characterMap);
+    this.setTotalCharactersDetected(
+      this.getTotalCharactersDetected() + newCharCount
+    );
+
+    console.log(
+      `Extracted ${Object.keys(characterMap).length} characters:`,
+      characterMap
+    );
     return characterMap;
   }
 
@@ -127,30 +144,112 @@ class EnhancerIntegration {
    */
   extractAdditionalNames(text, characterMap) {
     const namePatterns = [
+      // Character said pattern
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
+
+      // "Text" attribution pattern
       /"([^"]+)"\s*,?\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered)/g,
+
+      // Character: "Text" pattern
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s*:\s*"([^"]+)"/g,
-      /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})'s\s+(?:face|eyes|voice|body|hand|arm|leg|hair|head|mouth|mind|heart|soul|gaze|attention)/g
+
+      // Character's possession pattern
+      /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})'s\s+(?:face|eyes|voice|body|hand|arm|leg|hair|head|mouth|mind|heart|soul|gaze|attention)/g,
+
+      // Title + name pattern
+      /(Master|Lady|Lord|Sir|Madam|Miss|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})/g,
+
+      // "Xiao" prefix common in Chinese novels
+      /(Xiao\s[A-Z][a-z]+)/g
     ];
 
     for (const pattern of namePatterns) {
       let match;
       while ((match = pattern.exec(text)) !== null) {
-        const name = match[1].includes('"') ? match[2] : match[1];
-
-        if (this.isCommonNonName(name)) continue;
-
-        if (!characterMap[name]) {
-          const gender = this.genderUtils.guessGender(name, text, characterMap);
-          characterMap[name] = {
-            gender,
-            appearances: 1
-          };
+        // Determine which capture group contains the name based on pattern
+        let name;
+        if (pattern === namePatterns[1]) {
+          name = match[2]; // For "Text" attribution pattern, name is in group 2
+        } else if (pattern === namePatterns[4]) {
+          name = match[2] ? `${match[1]} ${match[2]}` : match[1]; // For title pattern
         } else {
-          characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
+          name = match[1]; // For most patterns, name is in group 1
+        }
+
+        // Skip if name isn't valid or is too long
+        if (!name || name.length > 30) continue;
+
+        // Use dialogueUtils to verify it's a legitimate name
+        if (this.dialogueUtils.isLikelyName(name)) {
+          if (!characterMap[name]) {
+            const gender = this.genderUtils.guessGender(
+              name,
+              text,
+              characterMap
+            );
+            characterMap[name] = {
+              gender,
+              appearances: 1
+            };
+          } else {
+            characterMap[name].appearances =
+              (characterMap[name].appearances || 0) + 1;
+          }
         }
       }
     }
+
+    // Clean up possible duplicates or invalid entries
+    this.cleanupCharacterMap(characterMap);
+  }
+
+  /**
+   * Clean up character map by removing invalid entries and merging duplicates
+   * @param {object} characterMap - Character map to clean up
+   */
+  cleanupCharacterMap(characterMap) {
+    const invalidKeys = [];
+
+    // Find invalid entries
+    for (const name in characterMap) {
+      // Check for very long names (likely not real character names)
+      if (name.length > 30) {
+        invalidKeys.push(name);
+        continue;
+      }
+
+      // Check if it contains sentence-like structures
+      if (
+        name.includes(". ") ||
+        name.includes("! ") ||
+        name.includes("? ") ||
+        name.includes(", ") ||
+        name.match(/\w+\s+\w+\s+\w+\s+\w+\s+\w+/)
+      ) {
+        invalidKeys.push(name);
+        continue;
+      }
+
+      // Check for common sentence starters that aren't names
+      const commonNonNames = [
+        "The",
+        "Then",
+        "Well",
+        "From",
+        "At",
+        "Old",
+        "Sister"
+      ];
+      if (commonNonNames.includes(name)) {
+        invalidKeys.push(name);
+        continue;
+      }
+    }
+
+    // Remove invalid entries
+    invalidKeys.forEach((key) => {
+      delete characterMap[key];
+    });
   }
 
   /**
@@ -160,15 +259,62 @@ class EnhancerIntegration {
    */
   isCommonNonName(word) {
     const commonNonNames = [
-      "The", "Then", "This", "That", "These", "Those", "There", "Their", "They",
-      "However", "Suddenly", "Finally", "Eventually", "Certainly", "Perhaps",
-      "Maybe", "While", "When", "After", "Before", "During", "Within", "Without",
-      "Also", "Thus", "Therefore", "Hence", "Besides", "Moreover", "Although",
-      "Despite", "Since", "Because", "Nonetheless", "Nevertheless", "Regardless",
-      "Consequently", "Accordingly", "Meanwhile", "Afterwards", "Beforehand",
-      "Likewise", "Similarly", "Alternatively", "Conversely", "Instead",
-      "Otherwise", "Particularly", "Specifically", "Generally", "Usually",
-      "Typically", "Rarely", "Frequently", "Occasionally", "Normally"
+      "The",
+      "Then",
+      "This",
+      "That",
+      "These",
+      "Those",
+      "There",
+      "Their",
+      "They",
+      "However",
+      "Suddenly",
+      "Finally",
+      "Eventually",
+      "Certainly",
+      "Perhaps",
+      "Maybe",
+      "While",
+      "When",
+      "After",
+      "Before",
+      "During",
+      "Within",
+      "Without",
+      "Also",
+      "Thus",
+      "Therefore",
+      "Hence",
+      "Besides",
+      "Moreover",
+      "Although",
+      "Despite",
+      "Since",
+      "Because",
+      "Nonetheless",
+      "Nevertheless",
+      "Regardless",
+      "Consequently",
+      "Accordingly",
+      "Meanwhile",
+      "Afterwards",
+      "Beforehand",
+      "Likewise",
+      "Similarly",
+      "Alternatively",
+      "Conversely",
+      "Instead",
+      "Otherwise",
+      "Particularly",
+      "Specifically",
+      "Generally",
+      "Usually",
+      "Typically",
+      "Rarely",
+      "Frequently",
+      "Occasionally",
+      "Normally"
     ];
 
     return commonNonNames.includes(word);
@@ -184,18 +330,20 @@ class EnhancerIntegration {
     try {
       // Create an enhanced prompt with character information
       const enhancedPrompt = this.createEnhancedPrompt(text, characterSummary);
-      
+
       // Show progress indicator
       this.toaster.showMessage("Enhancing text with LLM...");
-      
+
       // Process with Ollama
-      const enhancedText = await this.ollamaClient.enhanceWithLLM(enhancedPrompt);
-      
+      const enhancedText = await this.ollamaClient.enhanceWithLLM(
+        enhancedPrompt
+      );
+
       // Extract only the enhanced text response (removing any prompt or instruction text)
       const cleanedText = this.cleanLLMResponse(enhancedText);
-      
+
       this.toaster.showMessage("Text enhancement complete!", 3000);
-      
+
       return cleanedText;
     } catch (error) {
       console.error("LLM enhancement error:", error);
@@ -239,14 +387,20 @@ ${text}`;
    */
   cleanLLMResponse(llmResponse) {
     // If the response contains markdown code blocks, remove them
-    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, '');
-    
+    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
+
     // Remove potential explanations or notes at the beginning/end
-    cleanedText = cleanedText.replace(/^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i, '');
-    
+    cleanedText = cleanedText.replace(
+      /^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i,
+      ""
+    );
+
     // Remove any final notes
-    cleanedText = cleanedText.replace(/(Note:.*$)|(I hope this helps.*$)/im, '');
-    
+    cleanedText = cleanedText.replace(
+      /(Note:.*$)|(I hope this helps.*$)/im,
+      ""
+    );
+
     return cleanedText.trim();
   }
 
@@ -307,7 +461,7 @@ ${text}`;
   setProcessingTime(processingTime) {
     this.processingTime = processingTime;
   }
-  
+
   /**
    * Get the current totalDialoguesEnhanced
    * @return {number} - Total dialogues enhanced

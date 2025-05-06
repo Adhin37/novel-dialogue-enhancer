@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
   const modelNameInput = document.getElementById("model-name");
-  const ollamaUrlInput = document.getElementById("ollama-url");
   const saveButton = document.getElementById("save");
   const maxChunkSizeSlider = document.getElementById("max-chunk-size");
   const maxChunkSizeValue = document.getElementById("max-chunk-size-value");
@@ -11,7 +10,6 @@ document.addEventListener("DOMContentLoaded", function () {
   const whitelistItemsContainer = document.getElementById("whitelist-items");
   const clearAllBtn = document.getElementById("clear-all");
   const closeBtn = document.getElementById("close-btn");
-  const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 
   loadWhitelist();
 
@@ -79,13 +77,11 @@ document.addEventListener("DOMContentLoaded", function () {
   chrome.storage.sync.get(
     {
       modelName: "qwen3:8b",
-      ollamaUrl: "http://localhost:11434",
       maxChunkSize: 8000,
       timeout: 120
     },
     function (data) {
       modelNameInput.value = data.modelName;
-      ollamaUrlInput.value = data.ollamaUrl;
       maxChunkSizeSlider.value = data.maxChunkSize;
       maxChunkSizeValue.textContent = data.maxChunkSize;
       timeoutSlider.value = data.timeout;
@@ -104,12 +100,10 @@ document.addEventListener("DOMContentLoaded", function () {
   saveButton.addEventListener("click", function () {
     const maxChunkSize = parseInt(maxChunkSizeSlider.value);
     const timeout = parseInt(timeoutSlider.value);
-    const ollamaUrl = ollamaUrlInput.value.trim() || DEFAULT_OLLAMA_URL;
 
     chrome.storage.sync.set(
       {
         modelName: modelNameInput.value.trim() || "qwen3:8b",
-        ollamaUrl: ollamaUrl,
         maxChunkSize: maxChunkSize,
         timeout: timeout
       },
@@ -131,13 +125,10 @@ document.addEventListener("DOMContentLoaded", function () {
     ollamaStatus.textContent = "Testing Ollama connection...";
     ollamaStatus.className = "status-message pending";
 
-    const currentOllamaUrl = ollamaUrlInput.value.trim() || DEFAULT_OLLAMA_URL;
-
     try {
       chrome.runtime.sendMessage(
         {
-          action: "checkOllamaAvailability",
-          data: { ollamaUrl: currentOllamaUrl }
+          action: "checkOllamaAvailability"
         },
         (response) => {
           if (chrome.runtime.lastError) {

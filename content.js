@@ -12,6 +12,7 @@ let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
 let ollamaClient;
+let maxRetries = 3;
 
 function init() {
   enhancerIntegration = new EnhancerIntegration();
@@ -30,33 +31,53 @@ function init() {
 
       characterMap = data.characterMap || {};
 
-      checkOllamaStatus();
+      setTimeout(() => {
+        checkOllamaStatus();
 
-      if (settings.enhancerEnabled) {
-        enhancePage();
-      }
+        if (settings.enhancerEnabled) {
+          enhancePage();
+        }
+      }, 1000);
     }
   );
 }
 
 async function checkOllamaStatus() {
-  try {
-    const status = await ollamaClient.checkOllamaAvailability();
-    if (status.available) {
-      console.log(`Ollama is running (v${status.version})`);
-    } else {
-      console.warn(`Ollama is not available: ${status.reason}`);
-
-      chrome.runtime.sendMessage({
-        action: "showNotification",
-        data: {
-          title: "Ollama Not Available",
-          message: `LLM enhancement requires Ollama to be running. Ollama is not available (${status.reason}). Please start Ollama and try again.`
-        }
-      });
+  console.log("Checking Ollama status...");
+  let retries = 0;
+  let status = null;
+  
+  while (retries < maxRetries) {
+    try {
+      status = await ollamaClient.checkOllamaAvailability();
+      break;
+    } catch (err) {
+      console.warn(`Ollama check failed (attempt ${retries + 1}/${maxRetries}):`, err);
+      retries++;
+      
+      if (retries < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+      }
     }
-  } catch (err) {
-    console.error("Failed to check Ollama status:", err);
+  }
+  
+  if (status && status.available) {
+    console.log(`Ollama is running (v${status.version})`);
+  } else {
+    const reason = status ? status.reason : "Unknown error";
+    console.warn(`Ollama is not available: ${reason}`);
+
+    chrome.runtime.sendMessage({
+      action: "showNotification",
+      data: {
+        title: "Ollama Not Available",
+        message: `LLM enhancement requires Ollama to be running. Ollama is not available (${reason}). Please start Ollama and try again.`
+      }
+    }, response => {
+      if (chrome.runtime.lastError) {
+        console.warn("Could not send notification:", chrome.runtime.lastError);
+      }
+    });
   }
 }
 
@@ -201,10 +222,13 @@ async function enhancePageWithLLM() {
 
     if (paragraphs.length === 0) {
       const originalText = contentElement.innerHTML;
-      
+
       // Extract character data before LLM enhancement
       if (settings.preserveNames || settings.fixPronouns) {
-        const result = enhancerIntegration.extractCharacterNamesInternal(originalText, characterMap);
+        const result = enhancerIntegration.extractCharacterNames(
+          originalText,
+          characterMap
+        );
         characterMap = result;
       }
 
@@ -264,7 +288,10 @@ async function enhancePageWithLLM() {
 
         // Extract character data for this batch before LLM enhancement
         if (settings.preserveNames || settings.fixPronouns) {
-          const result = enhancerIntegration.extractCharacterNamesInternal(batchText, characterMap);
+          const result = enhancerIntegration.extractCharacterNames(
+            batchText,
+            characterMap
+          );
           characterMap = result;
         }
 
@@ -303,12 +330,10 @@ async function enhancePageWithLLM() {
           );
         } catch (error) {
           console.error(
-            `LLM enhancement failed for batch ${i}-${
-              i + chunkSize
-            }:`,
+            `LLM enhancement failed for batch ${i}-${i + chunkSize}:`,
             error
           );
-          
+
           toaster.showMessage(
             `Batch ${i}-${
               i + batch.length

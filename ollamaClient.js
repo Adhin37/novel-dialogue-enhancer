@@ -5,7 +5,7 @@
  */
 class OllamaClient {
     constructor() {
-      this.CLIENT_TIMEOUT = 180000; // Increased timeout for more complex prompts
+      this.CLIENT_TIMEOUT = 200000; // Increased timeout for more complex prompts
       this.DEFAULT_CHUNK_SIZE = 8000;
       this.BATCH_DELAY = 800;
       this.API_ENDPOINT = "http://localhost:11434/api";
