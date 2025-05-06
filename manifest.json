@@ -16,7 +16,7 @@
     "*://*.novelupdates.com/*",
     "*://*.wuxiaworld.com/*",
     "*://*.webnovel.com/*",
-    "http://localhost:11434/*"
+    "http://localhost:*"
   ],
   "action": {
     "default_popup": "popup.html",

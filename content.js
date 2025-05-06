@@ -193,23 +193,21 @@ async function enhancePageWithLLM() {
     if (paragraphs.length === 0) {
       const originalText = contentElement.innerHTML;
 
-      const initialEnhancedText = enhanceText(originalText);
-
       try {
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user before processing");
-          contentElement.innerHTML = initialEnhancedText;
+          contentElement.innerHTML = originalText;
           toaster.showError("Enhancement terminated by user");
           return;
         }
 
         console.log("Sending content to LLM for full-content enhancement");
         toaster.updateProgress(0, 1, true);
-        const llmEnhancedText = await enhanceWithLLM(initialEnhancedText);
+        const llmEnhancedText = await ollamaClient.enhanceWithLLM(originalText);
 
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user after processing");
-          contentElement.innerHTML = initialEnhancedText;
+          contentElement.innerHTML = originalText;
           toaster.showError("Enhancement terminated by user");
           return;
         }
@@ -218,7 +216,7 @@ async function enhancePageWithLLM() {
         toaster.updateProgress(1, 1, true);
       } catch (error) {
         console.warn("LLM enhancement failed, using rule-based result:", error);
-        contentElement.innerHTML = initialEnhancedText;
+        contentElement.innerHTML = originalText;
         toaster.showError("LLM enhancement failed: " + error.message);
       }
     } else {
@@ -251,17 +249,13 @@ async function enhancePageWithLLM() {
           batchText += p.innerHTML + "\n\n";
         });
 
-        const initialEnhanced = enhanceText(batchText);
-
         try {
           console.log(
             `Sending large batch ${i}-${i + batch.length - 1} to LLM (${
               batchText.length
             } chars)`
           );
-          const llmEnhanced = await ollamaClient.enhanceWithLLM(
-            initialEnhanced
-          );
+          const llmEnhanced = await ollamaClient.enhanceWithLLM(batchText);
 
           if (terminateRequested) {
             console.log(
@@ -296,7 +290,7 @@ async function enhancePageWithLLM() {
             error
           );
 
-          const enhancedParagraphs = initialEnhanced.split("\n\n");
+          const enhancedParagraphs = batchText.split("\n\n");
           for (
             let j = 0;
             j < batch.length && j < enhancedParagraphs.length;
@@ -330,7 +324,6 @@ async function enhancePageWithLLM() {
     );
 
     toaster.showError("LLM enhancement failed: " + error.message);
-    enhancePageWithRules();
   } finally {
     console.timeEnd("llmEnhancement");
   }
@@ -379,10 +372,6 @@ function enhanceText(text) {
   characterMap = result.characterMap;
 
   return result.enhancedText;
-}
-
-function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
