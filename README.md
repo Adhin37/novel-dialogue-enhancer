@@ -5,7 +5,7 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 ## Features
 
 - **Natural Dialogue Enhancement**: Automatically converts stiff, literally-translated dialogue into more natural English
-- **Character Name Preservation**: Keeps original character names intact 
+- **Character Name Preservation**: Keeps original character names intact
 - **Pronoun Correction**: Fixes common pronoun mistakes by tracking character genders
 - **Dynamic Content Detection**: Works with various novel websites by intelligently finding the content area
 - **Customizable Settings**: Toggle features on/off according to your preferences
@@ -13,9 +13,11 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 ## Installation
 
 ### From Chrome Web Store
-*(Coming soon)*
+
+(Coming soon)
 
 ### Manual Installation
+
 1. Download this repository as a ZIP file and extract it
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" (toggle in the top-right corner)
@@ -34,6 +36,7 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 ## Supported Websites
 
 The extension currently supports many popular novel translation sites including:
+
 - FanMTL.com
 - NovelUpdates.com
 - WuxiaWorld.com
@@ -43,6 +46,7 @@ The extension currently supports many popular novel translation sites including:
 ## How It Works
 
 The extension:
+
 1. Identifies the main content area of the novel page
 2. Analyzes the text to detect character names and their likely genders
 3. Processes the dialogue to make it sound more natural

@@ -12,6 +12,7 @@ let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
 let ollamaClient;
+
 function init() {
   enhancerIntegration = new EnhancerIntegration();
   toaster = new Toaster();
@@ -50,7 +51,7 @@ async function checkOllamaStatus() {
         action: "showNotification",
         data: {
           title: "Ollama Not Available",
-          message: `LLM enhancement is enabled but Ollama is not available (${status.reason}). Rule-based enhancement will be used instead.`
+          message: `LLM enhancement requires Ollama to be running. Ollama is not available (${status.reason}). Please start Ollama and try again.`
         }
       });
     }
@@ -144,6 +145,13 @@ async function enhancePage() {
   }
 
   try {
+    const ollamaStatus = await ollamaClient.checkOllamaAvailability();
+    if (!ollamaStatus.available) {
+      console.warn("Ollama not available, cannot enhance content");
+      toaster.showError(`Ollama not available: ${ollamaStatus.reason}`);
+      throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
+    }
+
     await enhancePageWithLLM();
 
     chrome.runtime.sendMessage({
@@ -157,6 +165,7 @@ async function enhancePage() {
     toaster.finishProgress();
   } catch (error) {
     console.error("Novel Dialogue Enhancer: Enhancement error", error);
+    toaster.showError(`Enhancement failed: ${error.message}`);
   } finally {
     if (typeof observer !== "undefined" && observer && contentElement) {
       setTimeout(() => {
@@ -192,11 +201,16 @@ async function enhancePageWithLLM() {
 
     if (paragraphs.length === 0) {
       const originalText = contentElement.innerHTML;
+      
+      // Extract character data before LLM enhancement
+      if (settings.preserveNames || settings.fixPronouns) {
+        const result = enhancerIntegration.extractCharacterNamesInternal(originalText, characterMap);
+        characterMap = result;
+      }
 
       try {
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user before processing");
-          contentElement.innerHTML = originalText;
           toaster.showError("Enhancement terminated by user");
           return;
         }
@@ -207,7 +221,6 @@ async function enhancePageWithLLM() {
 
         if (terminateRequested) {
           console.log("LLM enhancement terminated by user after processing");
-          contentElement.innerHTML = originalText;
           toaster.showError("Enhancement terminated by user");
           return;
         }
@@ -215,9 +228,9 @@ async function enhancePageWithLLM() {
         contentElement.innerHTML = llmEnhancedText;
         toaster.updateProgress(1, 1, true);
       } catch (error) {
-        console.warn("LLM enhancement failed, using rule-based result:", error);
-        contentElement.innerHTML = originalText;
+        console.error("LLM enhancement failed:", error);
         toaster.showError("LLM enhancement failed: " + error.message);
+        throw error;
       }
     } else {
       const totalParagraphs = paragraphs.length;
@@ -248,6 +261,12 @@ async function enhancePageWithLLM() {
         batch.forEach((p) => {
           batchText += p.innerHTML + "\n\n";
         });
+
+        // Extract character data for this batch before LLM enhancement
+        if (settings.preserveNames || settings.fixPronouns) {
+          const result = enhancerIntegration.extractCharacterNamesInternal(batchText, characterMap);
+          characterMap = result;
+        }
 
         try {
           console.log(
@@ -283,26 +302,17 @@ async function enhancePageWithLLM() {
             true
           );
         } catch (error) {
-          console.warn(
+          console.error(
             `LLM enhancement failed for batch ${i}-${
               i + chunkSize
-            }, using rule-based result:`,
+            }:`,
             error
           );
-
-          const enhancedParagraphs = batchText.split("\n\n");
-          for (
-            let j = 0;
-            j < batch.length && j < enhancedParagraphs.length;
-            j++
-          ) {
-            batch[j].innerHTML = enhancedParagraphs[j];
-          }
-
+          
           toaster.showMessage(
             `Batch ${i}-${
               i + batch.length
-            } failed, using rule-based result. Continuing...`,
+            } failed. Skipping this batch and continuing...`,
             2000
           );
         }
@@ -322,10 +332,10 @@ async function enhancePageWithLLM() {
       "Novel Dialogue Enhancer: LLM enhancement failed completely",
       error
     );
-
     toaster.showError("LLM enhancement failed: " + error.message);
+    throw error;
   } finally {
-    console.timeEnd("llmEnhancement");
+    console.timeEnd("LLMEnhancement");
   }
 }
 
@@ -356,22 +366,6 @@ function handleTerminationRequest() {
     terminateRequested = false;
     pendingEnhancement = false;
   }
-}
-
-function enhanceText(text) {
-  if (terminateRequested) {
-    return text;
-  }
-
-  const result = enhancerIntegration.enhanceTextIntegrated(
-    text,
-    settings,
-    characterMap
-  );
-
-  characterMap = result.characterMap;
-
-  return result.enhancedText;
 }
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {

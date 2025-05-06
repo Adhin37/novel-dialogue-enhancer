@@ -1,19 +1,22 @@
 // enhancerIntegration.js
 
 /**
- * Enhancer integration module for Novel Dialogue Enhancer
- * This module combines the functionality of dialogueUtils and genderUtils
+ * Enhanced integration module for Novel Dialogue Enhancer
+ * Integrates dialogueUtils, genderUtils, and ollamaClient for LLM-based enhancement
  */
 class EnhancerIntegration {
   constructor() {
     this.dialogueUtils = new DialogueUtils();
     this.genderUtils = new GenderUtils();
+    this.ollamaClient = new OllamaClient();
+    this.toaster = new Toaster();
+    
     this.setTotalDialoguesEnhanced(0);
     this.setTotalPronounsFixed(0);
     this.setTotalCharactersDetected(0);
     this.setProcessingTime(0);
 
-    console.log("Novel Dialogue Enhancer: Integration module initialized");
+    console.log("Novel Dialogue Enhancer: Integration module initialized with LLM support");
 
     this.setEnhancementStats({
       totalDialoguesEnhanced: this.getTotalDialoguesEnhanced(),
@@ -24,43 +27,57 @@ class EnhancerIntegration {
   }
 
   /**
-   * Enhance text with all available improvements
+   * Main enhancement function for text using LLM
    * @param {string} text - The text to enhance
-   * @param {object} settings - Enhancement settings
-   * @param {object} characterMap - Existing character data
-   * @return {object} - Enhanced text and updated character map
+   * @return {Promise<string>} - Enhanced text
    */
-  enhanceTextIntegrated(text, settings, characterMap = {}) {
+  async enhanceText(text) {
     const startTime = performance.now();
-
-    if (settings.preserveNames || settings.fixPronouns) {
-      characterMap = this.extractCharacterNamesInternal(text, characterMap);
-    }
-
-    let enhancedText = text;
-
-    enhancedText = enhancedText.replace(/"([^"]+)"/g, (match, dialogue) => {
-      const enhanced = this.dialogueUtils.enhanceDialogue(dialogue);
-      if (enhanced !== dialogue) {
-        this.setTotalDialoguesEnhanced(this.getTotalDialoguesEnhanced() + 1);
+    
+    try {
+      // Extract character information
+      const characterMap = this.extractCharacterNames(text);
+      const characterArray = Object.entries(characterMap).map(([name, data]) => ({
+        name,
+        gender: data.gender,
+        appearances: data.appearances
+      }));
+      
+      // Get dialogue patterns for statistics
+      const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
+      const dialogueCount = dialoguePatterns.quotedDialogue.length + 
+                           dialoguePatterns.colonSeparatedDialogue.length +
+                           dialoguePatterns.actionDialogue.length;
+      
+      this.setTotalDialoguesEnhanced(this.getTotalDialoguesEnhanced() + dialogueCount);
+      
+      // Check LLM availability
+      const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
+      if (!ollamaStatus.available) {
+        this.toaster.showError(`LLM not available: ${ollamaStatus.reason}`);
+        return text;
       }
-      return `"${enhanced}"`;
-    });
-
-    enhancedText = this.dialogueUtils.fixDialoguePatterns(enhancedText);
-
-    if (settings.fixPronouns) {
-      enhancedText = this.fixPronounsIntegrated(enhancedText, characterMap);
+      
+      // Create character summary for LLM context
+      const characterSummary = this.dialogueUtils.createDialogueSummary(characterArray);
+      
+      // Enhance text with LLM
+      const enhancedText = await this.enhanceTextWithLLM(text, characterSummary);
+      
+      const endTime = performance.now();
+      this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
+      
+      return enhancedText;
+      
+    } catch (error) {
+      console.error("Error enhancing text:", error);
+      this.toaster.showError("Enhancement failed: " + error.message);
+      
+      const endTime = performance.now();
+      this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
+      
+      return text;
     }
-
-    this.setProcessingTime(
-      this.getProcessingTime() + performance.now() - startTime
-    );
-
-    return {
-      enhancedText,
-      characterMap
-    };
   }
 
   /**
@@ -69,13 +86,51 @@ class EnhancerIntegration {
    * @param {object} existingMap - Existing character data
    * @return {object} - Updated character map
    */
-  extractCharacterNamesInternal(text, existingMap = {}) {
+  extractCharacterNames(text, existingMap = {}) {
+    console.log("Extracting character names and genders...");
     const characterMap = { ...existingMap };
+    const startCharCount = Object.keys(characterMap).length;
 
+    // Get dialogue patterns
+    const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
+    
+    // Extract characters from dialogue
+    const characterNames = this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
+    
+    // Process each character name
+    characterNames.forEach(name => {
+      if (!characterMap[name]) {
+        const gender = this.genderUtils.guessGender(name, text, characterMap);
+        characterMap[name] = {
+          gender,
+          appearances: 1
+        };
+      } else {
+        characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
+      }
+    });
+    
+    // Look for additional names using more patterns
+    this.extractAdditionalNames(text, characterMap);
+    
+    const newCharCount = Object.keys(characterMap).length - startCharCount;
+    this.setTotalCharactersDetected(this.getTotalCharactersDetected() + newCharCount);
+    
+    console.log(`Extracted ${Object.keys(characterMap).length} characters:`, characterMap);
+    return characterMap;
+  }
+
+  /**
+   * Extract additional names using more patterns
+   * @param {string} text - The text to analyze
+   * @param {object} characterMap - Character map to update
+   */
+  extractAdditionalNames(text, characterMap) {
     const namePatterns = [
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
       /"([^"]+)"\s*,?\s*([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered)/g,
-      /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s*:\s*"([^"]+)"/g
+      /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s*:\s*"([^"]+)"/g,
+      /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})'s\s+(?:face|eyes|voice|body|hand|arm|leg|hair|head|mouth|mind|heart|soul|gaze|attention)/g
     ];
 
     for (const pattern of namePatterns) {
@@ -91,153 +146,114 @@ class EnhancerIntegration {
             gender,
             appearances: 1
           };
-          this.setTotalCharactersDetected(
-            this.getTotalCharactersDetected() + 1
-          );
         } else {
-          characterMap[name].appearances =
-            (characterMap[name].appearances || 0) + 1;
+          characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
         }
       }
     }
-
-    return characterMap;
   }
 
   /**
    * Check if a potential name is actually a common word or phrase
-   * that shouldn't be considered a character name
+   * @param {string} word - Word to check
+   * @return {boolean} - True if common non-name
    */
   isCommonNonName(word) {
     const commonNonNames = [
-      "The",
-      "Then",
-      "This",
-      "That",
-      "These",
-      "Those",
-      "There",
-      "Their",
-      "They",
-      "However",
-      "Suddenly",
-      "Finally",
-      "Eventually",
-      "Certainly",
-      "Perhaps",
-      "Maybe",
-      "While",
-      "When",
-      "After",
-      "Before",
-      "During",
-      "Within",
-      "Without",
-      "Also",
-      "Thus",
-      "Therefore",
-      "Hence",
-      "Besides",
-      "Moreover",
-      "Although",
-      "Despite",
-      "Since",
-      "Because",
-      "Nonetheless",
-      "Nevertheless",
-      "Regardless",
-      "Consequently",
-      "Accordingly",
-      "Meanwhile",
-      "Afterwards",
-      "Beforehand",
-      "Likewise",
-      "Similarly",
-      "Alternatively",
-      "Conversely",
-      "Instead",
-      "Otherwise",
-      "Particularly",
-      "Specifically",
-      "Generally",
-      "Usually",
-      "Typically",
-      "Rarely",
-      "Frequently",
-      "Occasionally",
-      "Normally"
+      "The", "Then", "This", "That", "These", "Those", "There", "Their", "They",
+      "However", "Suddenly", "Finally", "Eventually", "Certainly", "Perhaps",
+      "Maybe", "While", "When", "After", "Before", "During", "Within", "Without",
+      "Also", "Thus", "Therefore", "Hence", "Besides", "Moreover", "Although",
+      "Despite", "Since", "Because", "Nonetheless", "Nevertheless", "Regardless",
+      "Consequently", "Accordingly", "Meanwhile", "Afterwards", "Beforehand",
+      "Likewise", "Similarly", "Alternatively", "Conversely", "Instead",
+      "Otherwise", "Particularly", "Specifically", "Generally", "Usually",
+      "Typically", "Rarely", "Frequently", "Occasionally", "Normally"
     ];
 
     return commonNonNames.includes(word);
   }
 
   /**
-   * Fix pronouns based on character map
-   * @param {string} text - The text to fix
-   * @param {object} characterMap - Character data with gender information
-   * @return {string} - Text with fixed pronouns
+   * Enhance text using the LLM with character context
+   * @param {string} text - Text to enhance
+   * @param {string} characterSummary - Character information summary
+   * @return {Promise<string>} - Enhanced text
    */
-  fixPronounsIntegrated(text, characterMap) {
-    let fixedText = text;
-    let fixCount = 0;
+  async enhanceTextWithLLM(text, characterSummary) {
+    try {
+      // Create an enhanced prompt with character information
+      const enhancedPrompt = this.createEnhancedPrompt(text, characterSummary);
+      
+      // Show progress indicator
+      this.toaster.showMessage("Enhancing text with LLM...");
+      
+      // Process with Ollama
+      const enhancedText = await this.ollamaClient.enhanceWithLLM(enhancedPrompt);
+      
+      // Extract only the enhanced text response (removing any prompt or instruction text)
+      const cleanedText = this.cleanLLMResponse(enhancedText);
+      
+      this.toaster.showMessage("Text enhancement complete!", 3000);
+      
+      return cleanedText;
+    } catch (error) {
+      console.error("LLM enhancement error:", error);
+      this.toaster.showError("LLM enhancement failed: " + error.message);
+      throw error;
+    }
+  }
 
-    Object.keys(characterMap).forEach((name) => {
-      const character = characterMap[name];
+  /**
+   * Create an enhanced prompt with character information
+   * @param {string} text - Original text
+   * @param {string} characterSummary - Character information summary
+   * @return {string} - Enhanced prompt for LLM
+   */
+  createEnhancedPrompt(text, characterSummary) {
+    return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following text to make it sound more natural in English.
 
-      if (character.gender === "unknown") return;
+${characterSummary}
 
-      const nameRegex = new RegExp(
-        `([^.!?]*\\b${this.escapeRegExp(name)}\\b[^.!?]*(?:[.!?]))`,
-        "g"
-      );
+INSTRUCTIONS:
+0. IMPORTANT: Do not omit or remove any sentences or paragraphs. Every original paragraph must appear in the output, even if lightly edited for style or clarity.
+1. Improve dialogue naturalness while preserving the original meaning
+2. Make dialogue flow better in English
+3. Keep all character names in the same language and exactly as provided
+4. Fix pronoun inconsistencies based on the character information above
+5. Briefly translate any foreign titles/cities/terms to English
+6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary
+7. IMPORTANT: Do not use markdown formatting or annotations
+8. Maintain paragraph breaks as in the original text as much as possible
+9. Focus especially on maintaining gender consistency based on the character information provided
 
-      const matches = Array.from(fixedText.matchAll(nameRegex));
+TEXT TO ENHANCE:
 
-      matches.forEach((match) => {
-        const sentence = match[0];
-        const sentenceIndex = match.index;
+${text}`;
+  }
 
-        const followingText = fixedText.substring(
-          sentenceIndex + sentence.length
-        );
-
-        if (character.gender === "male") {
-          const fixedFollowing = followingText
-            .replace(/\b(She|she)\b(?=\s)(?![^<]*>)/g, "He")
-            .replace(/\b(Her|her)\b(?=\s)(?![^<]*>)/g, (match) => {
-              return /\b(Her|her)\b\s+([\w-]+)/i.test(match) ? "His" : "Him";
-            })
-            .replace(/\b(herself)\b(?=\s)(?![^<]*>)/g, "himself");
-
-          if (followingText !== fixedFollowing) {
-            fixedText =
-              fixedText.substring(0, sentenceIndex + sentence.length) +
-              fixedFollowing;
-            fixCount++;
-          }
-        } else if (character.gender === "female") {
-          const fixedFollowing = followingText
-            .replace(/\b(He|he)\b(?=\s)(?![^<]*>)/g, "She")
-            .replace(/\b(His|his)\b(?=\s)(?![^<]*>)/g, "Her")
-            .replace(/\b(Him|him)\b(?=\s)(?![^<]*>)/g, "Her")
-            .replace(/\b(himself)\b(?=\s)(?![^<]*>)/g, "herself");
-
-          if (followingText !== fixedFollowing) {
-            fixedText =
-              fixedText.substring(0, sentenceIndex + sentence.length) +
-              fixedFollowing;
-            fixCount++;
-          }
-        }
-      });
-    });
-
-    this.setTotalPronounsFixed(this.getTotalPronounsFixed() + fixCount);
-    return fixedText;
+  /**
+   * Clean the LLM response to extract only the enhanced text
+   * @param {string} llmResponse - Raw LLM response
+   * @return {string} - Cleaned enhanced text
+   */
+  cleanLLMResponse(llmResponse) {
+    // If the response contains markdown code blocks, remove them
+    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, '');
+    
+    // Remove potential explanations or notes at the beginning/end
+    cleanedText = cleanedText.replace(/^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i, '');
+    
+    // Remove any final notes
+    cleanedText = cleanedText.replace(/(Note:.*$)|(I hope this helps.*$)/im, '');
+    
+    return cleanedText.trim();
   }
 
   /**
    * Escape special characters for regex
+   * @param {string} string - String to escape
+   * @return {string} - Escaped string
    */
   escapeRegExp(string) {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -262,7 +278,7 @@ class EnhancerIntegration {
 
   /**
    * Set the current totalDialoguesEnhanced
-   * @return {object} - totalDialoguesEnhanced
+   * @param {number} totalDialoguesEnhanced - Number of dialogues enhanced
    */
   setTotalDialoguesEnhanced(totalDialoguesEnhanced) {
     this.totalDialoguesEnhanced = totalDialoguesEnhanced;
@@ -270,7 +286,7 @@ class EnhancerIntegration {
 
   /**
    * Set the current totalPronounsFixed
-   * @return {object} - totalPronounsFixed
+   * @param {number} totalPronounsFixed - Number of pronouns fixed
    */
   setTotalPronounsFixed(totalPronounsFixed) {
     this.totalPronounsFixed = totalPronounsFixed;
@@ -278,7 +294,7 @@ class EnhancerIntegration {
 
   /**
    * Set the current totalCharactersDetected
-   * @return {object} - totalCharactersDetected
+   * @param {number} totalCharactersDetected - Number of characters detected
    */
   setTotalCharactersDetected(totalCharactersDetected) {
     this.totalCharactersDetected = totalCharactersDetected;
@@ -286,14 +302,15 @@ class EnhancerIntegration {
 
   /**
    * Set the current processingTime
-   * @return {object} - processingTime
+   * @param {number} processingTime - Processing time in ms
    */
   setProcessingTime(processingTime) {
     this.processingTime = processingTime;
   }
+  
   /**
    * Get the current totalDialoguesEnhanced
-   * @return {number} - totalDialoguesEnhanced
+   * @return {number} - Total dialogues enhanced
    */
   getTotalDialoguesEnhanced() {
     return this.totalDialoguesEnhanced;
@@ -301,7 +318,7 @@ class EnhancerIntegration {
 
   /**
    * Get the current totalPronounsFixed
-   * @return {number} - totalPronounsFixed
+   * @return {number} - Total pronouns fixed
    */
   getTotalPronounsFixed() {
     return this.totalPronounsFixed;
@@ -309,7 +326,7 @@ class EnhancerIntegration {
 
   /**
    * Get the current totalCharactersDetected
-   * @return {number} - totalCharactersDetected
+   * @return {number} - Total characters detected
    */
   getTotalCharactersDetected() {
     return this.totalCharactersDetected;
@@ -317,7 +334,7 @@ class EnhancerIntegration {
 
   /**
    * Get the current processingTime
-   * @return {number} - processingTime
+   * @return {number} - Processing time in ms
    */
   getProcessingTime() {
     return this.processingTime;
