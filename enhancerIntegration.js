@@ -9,7 +9,6 @@ class EnhancerIntegration {
     this.dialogueUtils = new DialogueUtils();
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
-    this.toaster = new Toaster();
 
     this.setTotalDialoguesEnhanced(0);
     this.setTotalPronounsFixed(0);
@@ -59,17 +58,19 @@ class EnhancerIntegration {
           appearances: data.appearances
         })
       );
-      const characterSummary = this.createDialogueSummary(characterArray);
+
+      const characterSummary =
+        this.dialogueUtils.createDialogueSummary(characterArray);
 
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
-        this.toaster.showError(`LLM not available: ${ollamaStatus.reason}`);
+        console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
 
       // Use the ollamaClient directly, passing the character summary
-      const enhancedText = await this.ollamaClient.enhanceWithLLM(
+      const enhancedText = await this.enhanceTextWithLLM(
         text,
         characterSummary
       );
@@ -80,50 +81,12 @@ class EnhancerIntegration {
       return enhancedText;
     } catch (error) {
       console.error("Error enhancing text:", error);
-      this.toaster.showError("Enhancement failed: " + error.message);
 
       const endTime = performance.now();
       this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
 
       return text;
     }
-  }
-
-  /**
-   * Create a dialogue summary from character data for LLM context
-   * @param {Array} characters - Character data array
-   * @return {string} - Character summary string
-   */
-  createDialogueSummary(characterArray) {
-    if (!characterArray || characterArray.length === 0) {
-      return "";
-    }
-
-    let summary =
-      "CHARACTER INFORMATION (for gender and pronoun consistency):\n";
-
-    characterArray.sort((a, b) => (b.appearances || 0) - (a.appearances || 0));
-
-    // Include only characters with multiple appearances to avoid noise
-    const significantCharacters = characterArray.filter(
-      (c) => c.appearances > 1
-    );
-
-    for (const character of significantCharacters.slice(0, 10)) {
-      const genderInfo = character.gender
-        ? `(${character.gender}, ${
-            character.gender === "male"
-              ? "he/him"
-              : character.gender === "female"
-              ? "she/her"
-              : "they/them"
-          })`
-        : "(unknown gender)";
-
-      summary += `- ${character.name} ${genderInfo}\n`;
-    }
-
-    return summary;
   }
 
   /**
@@ -161,16 +124,61 @@ class EnhancerIntegration {
     // Look for additional names using more patterns
     this.extractAdditionalNames(text, characterMap);
 
+    // Clean up characters
+    this.cleanupCharacterMap(characterMap);
+
+    // Track new characters found
     const newCharCount = Object.keys(characterMap).length - startCharCount;
     this.setTotalCharactersDetected(
       this.getTotalCharactersDetected() + newCharCount
     );
 
+    // Get novel ID and sync character map with background
+    const novelId = this.generateNovelId();
+    if (novelId && Object.keys(characterMap).length > 0) {
+      this.syncCharacterMap(characterMap, novelId);
+    }
+
     console.log(
-      `Extracted ${Object.keys(characterMap).length} characters:`,
+      `Extracted ${
+        Object.keys(characterMap).length
+      } characters for novel ${novelId}:`,
       characterMap
     );
     return characterMap;
+  }
+
+  /**
+   * Generate a novel identifier based on URL and title
+   * @return {string} - Unique novel identifier
+   */
+  generateNovelId() {
+    const url = window.location.href;
+    const title = document.title;
+
+    let domain = new URL(url).hostname.replace(/^www\./, "");
+    let novelName = "";
+
+    if (title) {
+      const titleParts = title.split(/[|\-–—:]/);
+      if (titleParts.length > 0) {
+        novelName = titleParts[0].trim();
+      }
+    }
+
+    if (!novelName) {
+      novelName = title.replace(/[^\w\s]/g, "").trim();
+    }
+
+    const novelId = `${domain}_${novelName}`
+      .toLowerCase()
+      .replace(/[^\w]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/_(\d+)(?=\.\w+$)/, "")
+      .substring(0, 50);
+
+    console.log(`Generated novel ID: ${novelId}`);
+    return novelId;
   }
 
   /**
@@ -291,71 +299,22 @@ class EnhancerIntegration {
   }
 
   /**
-   * Check if a potential name is actually a common word or phrase
-   * @param {string} word - Word to check
-   * @return {boolean} - True if common non-name
+   * Sync character map with background script
+   * @param {object} characterMap - Character map to sync
+   * @param {string} novelId - Unique identifier for the novel
    */
-  isCommonNonName(word) {
-    const commonNonNames = [
-      "The",
-      "Then",
-      "This",
-      "That",
-      "These",
-      "Those",
-      "There",
-      "Their",
-      "They",
-      "However",
-      "Suddenly",
-      "Finally",
-      "Eventually",
-      "Certainly",
-      "Perhaps",
-      "Maybe",
-      "While",
-      "When",
-      "After",
-      "Before",
-      "During",
-      "Within",
-      "Without",
-      "Also",
-      "Thus",
-      "Therefore",
-      "Hence",
-      "Besides",
-      "Moreover",
-      "Although",
-      "Despite",
-      "Since",
-      "Because",
-      "Nonetheless",
-      "Nevertheless",
-      "Regardless",
-      "Consequently",
-      "Accordingly",
-      "Meanwhile",
-      "Afterwards",
-      "Beforehand",
-      "Likewise",
-      "Similarly",
-      "Alternatively",
-      "Conversely",
-      "Instead",
-      "Otherwise",
-      "Particularly",
-      "Specifically",
-      "Generally",
-      "Usually",
-      "Typically",
-      "Rarely",
-      "Frequently",
-      "Occasionally",
-      "Normally"
-    ];
+  syncCharacterMap(characterMap, novelId) {
+    if (!novelId) {
+      console.warn("No novel ID provided for character map sync");
+      return;
+    }
 
-    return commonNonNames.includes(word);
+    console.log(`Syncing character map for novel: ${novelId}`);
+    chrome.runtime.sendMessage({
+      action: "updateCharacterMap",
+      characters: characterMap,
+      novelId: novelId
+    });
   }
 
   /**
@@ -366,56 +325,31 @@ class EnhancerIntegration {
    */
   async enhanceTextWithLLM(text, characterSummary) {
     try {
-      // Create an enhanced prompt with character information
-      const enhancedPrompt = this.createEnhancedPrompt(text, characterSummary);
+      const novelId = this.generateNovelId();
 
-      // Show progress indicator
-      this.toaster.showMessage("Enhancing text with LLM...");
+      // Add context about the novel and writing style
+      const novelInfo = await this.dialogueUtils.analyzeNovelStyle(
+        text,
+        novelId
+      );
 
       // Process with Ollama
       const enhancedText = await this.ollamaClient.enhanceWithLLM(
-        enhancedPrompt
+        text,
+        characterSummary,
+        novelInfo
       );
 
       // Extract only the enhanced text response (removing any prompt or instruction text)
       const cleanedText = this.cleanLLMResponse(enhancedText);
 
-      this.toaster.showMessage("Text enhancement complete!", 3000);
+      console.log("Text enhancement complete!");
 
       return cleanedText;
     } catch (error) {
       console.error("LLM enhancement error:", error);
-      this.toaster.showError("LLM enhancement failed: " + error.message);
       throw error;
     }
-  }
-
-  /**
-   * Create an enhanced prompt with character information
-   * @param {string} text - Original text
-   * @param {string} characterSummary - Character information summary
-   * @return {string} - Enhanced prompt for LLM
-   */
-  createEnhancedPrompt(text, characterSummary) {
-    return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following text to make it sound more natural in English.
-
-${characterSummary}
-
-INSTRUCTIONS:
-0. IMPORTANT: Do not omit or remove any sentences or paragraphs. Every original paragraph must appear in the output, even if lightly edited for style or clarity.
-1. Improve dialogue naturalness while preserving the original meaning
-2. Make dialogue flow better in English
-3. Keep all character names in the same language and exactly as provided
-4. Fix pronoun inconsistencies based on the character information above
-5. Briefly translate any foreign titles/cities/terms to English
-6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary
-7. IMPORTANT: Do not use markdown formatting or annotations
-8. Maintain paragraph breaks as in the original text as much as possible
-9. Focus especially on maintaining gender consistency based on the character information provided
-
-TEXT TO ENHANCE:
-
-${text}`;
   }
 
   /**

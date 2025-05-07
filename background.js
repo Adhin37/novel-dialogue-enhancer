@@ -1,16 +1,46 @@
 // background.js
-let globalCharacterMap = {};
 let activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
+let novelCharacterMaps = {};
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateCharacterMap") {
-    globalCharacterMap = { ...globalCharacterMap, ...request.characters };
+    const novelId = request.novelId;
 
-    chrome.storage.sync.set({ characterMap: globalCharacterMap });
+    if (!novelId) {
+      console.warn("No novel ID provided for character map update");
+      sendResponse({ status: "error", message: "No novel ID provided" });
+      return false;
+    }
+
+    // Create or update the character map for this novel
+    if (!novelCharacterMaps[novelId]) {
+      novelCharacterMaps[novelId] = {};
+    }
+
+    novelCharacterMaps[novelId] = {
+      ...novelCharacterMaps[novelId],
+      ...request.characters
+    };
+
+    // Store in sync storage (with size limit handling)
+    storeNovelCharacterMaps();
 
     sendResponse({ status: "ok" });
-    return false; // No async response needed
+    return false;
+  } else if (request.action === "getCharacterMap") {
+    const novelId = request.novelId;
+
+    if (!novelId) {
+      sendResponse({ status: "error", message: "No novel ID provided" });
+      return false;
+    }
+
+    sendResponse({
+      status: "ok",
+      characterMap: novelCharacterMaps[novelId] || {}
+    });
+    return false;
   } else if (request.action === "ollamaRequest") {
     handleOllamaRequest(request, sendResponse);
     return true; // We'll send a response asynchronously
@@ -27,10 +57,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       status: "terminated",
       count: activeRequestControllers.size
     });
-    return false; // No async response needed
+    return false;
   } else if (request.action === "checkOllamaAvailability") {
     checkOllamaAvailability(sendResponse);
-    return true; // We'll send a response asynchronously
+    return true;
   } else if (request.action === "showNotification") {
     chrome.notifications.create({
       type: "basic",
@@ -45,10 +75,52 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false; // Default case
 });
 
+function storeNovelCharacterMaps() {
+  // Chrome storage has limits, so we need to manage size
+  // Calculate size of all character maps
+  const serialized = JSON.stringify(novelCharacterMaps);
+  const sizeInBytes = new Blob([serialized]).size;
+
+  // If we're approaching size limits (100KB is a safe limit)
+  if (sizeInBytes > 100000) {
+    console.warn(
+      "Character maps getting too large, pruning older/smaller entries"
+    );
+
+    // Get novels with least characters and remove them
+    const novelEntries = Object.entries(novelCharacterMaps);
+
+    // Sort by character count (ascending)
+    novelEntries.sort(
+      (a, b) => Object.keys(a[1]).length - Object.keys(b[1]).length
+    );
+
+    // Remove bottom 20% of novels
+    const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
+    for (let i = 0; i < toRemove; i++) {
+      if (novelEntries[i]) {
+        delete novelCharacterMaps[novelEntries[i][0]];
+      }
+    }
+  }
+
+  // Store the updated maps
+  chrome.storage.local.set({ novelCharacterMaps });
+}
+
+// Load character maps on startup
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get("novelCharacterMaps", (data) => {
+    if (data.novelCharacterMaps) {
+      novelCharacterMaps = data.novelCharacterMaps;
+    }
+  });
+});
+
 function handleOllamaRequest(request, sendResponse) {
   chrome.storage.sync.get(
     {
-      timeout: 180,
+      timeout: 180
     },
     function (data) {
       const OLLAMA_REQUEST_TIMEOUT = data.timeout * 1000;
@@ -93,9 +165,7 @@ function handleOllamaRequest(request, sendResponse) {
               let enhancedText = "";
 
               if (rawText.includes("\n")) {
-                const lines = rawText
-                  .split("\n")
-                  .filter((line) => line.trim());
+                const lines = rawText.split("\n").filter((line) => line.trim());
                 for (const line of lines) {
                   try {
                     const data = JSON.parse(line);
@@ -108,8 +178,7 @@ function handleOllamaRequest(request, sendResponse) {
                 }
               } else {
                 const data = JSON.parse(rawText);
-                enhancedText =
-                  data.response || data.choices?.[0]?.text?.trim();
+                enhancedText = data.response || data.choices?.[0]?.text?.trim();
               }
 
               if (!enhancedText) {
@@ -176,8 +245,10 @@ function handleOllamaRequest(request, sendResponse) {
 }
 
 function checkOllamaAvailability(sendResponse) {
-  console.log(`Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`);
-  
+  console.log(
+    `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
+  );
+
   fetch(DEFAULT_OLLAMA_URL + "/api/version", {
     method: "GET",
     headers: { "Content-Type": "application/json" },
@@ -187,7 +258,7 @@ function checkOllamaAvailability(sendResponse) {
       if (response.ok) {
         return response.json().then((data) => {
           console.log(`Ollama version check successful: ${data.version}`);
-          
+
           fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
             method: "GET",
             headers: { "Content-Type": "application/json" },
@@ -209,12 +280,16 @@ function checkOllamaAvailability(sendResponse) {
               });
             })
             .catch((modelError) => {
-              console.log(`Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`);
+              console.log(
+                `Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`
+              );
               sendResponse({ available: true, version: data.version });
             });
         });
       } else {
-        console.warn(`Ollama availability check failed with status: ${response.status}`);
+        console.warn(
+          `Ollama availability check failed with status: ${response.status}`
+        );
         sendResponse({
           available: false,
           reason: `HTTP error: ${response.status}`

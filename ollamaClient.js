@@ -41,7 +41,7 @@ class OllamaClient {
         {
           modelName: "qwen3:8b",
           maxChunkSize: this.DEFAULT_CHUNK_SIZE,
-          temperature: 0.3,
+          temperature: 0.4,
           topP: 0.9,
           contextSize: 8192
         },
@@ -56,7 +56,7 @@ class OllamaClient {
    * @param {string} characterContext - Character information for context
    * @return {Promise<string>} - Enhanced text
    */
-  async enhanceWithLLM(text, characterContext = "") {
+  async enhanceWithLLM(text, characterContext = "", novelInfo = { style: "standard narrative", tone: "neutral" }) {
     console.time("enhanceWithLLM");
     try {
       // Make sure Ollama is available first
@@ -71,7 +71,6 @@ class OllamaClient {
       );
 
       const chunks = this.splitIntoChunks(text, settings.maxChunkSize);
-      console.log(`Processing ${chunks.length} chunks with Ollama`);
 
       const enhancedChunks = [];
       for (let i = 0; i < chunks.length; i++) {
@@ -81,9 +80,9 @@ class OllamaClient {
         );
 
         // Build context that includes surrounding text and character information
-        const contextInfo = this.buildChunkContext(chunks, i, characterContext);
+        const contextInfo = this.buildChunkContext(chunks, i);
 
-        const prompt = this.createEnhancementPrompt(chunk, contextInfo);
+        const prompt = this.createEnhancedPrompt(chunk, characterContext,contextInfo, novelInfo);
 
         // Create cache key based on chunk content and prompt
         const cacheKey = this.hashString(chunk + contextInfo);
@@ -135,16 +134,10 @@ class OllamaClient {
    * Build a context object that includes surrounding text chunks and character information
    * @param {Array<string>} chunks - All text chunks
    * @param {number} currentIndex - Current chunk index
-   * @param {string} characterContext - Character information summary
    * @return {string} - Combined context information
    */
-  buildChunkContext(chunks, currentIndex, characterContext) {
+  buildChunkContext(chunks, currentIndex) {
     let contextInfo = "";
-
-    // Add character context if available
-    if (characterContext && characterContext.trim().length > 0) {
-      contextInfo += characterContext + "\n\n";
-    }
 
     // Add previous chunk context for continuity
     if (currentIndex > 0 && chunks[currentIndex - 1]) {
@@ -175,13 +168,16 @@ class OllamaClient {
    * @param {string} contextInfo - Context information including characters
    * @return {string} - Complete prompt for LLM
    */
-  createEnhancementPrompt(chunk, contextInfo) {
-    return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following text to make it sound more natural in English.
+  createEnhancedPrompt(chunk, characterContext,contextInfo, novelInfo) {
+    return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following web novel text to improve dialogue attribution and clarity.
+The novel's style is ${novelInfo.style} with a ${novelInfo.tone} tone.
+
+Characters information (name, gender, appearances):
+${characterContext}
 
 ${contextInfo}
 
 INSTRUCTIONS:
-0. IMPORTANT: Do not omit or remove any sentences or paragraphs. Every original paragraph must appear in the output, even if lightly edited for style or clarity.
 1. Improve dialogue naturalness while preserving the original meaning
 2. Make dialogue flow better in English
 3. Keep all character names in the same language and exactly as provided
@@ -191,6 +187,8 @@ INSTRUCTIONS:
 7. IMPORTANT: Do not use markdown formatting or annotations
 8. Maintain paragraph breaks as in the original text as much as possible
 9. Focus especially on maintaining gender consistency based on the character information provided
+10. Don't change the story or add new plot elements
+11. Maintain the original tone and mood
 /no_think
 
 TEXT TO ENHANCE:
@@ -363,10 +361,6 @@ ${chunk}`;
       now - this.lastAvailabilityCheck < 30000 &&
       this.availabilityCache
     ) {
-      console.log(
-        "Using cached Ollama availability result:",
-        this.availabilityCache
-      );
       return this.availabilityCache;
     }
 

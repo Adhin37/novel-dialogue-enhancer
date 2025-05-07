@@ -5,7 +5,6 @@ let settings = {
   preserveNames: true,
   fixPronouns: true
 };
-let characterMap = {};
 let isEnhancing = false;
 let pendingEnhancement = false;
 let terminateRequested = false;
@@ -19,7 +18,7 @@ function init() {
   toaster = new Toaster();
   ollamaClient = new OllamaClient();
   chrome.storage.sync.get(
-    ["enhancerEnabled", "preserveNames", "fixPronouns", "characterMap"],
+    ["enhancerEnabled", "preserveNames", "fixPronouns"],
     function (data) {
       settings = {
         enhancerEnabled:
@@ -28,8 +27,6 @@ function init() {
           data.preserveNames !== undefined ? data.preserveNames : true,
         fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true
       };
-
-      characterMap = data.characterMap || {};
 
       setTimeout(() => {
         checkOllamaStatus();
@@ -184,11 +181,6 @@ async function enhancePage() {
 
     await enhancePageWithLLM();
 
-    chrome.runtime.sendMessage({
-      action: "updateCharacterMap",
-      characters: characterMap
-    });
-
     const stats = enhancerIntegration.getEnhancementStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
 
@@ -220,10 +212,6 @@ async function enhancePageWithLLM() {
   console.time("LLMEnhancement");
 
   try {
-    const { batchSize = 1 } = await new Promise((resolve) =>
-      chrome.storage.sync.get({ batchSize: 1 }, resolve)
-    );
-
     const paragraphs = contentElement.querySelectorAll("p");
     const totalParagraphs = paragraphs.length || 1;
 
@@ -231,15 +219,6 @@ async function enhancePageWithLLM() {
 
     if (paragraphs.length === 0) {
       const originalText = contentElement.innerHTML;
-
-      // Extract character data before LLM enhancement
-      if (settings.preserveNames || settings.fixPronouns) {
-        const result = enhancerIntegration.extractCharacterNames(
-          originalText,
-          characterMap
-        );
-        characterMap = result;
-      }
 
       try {
         if (terminateRequested) {
@@ -251,16 +230,8 @@ async function enhancePageWithLLM() {
         console.log("Sending content to LLM for full-content enhancement");
         toaster.updateProgress(0, 1, true);
 
-        // Create character context for this content
-        const characterContext =
-          settings.preserveNames || settings.fixPronouns
-            ? enhancerIntegration.createDialogueSummary(characterMap)
-            : "";
-
-        // Use enhancerIntegration instead of direct ollamaClient call
         const llmEnhancedText = await enhancerIntegration.enhanceText(
-          originalText,
-          characterContext
+          originalText
         );
 
         if (terminateRequested) {
@@ -306,15 +277,6 @@ async function enhancePageWithLLM() {
           batchText += p.innerHTML + "\n\n";
         });
 
-        // Extract character data for this batch before LLM enhancement
-        if (settings.preserveNames || settings.fixPronouns) {
-          const result = enhancerIntegration.extractCharacterNames(
-            batchText,
-            characterMap
-          );
-          characterMap = result;
-        }
-
         try {
           console.log(
             `Sending large batch ${i}-${i + batch.length - 1} to LLM (${
@@ -322,17 +284,7 @@ async function enhancePageWithLLM() {
             } chars)`
           );
 
-          // Create character context for this batch
-          const characterContext =
-            settings.preserveNames || settings.fixPronouns
-              ? enhancerIntegration.createDialogueSummary(characterMap)
-              : "";
-
-          // Use enhancerIntegration instead of direct ollamaClient call
-          const llmEnhanced = await enhancerIntegration.enhanceText(
-            batchText,
-            characterContext
-          );
+          const llmEnhanced = await enhancerIntegration.enhanceText(batchText);
 
           if (terminateRequested) {
             console.log(
@@ -427,28 +379,43 @@ function handleTerminationRequest() {
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   if (request.action === "ping") {
     sendResponse({ status: "ok" });
+    return false;
   } else if (request.action === "enhanceNow") {
     settings = request.settings;
 
     enhancePage()
-      .then(() => {
+      .then((result) => {
         const stats = enhancerIntegration.getEnhancementStats();
-        sendResponse({
-          status: "enhanced",
-          stats: stats
-        });
+        try {
+          sendResponse({
+            status: "enhanced",
+            stats: stats
+          });
+        } catch (err) {
+          console.warn("Failed to send response, port may be closed:", err);
+        }
       })
       .catch((error) => {
         console.error("Enhancement failed:", error);
-        sendResponse({
-          status: "failed",
-          error: error.message
-        });
+        try {
+          sendResponse({
+            status: "failed",
+            error: error.message
+          });
+        } catch (err) {
+          console.warn(
+            "Failed to send error response, port may be closed:",
+            err
+          );
+        }
       });
+
+    return true;
   } else if (request.action === "terminateOperations") {
     console.log("Termination request received from popup");
     handleTerminationRequest();
     sendResponse({ status: "terminating" });
+    return false;
   } else if (request.action === "updatePageStatus") {
     console.log(`Page status updated: disabled=${request.disabled}`);
 
@@ -457,9 +424,10 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     }
 
     sendResponse({ status: "updated" });
+    return false;
   }
 
-  return true;
+  return false;
 });
 
 init();
