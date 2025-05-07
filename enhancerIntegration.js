@@ -37,15 +37,8 @@ class EnhancerIntegration {
     const startTime = performance.now();
 
     try {
-      // Extract character information
+      // Extract character information if not already provided
       const characterMap = this.extractCharacterNames(text);
-      const characterArray = Object.entries(characterMap).map(
-        ([name, data]) => ({
-          name,
-          gender: data.gender,
-          appearances: data.appearances
-        })
-      );
 
       // Get dialogue patterns for statistics
       const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
@@ -58,6 +51,16 @@ class EnhancerIntegration {
         this.getTotalDialoguesEnhanced() + dialogueCount
       );
 
+      // Create character summary for LLM context
+      const characterArray = Object.entries(characterMap).map(
+        ([name, data]) => ({
+          name,
+          gender: data.gender,
+          appearances: data.appearances
+        })
+      );
+      const characterSummary = this.createDialogueSummary(characterArray);
+
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
@@ -65,12 +68,8 @@ class EnhancerIntegration {
         return text;
       }
 
-      // Create character summary for LLM context
-      const characterSummary =
-        this.dialogueUtils.createDialogueSummary(characterArray);
-
-      // Enhance text with LLM
-      const enhancedText = await this.enhanceTextWithLLM(
+      // Use the ollamaClient directly, passing the character summary
+      const enhancedText = await this.ollamaClient.enhanceWithLLM(
         text,
         characterSummary
       );
@@ -88,6 +87,43 @@ class EnhancerIntegration {
 
       return text;
     }
+  }
+
+  /**
+   * Create a dialogue summary from character data for LLM context
+   * @param {Array} characters - Character data array
+   * @return {string} - Character summary string
+   */
+  createDialogueSummary(characterArray) {
+    if (!characterArray || characterArray.length === 0) {
+      return "";
+    }
+
+    let summary =
+      "CHARACTER INFORMATION (for gender and pronoun consistency):\n";
+
+    characterArray.sort((a, b) => (b.appearances || 0) - (a.appearances || 0));
+
+    // Include only characters with multiple appearances to avoid noise
+    const significantCharacters = characterArray.filter(
+      (c) => c.appearances > 1
+    );
+
+    for (const character of significantCharacters.slice(0, 10)) {
+      const genderInfo = character.gender
+        ? `(${character.gender}, ${
+            character.gender === "male"
+              ? "he/him"
+              : character.gender === "female"
+              ? "she/her"
+              : "they/them"
+          })`
+        : "(unknown gender)";
+
+      summary += `- ${character.name} ${genderInfo}\n`;
+    }
+
+    return summary;
   }
 
   /**
@@ -180,20 +216,21 @@ class EnhancerIntegration {
         if (!name || name.length > 30) continue;
 
         // Use dialogueUtils to verify it's a legitimate name
-        if (this.dialogueUtils.isLikelyName(name)) {
-          if (!characterMap[name]) {
+        const extractedName = this.dialogueUtils.extractCharacterName(name);
+        if (extractedName) {
+          if (!characterMap[extractedName]) {
             const gender = this.genderUtils.guessGender(
-              name,
+              extractedName,
               text,
               characterMap
             );
-            characterMap[name] = {
+            characterMap[extractedName] = {
               gender,
               appearances: 1
             };
           } else {
-            characterMap[name].appearances =
-              (characterMap[name].appearances || 0) + 1;
+            characterMap[extractedName].appearances =
+              (characterMap[extractedName].appearances || 0) + 1;
           }
         }
       }
@@ -234,6 +271,7 @@ class EnhancerIntegration {
       const commonNonNames = [
         "The",
         "Then",
+        "This",
         "Well",
         "From",
         "At",
