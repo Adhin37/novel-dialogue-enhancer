@@ -95,7 +95,6 @@ class OllamaClient {
           enhancedChunk = this.cache.get(cacheKey);
         } else {
           try {
-            console.log(prompt);
             enhancedChunk = await this.processChunkWithLLM(
               settings.modelName,
               prompt,
