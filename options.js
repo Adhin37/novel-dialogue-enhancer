@@ -5,6 +5,10 @@ document.addEventListener("DOMContentLoaded", function () {
   const maxChunkSizeValue = document.getElementById("max-chunk-size-value");
   const timeoutSlider = document.getElementById("timeout");
   const timeoutValue = document.getElementById("timeout-value");
+  const temperatureSlider = document.getElementById("temperature");
+  const temperatureValue = document.getElementById("temperature-value");
+  const topPSlider = document.getElementById("top-p");
+  const topPValue = document.getElementById("top-p-value");
   const testOllamaButton = document.getElementById("test-ollama");
   const ollamaStatus = document.getElementById("ollama-status");
   const whitelistItemsContainer = document.getElementById("whitelist-items");
@@ -78,7 +82,9 @@ document.addEventListener("DOMContentLoaded", function () {
     {
       modelName: "qwen3:8b",
       maxChunkSize: 8000,
-      timeout: 120
+      timeout: 120,
+      temperature: 0.4,
+      topP: 0.9
     },
     function (data) {
       modelNameInput.value = data.modelName;
@@ -86,6 +92,10 @@ document.addEventListener("DOMContentLoaded", function () {
       maxChunkSizeValue.textContent = data.maxChunkSize;
       timeoutSlider.value = data.timeout;
       timeoutValue.textContent = data.timeout;
+      temperatureSlider.value = data.temperature;
+      temperatureValue.textContent = data.temperature;
+      topPSlider.value = data.topP;
+      topPValue.textContent = data.topP;
     }
   );
 
@@ -97,15 +107,27 @@ document.addEventListener("DOMContentLoaded", function () {
     timeoutValue.textContent = this.value;
   });
 
+  temperatureSlider.addEventListener("input", function () {
+    temperatureValue.textContent = this.value;
+  });
+
+  topPSlider.addEventListener("input", function () {
+    topPValue.textContent = this.value;
+  });
+
   saveButton.addEventListener("click", function () {
     const maxChunkSize = parseInt(maxChunkSizeSlider.value);
     const timeout = parseInt(timeoutSlider.value);
+    const temperature = parseFloat(temperatureSlider.value);
+    const topP = parseFloat(topPSlider.value);
 
     chrome.storage.sync.set(
       {
         modelName: modelNameInput.value.trim() || "qwen3:8b",
         maxChunkSize: maxChunkSize,
-        timeout: timeout
+        timeout: timeout,
+        temperature: temperature,
+        topP: topP
       },
       function () {
         const saveButton = document.getElementById("save");

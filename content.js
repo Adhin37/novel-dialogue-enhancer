@@ -10,13 +10,11 @@ let pendingEnhancement = false;
 let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
-let ollamaClient;
 let maxRetries = 3;
 
 function init() {
   enhancerIntegration = new EnhancerIntegration();
   toaster = new Toaster();
-  ollamaClient = new OllamaClient();
   chrome.storage.sync.get(
     ["isExtensionPaused", "preserveNames", "fixPronouns"],
     function (data) {
@@ -47,7 +45,7 @@ async function checkOllamaStatus() {
 
   while (retries < maxRetries) {
     try {
-      status = await ollamaClient.checkOllamaAvailability();
+      status = await enhancerIntegration.ollamaClient.checkOllamaAvailability();
       break;
     } catch (err) {
       console.warn(
@@ -173,7 +171,7 @@ async function enhancePage() {
   }
 
   try {
-    const ollamaStatus = await ollamaClient.checkOllamaAvailability();
+    const ollamaStatus = await enhancerIntegration.ollamaClient.checkOllamaAvailability();
     if (!ollamaStatus.available) {
       console.warn("Ollama not available, cannot enhance content");
       toaster.showError(`Ollama not available: ${ollamaStatus.reason}`);

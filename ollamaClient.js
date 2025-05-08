@@ -5,8 +5,13 @@
  */
 class OllamaClient {
   constructor() {
-    this.CLIENT_TIMEOUT = 200000; // Increased timeout for more complex prompts
+    this.CLIENT_TIMEOUT = 200000;
     this.DEFAULT_CHUNK_SIZE = 8000;
+    this.DEFAULT_TIMEOUT = 200;
+    this.DEFAULT_TEMPERATURE = 0.4;
+    this.DEFAULT_TOP_P = 0.9;
+    this.DEFAULT_CONTEXT_SIZE = 8192;
+    this.DEFAULT_MODEL = "qwen3:8b";
     this.BATCH_DELAY = 800;
     this.API_ENDPOINT = "http://localhost:11434/api";
     this.cache = new Map(); // Simple cache for repeated prompts
@@ -25,7 +30,7 @@ class OllamaClient {
    */
   async getModelName() {
     return new Promise((resolve) =>
-      chrome.storage.sync.get({ modelName: "qwen3:8b" }, (data) =>
+      chrome.storage.sync.get({ modelName: this.DEFAULT_MODEL }, (data) =>
         resolve(data.modelName)
       )
     );
@@ -39,11 +44,12 @@ class OllamaClient {
     return new Promise((resolve) =>
       chrome.storage.sync.get(
         {
-          modelName: "qwen3:8b",
+          modelName: this.DEFAULT_MODEL,
           maxChunkSize: this.DEFAULT_CHUNK_SIZE,
-          temperature: 0.4,
-          topP: 0.9,
-          contextSize: 8192
+          timeout: this.DEFAULT_TIMEOUT,
+          temperature: this.DEFAULT_TEMPERATURE,
+          topP: this.DEFAULT_TOP_P,
+          contextSize: this.DEFAULT_CONTEXT_SIZE
         },
         (data) => resolve(data)
       )
@@ -285,12 +291,10 @@ ${chunk}`;
         () =>
           reject(
             new Error(
-              `LLM request timed out after ${
-                this.CLIENT_TIMEOUT / 1000
-              } seconds`
+              `LLM request timed out after ${settings.timeout / 1000} seconds`
             )
           ),
-        this.CLIENT_TIMEOUT
+        settings.timeout * 1000
       );
     });
 
@@ -371,7 +375,6 @@ ${chunk}`;
       return this.availabilityCache;
     }
 
-    // Don't allow concurrent checks
     if (this.checkingAvailability) {
       console.log("Ollama availability check already in progress, waiting...");
       // Wait for the existing check to complete

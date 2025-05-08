@@ -162,17 +162,27 @@ chrome.runtime.onInstalled.addListener(() => {
 function handleOllamaRequest(request, sendResponse) {
   chrome.storage.sync.get(
     {
-      timeout: 180
+      timeout: 200,
+      temperature: 0.4,
+      topP: 0.9
     },
-    function (data) {
-      const OLLAMA_REQUEST_TIMEOUT = data.timeout * 1000;
+    (data) => {
+      if (!request.data.temperature) {
+        request.data.temperature = data.temperature;
+      }
+
+      if (!request.data.top_p) {
+        request.data.top_p = data.topP;
+      }
 
       console.log("Sending Ollama request:", {
         model: request.data.model,
         promptLength: request.data.prompt.length,
         max_tokens: request.data.max_tokens,
+        temperature: request.data.temperature,
+        top_p: request.data.top_p,
         stream: request.data.stream || false,
-        timeout: OLLAMA_REQUEST_TIMEOUT / 1000 + " seconds",
+        timeout: data.timeout + " seconds",
         options: request.data.options || {}
       });
 
@@ -182,7 +192,7 @@ function handleOllamaRequest(request, sendResponse) {
 
       const timeoutId = setTimeout(
         () => controller.abort(),
-        OLLAMA_REQUEST_TIMEOUT
+        data.timeout * 1000
       );
 
       if (request.data.stream == false) {
@@ -261,12 +271,12 @@ function handleOllamaRequest(request, sendResponse) {
               } else {
                 console.error(
                   "Ollama request timed out after",
-                  OLLAMA_REQUEST_TIMEOUT,
+                  data.timeout,
                   "ms"
                 );
                 sendResponse({
                   error: `Request timed out after ${
-                    OLLAMA_REQUEST_TIMEOUT / 1000
+                    data.timeout / 1000
                   } seconds`
                 });
               }
@@ -346,34 +356,17 @@ function checkOllamaAvailability(sendResponse) {
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(
-    [
-      "isExtensionPaused",
-      "preserveNames",
-      "fixPronouns",
-      "modelName",
-      "maxChunkSize",
-      "timeout",
-      "disabledPages"
-    ],
-    (data) => {
-      const defaults = {
-        isExtensionPaused: true,
-        preserveNames: true,
-        fixPronouns: true,
-        modelName: "qwen3:8b",
-        maxChunkSize: 4000,
-        timeout: 180,
-        disabledPages: []
-      };
-      try {
-        chrome.storage.sync.set({ ...defaults, ...data });
-      } catch (error) {
-        console.error(
-          "Error merging settings, using default settings instead:\n",
-          error
-        );
-        chrome.storage.sync.set(defaults);
-      }
-    }
+    {
+      isExtensionPaused: true,
+      preserveNames: true,
+      fixPronouns: true,
+      modelName: "qwen3:8b",
+      maxChunkSize: 4000,
+      timeout: 180,
+      disabledPages: [],
+      temperature: 0.4,
+      topP: 0.9
+    },
+    (data) => chrome.storage.sync.set(data)
   );
 });
