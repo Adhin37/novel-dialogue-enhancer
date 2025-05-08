@@ -9,6 +9,7 @@ class EnhancerIntegration {
     this.dialogueUtils = new DialogueUtils();
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
+    this.novelUtils = new NovelUtils();
 
     this.setTotalDialoguesEnhanced(0);
     this.setTotalPronounsFixed(0);
@@ -100,6 +101,25 @@ class EnhancerIntegration {
     const characterMap = { ...existingMap };
     const startCharCount = Object.keys(characterMap).length;
 
+    // Get novel ID to retrieve existing character data
+    const novelId = this.generateNovelId();
+
+    // Try to get existing character map for this novel first
+    if (novelId) {
+      this.getExistingCharacterMap(novelId, characterMap)
+        .then((existingNovelMap) => {
+          // Merge with existing map if available
+          Object.entries(existingNovelMap).forEach(([name, data]) => {
+            if (!characterMap[name]) {
+              characterMap[name] = { ...data };
+            }
+          });
+        })
+        .catch((err) => {
+          console.warn("Failed to fetch existing character map:", err);
+        });
+    }
+
     // Get dialogue patterns
     const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
 
@@ -116,8 +136,28 @@ class EnhancerIntegration {
           appearances: 1
         };
       } else {
+        // Increment appearances counter
         characterMap[name].appearances =
           (characterMap[name].appearances || 0) + 1;
+
+        // If gender was previously unknown but we have more context now, try again
+        if (
+          characterMap[name].gender === "unknown" ||
+          characterMap[name].confidence < 0.7
+        ) {
+          const updatedGender = this.genderUtils.guessGender(
+            name,
+            text,
+            characterMap
+          );
+
+          // Only update if we have better confidence
+          if (updatedGender.confidence > (characterMap[name].confidence || 0)) {
+            characterMap[name].gender = updatedGender.gender;
+            characterMap[name].confidence = updatedGender.confidence;
+            characterMap[name].evidence = updatedGender.evidence;
+          }
+        }
       }
     });
 
@@ -133,8 +173,7 @@ class EnhancerIntegration {
       this.getTotalCharactersDetected() + newCharCount
     );
 
-    // Get novel ID and sync character map with background
-    const novelId = this.generateNovelId();
+    // Sync character map with background
     if (novelId && Object.keys(characterMap).length > 0) {
       this.syncCharacterMap(characterMap, novelId);
     }
@@ -146,6 +185,41 @@ class EnhancerIntegration {
       characterMap
     );
     return characterMap;
+  }
+
+  /**
+   * Get existing character map for a novel from background storage
+   * @param {string} novelId - Unique novel identifier
+   * @param {object} currentMap - Current character map
+   * @return {Promise<object>} - Promise resolving to existing character map
+   */
+  getExistingCharacterMap(novelId, currentMap = {}) {
+    return new Promise((resolve, reject) => {
+      if (!novelId) {
+        resolve(currentMap);
+        return;
+      }
+
+      chrome.runtime.sendMessage(
+        { action: "getCharacterMap", novelId },
+        (response) => {
+          if (response && response.status === "ok") {
+            console.log(
+              `Retrieved existing character map for novel ${novelId} with ${
+                Object.keys(response.characterMap).length
+              } characters`
+            );
+            resolve(response.characterMap || {});
+          } else {
+            console.warn(
+              "Failed to get character map:",
+              response?.message || "Unknown error"
+            );
+            resolve(currentMap); // Return current map if retrieval fails
+          }
+        }
+      );
+    });
   }
 
   /**

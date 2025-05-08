@@ -5,8 +5,10 @@
  */
 class GenderUtils {
   constructor() {
-    console.log("Novel Dialogue Enhancer: Gender Utils initialized (LLM-optimized version)");
-    
+    console.log(
+      "Novel Dialogue Enhancer: Gender Utils initialized (LLM-optimized version)"
+    );
+
     // Initialize gender evidence statistics
     this.maleEvidenceCount = 0;
     this.femaleEvidenceCount = 0;
@@ -29,7 +31,8 @@ class GenderUtils {
    * @return {object} - Detailed gender information with confidence
    */
   guessGender(name, text, characterMap = {}) {
-    if (name.length <= 1) return { gender: "unknown", confidence: 0, evidence: [] };
+    if (name.length <= 1)
+      return { gender: "unknown", confidence: 0, evidence: [] };
 
     // Return existing gender if available
     if (characterMap[name] && characterMap[name].gender !== "unknown") {
@@ -43,7 +46,7 @@ class GenderUtils {
     let maleScore = 0;
     let femaleScore = 0;
     let evidence = [];
-    
+
     // Identify likely cultural origin of name
     const culturalOrigin = this.detectNameCulturalOrigin(name, text);
 
@@ -73,10 +76,14 @@ class GenderUtils {
     if (namePatternResult.gender !== "unknown") {
       if (namePatternResult.gender === "male") {
         maleScore += 2;
-        evidence.push(`${culturalOrigin} name pattern: ${namePatternResult.evidence}`);
+        evidence.push(
+          `${culturalOrigin} name pattern: ${namePatternResult.evidence}`
+        );
       } else {
         femaleScore += 2;
-        evidence.push(`${culturalOrigin} name pattern: ${namePatternResult.evidence}`);
+        evidence.push(
+          `${culturalOrigin} name pattern: ${namePatternResult.evidence}`
+        );
       }
     }
 
@@ -85,12 +92,16 @@ class GenderUtils {
     if (pronounResult.maleScore > 0 || pronounResult.femaleScore > 0) {
       maleScore += pronounResult.maleScore;
       femaleScore += pronounResult.femaleScore;
-      
+
       if (pronounResult.maleScore > 0) {
-        evidence.push(`pronouns: found ${pronounResult.maleScore} male pronouns`);
+        evidence.push(
+          `pronouns: found ${pronounResult.maleScore} male pronouns`
+        );
       }
       if (pronounResult.femaleScore > 0) {
-        evidence.push(`pronouns: found ${pronounResult.femaleScore} female pronouns`);
+        evidence.push(
+          `pronouns: found ${pronounResult.femaleScore} female pronouns`
+        );
       }
     }
 
@@ -100,19 +111,30 @@ class GenderUtils {
       // If we found an inconsistency correction, trust it highly
       if (inconsistencyResult.correctedGender === "male") {
         maleScore += 4;
-        evidence.push(`inconsistency correction: ${inconsistencyResult.correction}`);
+        evidence.push(
+          `inconsistency correction: ${inconsistencyResult.correction}`
+        );
       } else if (inconsistencyResult.correctedGender === "female") {
         femaleScore += 4;
-        evidence.push(`inconsistency correction: ${inconsistencyResult.correction}`);
+        evidence.push(
+          `inconsistency correction: ${inconsistencyResult.correction}`
+        );
       }
     }
 
     // Check relationships
-    const relationshipResult = this.checkRelationships(name, text, culturalOrigin);
-    if (relationshipResult.maleScore > 0 || relationshipResult.femaleScore > 0) {
+    const relationshipResult = this.checkRelationships(
+      name,
+      text,
+      culturalOrigin
+    );
+    if (
+      relationshipResult.maleScore > 0 ||
+      relationshipResult.femaleScore > 0
+    ) {
       maleScore += relationshipResult.maleScore;
       femaleScore += relationshipResult.femaleScore;
-      
+
       if (relationshipResult.maleScore > 0 && relationshipResult.evidence) {
         evidence.push(`relationship: ${relationshipResult.evidence}`);
       }
@@ -126,7 +148,7 @@ class GenderUtils {
     if (descriptionResult.maleScore > 0 || descriptionResult.femaleScore > 0) {
       maleScore += descriptionResult.maleScore;
       femaleScore += descriptionResult.femaleScore;
-      
+
       if (descriptionResult.maleScore > 0 && descriptionResult.evidence) {
         evidence.push(`description: ${descriptionResult.evidence}`);
       }
@@ -140,7 +162,7 @@ class GenderUtils {
     if (appearanceResult.maleScore > 0 || appearanceResult.femaleScore > 0) {
       maleScore += appearanceResult.maleScore;
       femaleScore += appearanceResult.femaleScore;
-      
+
       if (appearanceResult.maleScore > 0 && appearanceResult.evidence) {
         evidence.push(`appearance: ${appearanceResult.evidence}`);
       }
@@ -150,20 +172,26 @@ class GenderUtils {
     }
 
     // Check for cultural-specific character indicators
-    const culturalResult = this.checkCulturalSpecificIndicators(name, text, culturalOrigin);
+    const culturalResult = this.checkCulturalSpecificIndicators(
+      name,
+      text,
+      culturalOrigin
+    );
     if (culturalResult.maleScore > 0 || culturalResult.femaleScore > 0) {
       maleScore += culturalResult.maleScore;
       femaleScore += culturalResult.femaleScore;
-      
+
       if (culturalResult.evidence) {
-        evidence.push(`${culturalOrigin} cultural indicator: ${culturalResult.evidence}`);
+        evidence.push(
+          `${culturalOrigin} cultural indicator: ${culturalResult.evidence}`
+        );
       }
     }
 
     // Determine final gender and confidence
     let gender = "unknown";
     let confidence = 0;
-    
+
     if (maleScore > femaleScore && maleScore >= 3) {
       gender = "male";
       confidence = Math.min(0.9, 0.5 + (maleScore - femaleScore) * 0.05);
@@ -194,8 +222,9 @@ class GenderUtils {
     // Common character patterns in different languages
     const chineseChars = /[\u4E00-\u9FFF]/;
     const japaneseChars = /[\u3040-\u309F\u30A0-\u30FF]/;
-    const koreanChars = /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/;
-    
+    const koreanChars =
+      /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/;
+
     // Check for obvious character usage
     if (chineseChars.test(name)) {
       this.culturalOrigins.chinese++;
@@ -209,45 +238,45 @@ class GenderUtils {
       this.culturalOrigins.korean++;
       return "korean";
     }
-    
+
     // Check for common East Asian name patterns
     const chineseNamePatterns = [
       /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao)/i,
       /(?:Xiang|Tian|Jiang|Pan|Wei|Ye|Yuan|Lu|Deng|Yao|Peng|Cao|Zou|Xiong|Qian|Dai|Fu|Ding|Jiang)/i
     ];
-    
+
     const japaneseNamePatterns = [
       /(?:Sato|Suzuki|Takahashi|Tanaka|Watanabe|Ito|Yamamoto|Nakamura|Kobayashi|Kato|Yoshida|Yamada|Sasaki|Yamaguchi|Matsumoto|Inoue|Kimura|Hayashi|Shimizu|Yamazaki|Mori|Abe|Ikeda|Hashimoto|Ishikawa)/i,
       /(?:Akira|Yuki|Haruto|Soma|Yuma|Ren|Haru|Sora|Haruki|Ayumu|Riku|Taiyo|Hinata|Yamato|Minato|Yuto|Sota|Yui|Hina|Koharu|Mei|Mio|Rin|Miyu|Kokona|Hana|Yuna|Sakura|Saki|Ichika|Akari|Himari)/i,
       /(?:-san|-kun|-chan|-sama|-sensei|-senpai)/i
     ];
-    
+
     const koreanNamePatterns = [
       /(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
       /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
     ];
-    
+
     for (const pattern of chineseNamePatterns) {
       if (pattern.test(name)) {
         this.culturalOrigins.chinese++;
         return "chinese";
       }
     }
-    
+
     for (const pattern of japaneseNamePatterns) {
       if (pattern.test(name)) {
         this.culturalOrigins.japanese++;
         return "japanese";
       }
     }
-    
+
     for (const pattern of koreanNamePatterns) {
       if (pattern.test(name)) {
         this.culturalOrigins.korean++;
         return "korean";
       }
     }
-    
+
     // Check context for cultural indicators
     const contextClues = {
       chinese: [
@@ -263,14 +292,14 @@ class GenderUtils {
         /Hyung|Noona|Oppa|Unnie|Sunbae|Hoobae|Dongsaeng|Chingu|Ahjussi|Ahjumma|Halmeoni|Harabeoji/gi
       ]
     };
-    
+
     let culturalScores = {
       chinese: 0,
       japanese: 0,
       korean: 0,
       western: 0
     };
-    
+
     // Count cultural references in surrounding text
     for (const culture in contextClues) {
       for (const pattern of contextClues[culture]) {
@@ -278,16 +307,18 @@ class GenderUtils {
         culturalScores[culture] += matches.length;
       }
     }
-    
+
     // Get the dominant culture from the context
-    const dominantCulture = Object.keys(culturalScores).reduce((a, b) => 
-      culturalScores[a] > culturalScores[b] ? a : b, "western");
-    
+    const dominantCulture = Object.keys(culturalScores).reduce(
+      (a, b) => (culturalScores[a] > culturalScores[b] ? a : b),
+      "western"
+    );
+
     if (dominantCulture !== "western") {
       this.culturalOrigins[dominantCulture]++;
       return dominantCulture;
     }
-    
+
     // Default to western
     this.culturalOrigins.western++;
     return "western";
@@ -301,51 +332,191 @@ class GenderUtils {
   checkTitlesAndHonorifics(name, culturalOrigin = "western") {
     const maleTitles = {
       western: [
-        "Mr", "Mr.", "Sir", "Lord", "Master", "Prince", "King", "Duke", "Count", "Baron", "Emperor",
-        "Brother", "Uncle", "Father", "Dad", "Daddy", "Papa", "Grandpa", "Grandfather", "Boy", "Son",
-        "Husband", "Mister", "Gentleman", "Lad", "Fellow"
+        "Mr",
+        "Mr.",
+        "Sir",
+        "Lord",
+        "Master",
+        "Prince",
+        "King",
+        "Duke",
+        "Count",
+        "Baron",
+        "Emperor",
+        "Brother",
+        "Uncle",
+        "Father",
+        "Dad",
+        "Daddy",
+        "Papa",
+        "Grandpa",
+        "Grandfather",
+        "Boy",
+        "Son",
+        "Husband",
+        "Mister",
+        "Gentleman",
+        "Lad",
+        "Fellow"
       ],
       chinese: [
-        "Dage", "Gege", "Shixiong", "Shidi", "Shizun", "Shifu", "Taoist", "Monk", 
-        "Young Master", "Gongzi", "Laoye", "Fujun", "Xiandi", "Huangdi", "Wang", "Shaoye",
-        "Shibo", "Shishu", "Da-ge", "Er-ge", "San-ge", "Si-ge", "Wu-ge", "Liu-ge"
+        "Dage",
+        "Gege",
+        "Shixiong",
+        "Shidi",
+        "Shizun",
+        "Shifu",
+        "Taoist",
+        "Monk",
+        "Young Master",
+        "Gongzi",
+        "Laoye",
+        "Fujun",
+        "Xiandi",
+        "Huangdi",
+        "Wang",
+        "Shaoye",
+        "Shibo",
+        "Shishu",
+        "Da-ge",
+        "Er-ge",
+        "San-ge",
+        "Si-ge",
+        "Wu-ge",
+        "Liu-ge"
       ],
       japanese: [
-        "Oniisan", "Onii-san", "Onii-sama", "Onii-chan", "Otouto", "Aniki", "-kun", "Oji-san",
-        "Otou-san", "Otou-sama", "Ojii-san", "Ojii-sama", "Sensei", "Senpai", "Dono", "Sama",
-        "Bocchama", "Shishou", "Daimyo", "Shogun", "Tono"
+        "Oniisan",
+        "Onii-san",
+        "Onii-sama",
+        "Onii-chan",
+        "Otouto",
+        "Aniki",
+        "-kun",
+        "Oji-san",
+        "Otou-san",
+        "Otou-sama",
+        "Ojii-san",
+        "Ojii-sama",
+        "Sensei",
+        "Senpai",
+        "Dono",
+        "Sama",
+        "Bocchama",
+        "Shishou",
+        "Daimyo",
+        "Shogun",
+        "Tono"
       ],
       korean: [
-        "Oppa", "Hyung", "Ahjussi", "Harabeoji", "Samchon", "Appa", "Abeonim",
-        "Seonsaengnim", "Sunbae", "Sajangnim", "Daejang", "Daegam"
+        "Oppa",
+        "Hyung",
+        "Ahjussi",
+        "Harabeoji",
+        "Samchon",
+        "Appa",
+        "Abeonim",
+        "Seonsaengnim",
+        "Sunbae",
+        "Sajangnim",
+        "Daejang",
+        "Daegam"
       ]
     };
 
     const femaleTitles = {
       western: [
-        "Mrs", "Mrs.", "Ms", "Ms.", "Miss", "Lady", "Princess", "Queen", "Duchess", "Countess", "Baroness",
-        "Empress", "Sister", "Aunt", "Mother", "Mom", "Mommy", "Mama", "Grandma", "Grandmother", "Girl",
-        "Daughter", "Wife", "Madam", "Madame", "Mistress", "Dame"
+        "Mrs",
+        "Mrs.",
+        "Ms",
+        "Ms.",
+        "Miss",
+        "Lady",
+        "Princess",
+        "Queen",
+        "Duchess",
+        "Countess",
+        "Baroness",
+        "Empress",
+        "Sister",
+        "Aunt",
+        "Mother",
+        "Mom",
+        "Mommy",
+        "Mama",
+        "Grandma",
+        "Grandmother",
+        "Girl",
+        "Daughter",
+        "Wife",
+        "Madam",
+        "Madame",
+        "Mistress",
+        "Dame"
       ],
       chinese: [
-        "Jiejie", "Meimei", "Shijie", "Shimei", "Young Lady", "Young Miss", "Guniang", "Xiaojie",
-        "Furen", "Taitai", "Niangniang", "Huanghou", "Gongzhu", "Wangfei", "Guifei", "Gupo",
-        "Shenshen", "Da-jie", "Er-jie", "San-jie", "Si-jie", "Wu-jie", "Liu-jie"
+        "Jiejie",
+        "Meimei",
+        "Shijie",
+        "Shimei",
+        "Young Lady",
+        "Young Miss",
+        "Guniang",
+        "Xiaojie",
+        "Furen",
+        "Taitai",
+        "Niangniang",
+        "Huanghou",
+        "Gongzhu",
+        "Wangfei",
+        "Guifei",
+        "Gupo",
+        "Shenshen",
+        "Da-jie",
+        "Er-jie",
+        "San-jie",
+        "Si-jie",
+        "Wu-jie",
+        "Liu-jie"
       ],
       japanese: [
-        "Oneesan", "Onee-san", "Onee-sama", "Onee-chan", "Imouto", "Aneue", "-chan", 
-        "Oba-san", "Okaa-san", "Okaa-sama", "Obaa-san", "Obaa-sama", "Ojou-sama", "Hime",
-        "Fujin", "Himedono"
+        "Oneesan",
+        "Onee-san",
+        "Onee-sama",
+        "Onee-chan",
+        "Imouto",
+        "Aneue",
+        "-chan",
+        "Oba-san",
+        "Okaa-san",
+        "Okaa-sama",
+        "Obaa-san",
+        "Obaa-sama",
+        "Ojou-sama",
+        "Hime",
+        "Fujin",
+        "Himedono"
       ],
       korean: [
-        "Unni", "Nuna", "Ahjumma", "Halmeoni", "Imo", "Eomma", "Eomeonim", 
-        "Seonsaengnim", "Sunbae", "Sajangnim"
+        "Unni",
+        "Nuna",
+        "Ahjumma",
+        "Halmeoni",
+        "Imo",
+        "Eomma",
+        "Eomeonim",
+        "Seonsaengnim",
+        "Sunbae",
+        "Sajangnim"
       ]
     };
 
     // Check all cultural title sets, but prioritize the detected culture
-    const culturesToCheck = [culturalOrigin, ...Object.keys(maleTitles).filter(c => c !== culturalOrigin)];
-    
+    const culturesToCheck = [
+      culturalOrigin,
+      ...Object.keys(maleTitles).filter((c) => c !== culturalOrigin)
+    ];
+
     for (const culture of culturesToCheck) {
       // Check if name starts with a title
       for (const title of maleTitles[culture]) {
@@ -379,14 +550,20 @@ class GenderUtils {
 
       // Check if name contains a title
       for (const title of maleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${this.escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(
+          `\\s+${this.escapeRegExp(title)}\\s+`,
+          "i"
+        );
         if (titleRegex.test(name)) {
           return { gender: "male", evidence: `${title} (${culture})` };
         }
       }
 
       for (const title of femaleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${this.escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(
+          `\\s+${this.escapeRegExp(title)}\\s+`,
+          "i"
+        );
         if (titleRegex.test(name)) {
           return { gender: "female", evidence: `${title} (${culture})` };
         }
@@ -408,34 +585,158 @@ class GenderUtils {
     // Gender patterns by culture
     const femaleEndings = {
       western: [
-        "a", "ia", "ie", "y", "ey", "i", "elle", "ette", "ine", "ell", "lyn", "ina", "ah", 
-        "ella", "anna", "enna", "anne", "issa", "ara", "lyn", "lynn", "lee"
+        "a",
+        "ia",
+        "ie",
+        "y",
+        "ey",
+        "i",
+        "elle",
+        "ette",
+        "ine",
+        "ell",
+        "lyn",
+        "ina",
+        "ah",
+        "ella",
+        "anna",
+        "enna",
+        "anne",
+        "issa",
+        "ara",
+        "lyn",
+        "lynn",
+        "lee"
       ],
-      chinese: ["xia", "qian", "ying", "yan", "yun", "juan", "xin", "min", "ning", "ping", "zhen", "hua"],
-      japanese: ["ko", "mi", "ki", "na", "ka", "ri", "yo", "ho", "sa", "shi", "tsu", "chi"],
-      korean: ["mi", "hee", "jung", "young", "hyun", "jin", "eun", "seon", "yeon", "ji", "hye", "kyung"]
+      chinese: [
+        "xia",
+        "qian",
+        "ying",
+        "yan",
+        "yun",
+        "juan",
+        "xin",
+        "min",
+        "ning",
+        "ping",
+        "zhen",
+        "hua"
+      ],
+      japanese: [
+        "ko",
+        "mi",
+        "ki",
+        "na",
+        "ka",
+        "ri",
+        "yo",
+        "ho",
+        "sa",
+        "shi",
+        "tsu",
+        "chi"
+      ],
+      korean: [
+        "mi",
+        "hee",
+        "jung",
+        "young",
+        "hyun",
+        "jin",
+        "eun",
+        "seon",
+        "yeon",
+        "ji",
+        "hye",
+        "kyung"
+      ]
     };
 
     const maleEndings = {
       western: [
-        "o", "er", "on", "en", "us", "or", "k", "d", "t", "io", "ian", "im", "am", "ik", 
-        "to", "ro", "hn", "il", "rt", "ng", "ez", "an"
+        "o",
+        "er",
+        "on",
+        "en",
+        "us",
+        "or",
+        "k",
+        "d",
+        "t",
+        "io",
+        "ian",
+        "im",
+        "am",
+        "ik",
+        "to",
+        "ro",
+        "hn",
+        "il",
+        "rt",
+        "ng",
+        "ez",
+        "an"
       ],
-      chinese: ["hao", "wei", "jian", "feng", "ming", "tao", "cheng", "jun", "gang", "long", "peng", "kun"],
-      japanese: ["ro", "ta", "to", "ki", "ji", "shi", "ya", "suke", "kazu", "hiro", "aki", "yuki"],
-      korean: ["ho", "seok", "woo", "jin", "joon", "sung", "hyun", "min", "seung", "jun", "cheol", "tae"]
+      chinese: [
+        "hao",
+        "wei",
+        "jian",
+        "feng",
+        "ming",
+        "tao",
+        "cheng",
+        "jun",
+        "gang",
+        "long",
+        "peng",
+        "kun"
+      ],
+      japanese: [
+        "ro",
+        "ta",
+        "to",
+        "ki",
+        "ji",
+        "shi",
+        "ya",
+        "suke",
+        "kazu",
+        "hiro",
+        "aki",
+        "yuki"
+      ],
+      korean: [
+        "ho",
+        "seok",
+        "woo",
+        "jin",
+        "joon",
+        "sung",
+        "hyun",
+        "min",
+        "seung",
+        "jun",
+        "cheol",
+        "tae"
+      ]
     };
 
     // First check specific culture's patterns
     for (const ending of femaleEndings[culturalOrigin] || []) {
       if (nameLower.endsWith(ending)) {
-        return { gender: "female", evidence: `${culturalOrigin} name ending with '${ending}'` };
+        return {
+          gender: "female",
+          evidence: `${culturalOrigin} name ending with '${ending}'`
+        };
       }
     }
 
     for (const ending of maleEndings[culturalOrigin] || []) {
       if (nameLower.endsWith(ending)) {
-        return { gender: "male", evidence: `${culturalOrigin} name ending with '${ending}'` };
+        return {
+          gender: "male",
+          evidence: `${culturalOrigin} name ending with '${ending}'`
+        };
       }
     }
 
@@ -443,13 +744,19 @@ class GenderUtils {
     if (culturalOrigin !== "western") {
       for (const ending of femaleEndings.western) {
         if (nameLower.endsWith(ending)) {
-          return { gender: "female", evidence: `western name ending with '${ending}'` };
+          return {
+            gender: "female",
+            evidence: `western name ending with '${ending}'`
+          };
         }
       }
 
       for (const ending of maleEndings.western) {
         if (nameLower.endsWith(ending)) {
-          return { gender: "male", evidence: `western name ending with '${ending}'` };
+          return {
+            gender: "male",
+            evidence: `western name ending with '${ending}'`
+          };
         }
       }
     }
@@ -495,8 +802,10 @@ class GenderUtils {
       contexts.push(followingText);
 
       // Count pronouns in the following text
-      const malePronouns = (followingText.match(/\b(he|him|his)\b/gi) || []).length;
-      const femalePronouns = (followingText.match(/\b(she|her|hers)\b/gi) || []).length;
+      const malePronouns = (followingText.match(/\b(he|him|his)\b/gi) || [])
+        .length;
+      const femalePronouns = (followingText.match(/\b(she|her|hers)\b/gi) || [])
+        .length;
 
       // Determine score based on pronoun frequency
       if (malePronouns > femalePronouns) {
@@ -511,16 +820,24 @@ class GenderUtils {
       }
 
       // Add bonus for direct possessive connections
-      if (followingText.match(new RegExp(`\\b${this.escapeRegExp(name)}\\b[^.!?]*\\bhis\\b`, "i"))) {
+      if (
+        followingText.match(
+          new RegExp(`\\b${this.escapeRegExp(name)}\\b[^.!?]*\\bhis\\b`, "i")
+        )
+      ) {
         maleScore += 2;
       }
-      if (followingText.match(new RegExp(`\\b${this.escapeRegExp(name)}\\b[^.!?]*\\bher\\b`, "i"))) {
+      if (
+        followingText.match(
+          new RegExp(`\\b${this.escapeRegExp(name)}\\b[^.!?]*\\bher\\b`, "i")
+        )
+      ) {
         femaleScore += 2;
       }
     });
 
-    return { 
-      maleScore, 
+    return {
+      maleScore,
       femaleScore,
       inconsistencies,
       contexts
@@ -536,16 +853,16 @@ class GenderUtils {
   detectPronounInconsistencies(name, text) {
     // First analyze pronoun usage
     const pronounResult = this.analyzePronounContext(name, text);
-    
+
     // If few inconsistencies, probably no issue
     if (pronounResult.inconsistencies < 2) {
       return { correction: null };
     }
-    
+
     // Look for patterns in same paragraph pronoun switches
     let maleToFemaleCount = 0;
     let femaleToMaleCount = 0;
-    
+
     for (const context of pronounResult.contexts) {
       // Look for sequences like "he... she" or "her... his" within same paragraph
       if (/\b(he|his|him)\b.*\b(she|her|hers)\b/i.test(context)) {
@@ -555,14 +872,14 @@ class GenderUtils {
         femaleToMaleCount++;
       }
     }
-    
+
     // Calculate the overall ratio of male to female pronouns
     const totalMale = pronounResult.maleScore;
     const totalFemale = pronounResult.femaleScore;
-    
+
     let correctedGender = null;
     let correction = null;
-    
+
     // If dominant gender is clear despite inconsistencies
     if (totalMale > totalFemale * 2) {
       correctedGender = "male";
@@ -570,7 +887,7 @@ class GenderUtils {
     } else if (totalFemale > totalMale * 2) {
       correctedGender = "female";
       correction = `inconsistent pronouns detected (${totalFemale} female vs ${totalMale} male) - corrected to female`;
-    } 
+    }
     // If direction of mistranslation is clear
     else if (maleToFemaleCount > femaleToMaleCount * 2) {
       correctedGender = "male";
@@ -579,350 +896,356 @@ class GenderUtils {
       correctedGender = "female";
       correction = `detected translation error pattern (female→male) - corrected to female`;
     }
-    
-    return { 
+
+    return {
       correctedGender,
       correction,
       inconsistencies: pronounResult.inconsistencies
     };
   }
 
-/**
- * Check for cultural-specific character indicators
- * @param {string} name - Character name
- * @param {string} text - Text context
- * @param {string} culturalOrigin - Detected cultural origin
- * @return {object} - Gender scores with evidence
- */
-checkCulturalSpecificIndicators(name, text, culturalOrigin) {
-  let maleScore = 0;
-  let femaleScore = 0;
-  let evidence = null;
-  
-  // Mapping of cultural-specific indicators
-  const culturalIndicators = {
-    western: {
-      male: [
-        "man", "boy", "gentleman", "male", "lad", "groom", "bachelor", "Mr", "Mr.",
-        "sir", "lord", "king", "prince", "duke", "emperor", "chairman", "master", "knight"
-      ],
-      female: [
-        "woman", "girl", "lady", "female", "lass", "bride", "maiden", "Miss", "Mrs", "Ms",
-        "madam", "ma'am", "queen", "princess", "duchess", "empress", "chairwoman", "mistress", "dame"
-      ]
-    },
-    chinese: {
-      male: [
-        "shixiong", "shidi", "gege", "dage", "tangge", "shushu", "bobo", "yeye",
-        "shifu", "gongzi", "laoye", "wangye", "shizi", "gongzi", "langjun", "xiansheng",
-        "xiong", "shaoye", "gongzi", "shaoye", "xianzhu", "fuma"
-      ],
-      female: [
-        "shijie", "shimei", "jiejie", "meimei", "tangjie", "tangmei", "ayi", "nainai",
-        "guniang", "xiaojie", "furen", "taitai", "wangfei", "gongzhu", "xiaojie", "niangniang",
-        "guifei", "gupo", "shitai", "shiniang"
-      ]
-    },
-    japanese: {
-      male: [
-        "otoko", "shounen", "danshi", "oniisan", "otouto", "ojisan", "ojiisan", "otousan",
-        "danna", "shujin", "otto", "senpai", "kohai", "sensei", "kun", "bocchama",
-        "dono", "tono", "-kun", "-dono", "-sama", "-san"
-      ],
-      female: [
-        "onna", "shoujo", "joshi", "oneesan", "imouto", "obasan", "obaasan", "okaasan",
-        "tsuma", "okusan", "kanai", "senpai", "kohai", "sensei", "chan", "ojousama",
-        "hime", "-chan", "-san", "-sama"
-      ]
-    },
-    korean: {
-      male: [
-        "namja", "sonyeon", "abeoji", "hyeong", "oppa", "ajussi", "harabeoji", "abeoji",
-        "nampyeon", "yeobo", "sunbae", "hubae", "seonsaengnim", "gun", "ssi"
-      ],
-      female: [
-        "yeoja", "sonyeo", "eomeoni", "unni", "eonni", "ajumma", "halmeoni", "eomeoni",
-        "anae", "yeobo", "sunbae", "hubae", "seonsaengnim", "yang", "ssi"
-      ]
-    }
-  };
+  /**
+   * Check for cultural-specific character indicators
+   * @param {string} name - Character name
+   * @param {string} text - Text context
+   * @param {string} culturalOrigin - Detected cultural origin
+   * @return {object} - Gender scores with evidence
+   */
+  checkCulturalSpecificIndicators(name, text, culturalOrigin) {
+    let maleScore = 0;
+    let femaleScore = 0;
+    let evidence = null;
 
-  const exactIndicators = {
-    western: {
-      male: [
-        `${name} is a man`, `${name} is male`, `${name}, a man`, `${name}, a male`,
-        `${name} was a man`, `${name} was male`, `${name}, the man`, `man named ${name}`
-      ],
-      female: [
-        `${name} is a woman`, `${name} is female`, `${name}, a woman`, `${name}, a female`,
-        `${name} was a woman`, `${name} was female`, `${name}, the woman`, `woman named ${name}`
-      ]
-    },
-    chinese: {
-      male: [
-        `${name} xiong`, `${name} ge`, `${name} gege`, `${name} dage`,
-        `${name} shixiong`, `${name} shidi`, `${name} shifu`, `${name} gongzi`
-      ],
-      female: [
-        `${name} mei`, `${name} jie`, `${name} jiejie`, `${name} shimei`,
-        `${name} shijie`, `${name} guniang`, `${name} xiaojie`, `${name} gongzhu`
-      ]
-    },
-    japanese: {
-      male: [
-        `${name} kun`, `${name}-kun`, `${name} san`, `${name}-san`,
-        `${name} sama`, `${name}-sama`, `${name} dono`, `${name}-dono`
-      ],
-      female: [
-        `${name} chan`, `${name}-chan`, `${name} san`, `${name}-san`,
-        `${name} sama`, `${name}-sama`, `${name} ojousama`
-      ]
-    },
-    korean: {
-      male: [
-        `${name} gun`, `${name}-gun`, `${name} ssi`, `${name}-ssi`,
-        `${name} hyung`, `${name} oppa`
-      ],
-      female: [
-        `${name} yang`, `${name}-yang`, `${name} ssi`, `${name}-ssi`,
-        `${name} unni`, `${name} eonni`
-      ]
-    }
-  };
-
-  // Check culture-specific direct indicators
-  const specificCultureIndicators = exactIndicators[culturalOrigin] || exactIndicators.western;
-  
-  for (const indicator of specificCultureIndicators.male) {
-    if (text.toLowerCase().includes(indicator.toLowerCase())) {
-      maleScore += 3;
-      evidence = indicator;
-      break;
-    }
-  }
-  
-  for (const indicator of specificCultureIndicators.female) {
-    if (text.toLowerCase().includes(indicator.toLowerCase())) {
-      femaleScore += 3;
-      evidence = indicator;
-      break;
-    }
-  }
-  
-  // If no direct evidence found, look for nearby cultural indicators
-  if (!evidence) {
-    // Find text segments within 50 characters of name mentions
-    const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${this.escapeRegExp(name)}\\b[^.!?]{0,50}`,
-      "gi"
-    );
-    const proximityMatches = Array.from(text.matchAll(nameProximityRegex));
-    let proximityText = "";
-    
-    proximityMatches.forEach(match => {
-      proximityText += match[0] + " ";
-    });
-    
-    // Check for cultural indicators in proximity text
-    const cultureSpecific = culturalIndicators[culturalOrigin] || culturalIndicators.western;
-    
-    for (const indicator of cultureSpecific.male) {
-      const indicatorRegex = new RegExp(`\\b${this.escapeRegExp(indicator)}\\b`, "i");
-      if (indicatorRegex.test(proximityText)) {
-        maleScore += 1;
-        evidence = `near term '${indicator}'`;
-        break;
+    // Mapping of cultural-specific indicators
+    const culturalIndicators = {
+      western: {
+        male: [
+          "man",
+          "boy",
+          "gentleman",
+          "male",
+          "lad",
+          "groom",
+          "bachelor",
+          "Mr",
+          "Mr.",
+          "sir",
+          "lord",
+          "king",
+          "prince",
+          "duke",
+          "emperor",
+          "chairman",
+          "master",
+          "knight"
+        ],
+        female: [
+          "woman",
+          "girl",
+          "lady",
+          "female",
+          "lass",
+          "bride",
+          "maiden",
+          "Miss",
+          "Mrs",
+          "Ms",
+          "madam",
+          "ma'am",
+          "queen",
+          "princess",
+          "duchess",
+          "empress",
+          "chairwoman",
+          "mistress",
+          "dame"
+        ]
+      },
+      chinese: {
+        male: [
+          "shixiong",
+          "shidi",
+          "gege",
+          "dage",
+          "tangge",
+          "shushu",
+          "bobo",
+          "yeye",
+          "shifu",
+          "gongzi",
+          "laoye",
+          "wangye",
+          "shizi",
+          "gongzi",
+          "langjun",
+          "xiansheng",
+          "xiong",
+          "shaoye",
+          "gongzi",
+          "shaoye",
+          "xianzhu",
+          "fuma"
+        ],
+        female: [
+          "shijie",
+          "shimei",
+          "jiejie",
+          "meimei",
+          "tangjie",
+          "tangmei",
+          "ayi",
+          "nainai",
+          "guniang",
+          "xiaojie",
+          "furen",
+          "taitai",
+          "wangfei",
+          "gongzhu",
+          "xiaojie",
+          "niangniang",
+          "guifei",
+          "gupo",
+          "shitai",
+          "shiniang"
+        ]
+      },
+      japanese: {
+        male: [
+          "otoko",
+          "shounen",
+          "danshi",
+          "oniisan",
+          "otouto",
+          "ojisan",
+          "ojiisan",
+          "otousan",
+          "danna",
+          "shujin",
+          "otto",
+          "senpai",
+          "kohai",
+          "sensei",
+          "kun",
+          "bocchama",
+          "dono",
+          "tono",
+          "-kun",
+          "-dono",
+          "-sama",
+          "-san"
+        ],
+        female: [
+          "onna",
+          "shoujo",
+          "joshi",
+          "oneesan",
+          "imouto",
+          "obasan",
+          "obaasan",
+          "okaasan",
+          "tsuma",
+          "okusan",
+          "kanai",
+          "senpai",
+          "kohai",
+          "sensei",
+          "chan",
+          "ojousama",
+          "hime",
+          "-chan",
+          "-san",
+          "-sama"
+        ]
+      },
+      korean: {
+        male: [
+          "namja",
+          "sonyeon",
+          "abeoji",
+          "hyeong",
+          "oppa",
+          "ajussi",
+          "harabeoji",
+          "abeoji",
+          "nampyeon",
+          "yeobo",
+          "sunbae",
+          "hubae",
+          "seonsaengnim",
+          "gun",
+          "ssi"
+        ],
+        female: [
+          "yeoja",
+          "sonyeo",
+          "eomeoni",
+          "unni",
+          "eonni",
+          "ajumma",
+          "halmeoni",
+          "eomeoni",
+          "anae",
+          "yeobo",
+          "sunbae",
+          "hubae",
+          "seonsaengnim",
+          "yang",
+          "ssi"
+        ]
       }
-    }
-    
-    for (const indicator of cultureSpecific.female) {
-      const indicatorRegex = new RegExp(`\\b${this.escapeRegExp(indicator)}\\b`, "i");
-      if (indicatorRegex.test(proximityText)) {
-        femaleScore += 1;
-        evidence = `near term '${indicator}'`;
-        break;
-      }
-    }
-  }
-  
-  return { maleScore, femaleScore, evidence };
-}
-
-/**
- * Advanced analysis for detecting mistranslated pronouns
- * @param {string} name - Character name
- * @param {string} text - Text context 
- * @return {object} - Analysis results with correction suggestions
- */
-analyzeTranslationErrors(name, text) {
-  // First get basic pronoun analysis
-  const pronounResult = this.analyzePronounContext(name, text);
-  
-  // These variables will track our error analysis
-  let potentialErrors = [];
-  let dominantGender = "unknown";
-  let confidence = 0;
-  
-  // Look for classic mistranslation patterns
-  
-  // Pattern 1: Pronoun flipping within same paragraph
-  const paragraphs = text.split(/\n\n+/);
-  
-  for (const paragraph of paragraphs) {
-    if (paragraph.includes(name)) {
-      // Count pronouns in this paragraph
-      const malePronouns = (paragraph.match(/\b(he|him|his)\b/gi) || []).length;
-      const femalePronouns = (paragraph.match(/\b(she|her|hers)\b/gi) || []).length;
-      
-      // Check for mixed pronouns in same paragraph (potential error)
-      if (malePronouns > 0 && femalePronouns > 0) {
-        potentialErrors.push({
-          type: "mixed_pronouns_paragraph",
-          maleCount: malePronouns,
-          femaleCount: femalePronouns,
-          excerpt: paragraph.substring(0, 100) + "..."
-        });
-      }
-    }
-  }
-  
-  // Pattern 2: Pronoun inconsistency with physical descriptions
-  const appearanceResult = this.analyzeAppearanceDescriptions(name, text);
-  const descriptionResult = this.analyzeDescriptions(name, text);
-  
-  // If physical descriptions and pronouns conflict
-  if ((appearanceResult.maleScore > 0 && pronounResult.femaleScore > pronounResult.maleScore) ||
-      (appearanceResult.femaleScore > 0 && pronounResult.maleScore > pronounResult.femaleScore)) {
-    potentialErrors.push({
-      type: "pronoun_appearance_conflict",
-      appearanceMale: appearanceResult.maleScore,
-      appearanceFemale: appearanceResult.femaleScore,
-      pronounMale: pronounResult.maleScore,
-      pronounFemale: pronounResult.femaleScore
-    });
-  }
-  
-  // Pattern 3: Relationship term conflicts with pronouns
-  const relationshipResult = this.checkRelationships(name, text);
-  
-  if ((relationshipResult.maleScore > 0 && pronounResult.femaleScore > pronounResult.maleScore) ||
-      (relationshipResult.femaleScore > 0 && pronounResult.maleScore > pronounResult.femaleScore)) {
-    potentialErrors.push({
-      type: "pronoun_relationship_conflict",
-      relationshipMale: relationshipResult.maleScore,
-      relationshipFemale: relationshipResult.femaleScore,
-      pronounMale: pronounResult.maleScore,
-      pronounFemale: pronounResult.femaleScore
-    });
-  }
-  
-  // Make correction determination based on all evidence
-  let totalMaleEvidence = 
-    (appearanceResult.maleScore * 2) + // Appearance is reliable
-    (descriptionResult.maleScore * 1.5) + // Descriptions are fairly reliable
-    (relationshipResult.maleScore * 3) + // Relationships are very reliable
-    (pronounResult.maleScore * 0.5); // Pronouns less reliable in translations
-    
-  let totalFemaleEvidence = 
-    (appearanceResult.femaleScore * 2) + // Appearance is reliable
-    (descriptionResult.femaleScore * 1.5) + // Descriptions are fairly reliable
-    (relationshipResult.femaleScore * 3) + // Relationships are very reliable
-    (pronounResult.femaleScore * 0.5); // Pronouns less reliable in translations
-  
-  // If we have potential errors AND clear evidence favoring one gender
-  if (potentialErrors.length > 0) {
-    // Use non-pronoun evidence to determine likely correct gender
-    const maleNonPronounEvidence = 
-      (appearanceResult.maleScore * 2) + 
-      (descriptionResult.maleScore * 1.5) + 
-      (relationshipResult.maleScore * 3);
-      
-    const femaleNonPronounEvidence = 
-      (appearanceResult.femaleScore * 2) + 
-      (descriptionResult.femaleScore * 1.5) + 
-      (relationshipResult.femaleScore * 3);
-    
-    if (maleNonPronounEvidence > femaleNonPronounEvidence * 1.5) {
-      dominantGender = "male";
-      confidence = Math.min(0.9, 0.6 + (maleNonPronounEvidence - femaleNonPronounEvidence) * 0.05);
-    } else if (femaleNonPronounEvidence > maleNonPronounEvidence * 1.5) {
-      dominantGender = "female";
-      confidence = Math.min(0.9, 0.6 + (femaleNonPronounEvidence - maleNonPronounEvidence) * 0.05);
-    } else if (totalMaleEvidence > totalFemaleEvidence * 1.2) {
-      dominantGender = "male";
-      confidence = Math.min(0.8, 0.5 + (totalMaleEvidence - totalFemaleEvidence) * 0.03);
-    } else if (totalFemaleEvidence > totalMaleEvidence * 1.2) {
-      dominantGender = "female";
-      confidence = Math.min(0.8, 0.5 + (totalFemaleEvidence - totalMaleEvidence) * 0.03);
-    }
-  }
-  
-  return {
-    potentialErrors,
-    dominantGender,
-    confidence,
-    correctedGender: dominantGender !== "unknown" ? dominantGender : null,
-    correction: dominantGender !== "unknown" ? 
-      `corrected to ${dominantGender} (translation error confidence: ${Math.round(confidence * 100)}%)` : null
-  };
-}
-
-/**
- * Final integrated gender analysis combining all methods
- * @param {string} name - Character name
- * @param {string} text - Text context
- * @param {object} characterMap - Existing character information
- * @return {object} - Complete gender analysis with confidence
- */
-completeGenderAnalysis(name, text, characterMap = {}) {
-  // First check if we already know this character
-  if (characterMap[name] && characterMap[name].gender !== "unknown" && characterMap[name].confidence > 0.7) {
-    return {
-      gender: characterMap[name].gender,
-      confidence: characterMap[name].confidence,
-      evidence: characterMap[name].evidence || ["previously determined"]
     };
-  }
-  
-  // Start with basic analysis
-  const result = this.guessGender(name, text, characterMap);
-  
-  // Add dialogue analysis
-  const dialogueResult = this.analyzeSpokenDialogue(name, text);
-  if (dialogueResult.maleScore > 0 || dialogueResult.femaleScore > 0) {
-    if (dialogueResult.maleScore > dialogueResult.femaleScore) {
-      result.gender = result.gender === "female" && result.confidence > 0.8 ? "female" : "male";
-      result.confidence = Math.min(0.95, result.confidence + 0.1);
-      result.evidence.push(`dialogue: ${dialogueResult.evidence}`);
-    } else if (dialogueResult.femaleScore > dialogueResult.maleScore) {
-      result.gender = result.gender === "male" && result.confidence > 0.8 ? "male" : "female";
-      result.confidence = Math.min(0.95, result.confidence + 0.1);
-      result.evidence.push(`dialogue: ${dialogueResult.evidence}`);
-    }
-  }
-  
-  // Add translation error analysis for potentially more accurate results
-  const translationResult = this.analyzeTranslationErrors(name, text);
-  if (translationResult.correctedGender) {
-    // If we have high confidence in a translation error correction
-    if (translationResult.confidence > 0.7) {
-      // This can override previous determination if confidence is high enough
-      if (result.gender !== translationResult.correctedGender && 
-          (result.confidence < translationResult.confidence || translationResult.confidence > 0.8)) {
-        result.gender = translationResult.correctedGender;
-        result.confidence = translationResult.confidence;
-        result.evidence.push(`translation error correction: ${translationResult.correction}`);
+
+    const exactIndicators = {
+      western: {
+        male: [
+          `${name} is a man`,
+          `${name} is male`,
+          `${name}, a man`,
+          `${name}, a male`,
+          `${name} was a man`,
+          `${name} was male`,
+          `${name}, the man`,
+          `man named ${name}`
+        ],
+        female: [
+          `${name} is a woman`,
+          `${name} is female`,
+          `${name}, a woman`,
+          `${name}, a female`,
+          `${name} was a woman`,
+          `${name} was female`,
+          `${name}, the woman`,
+          `woman named ${name}`
+        ]
+      },
+      chinese: {
+        male: [
+          `${name} xiong`,
+          `${name} ge`,
+          `${name} gege`,
+          `${name} dage`,
+          `${name} shixiong`,
+          `${name} shidi`,
+          `${name} shifu`,
+          `${name} gongzi`
+        ],
+        female: [
+          `${name} mei`,
+          `${name} jie`,
+          `${name} jiejie`,
+          `${name} shimei`,
+          `${name} shijie`,
+          `${name} guniang`,
+          `${name} xiaojie`,
+          `${name} gongzhu`
+        ]
+      },
+      japanese: {
+        male: [
+          `${name} kun`,
+          `${name}-kun`,
+          `${name} san`,
+          `${name}-san`,
+          `${name} sama`,
+          `${name}-sama`,
+          `${name} dono`,
+          `${name}-dono`
+        ],
+        female: [
+          `${name} chan`,
+          `${name}-chan`,
+          `${name} san`,
+          `${name}-san`,
+          `${name} sama`,
+          `${name}-sama`,
+          `${name} ojousama`
+        ]
+      },
+      korean: {
+        male: [
+          `${name} gun`,
+          `${name}-gun`,
+          `${name} ssi`,
+          `${name}-ssi`,
+          `${name} hyung`,
+          `${name} oppa`
+        ],
+        female: [
+          `${name} yang`,
+          `${name}-yang`,
+          `${name} ssi`,
+          `${name}-ssi`,
+          `${name} unni`,
+          `${name} eonni`
+        ]
       }
-      // Otherwise just add to evidence
-      else if (result.gender === translationResult.correctedGender) {
-        result.confidence = Math.min(0.95, result.confidence + 0.1);
-        result.evidence.push(`translation error confirmation: ${translationResult.correction}`);
+    };
+
+    // Check culture-specific direct indicators
+    const specificCultureIndicators =
+      exactIndicators[culturalOrigin] || exactIndicators.western;
+
+    for (const indicator of specificCultureIndicators.male) {
+      if (text.toLowerCase().includes(indicator.toLowerCase())) {
+        maleScore += 3;
+        evidence = indicator;
+        break;
       }
     }
+
+    for (const indicator of specificCultureIndicators.female) {
+      if (text.toLowerCase().includes(indicator.toLowerCase())) {
+        femaleScore += 3;
+        evidence = indicator;
+        break;
+      }
+    }
+
+    // If no direct evidence found, look for nearby cultural indicators
+    if (!evidence) {
+      // Find text segments within 50 characters of name mentions
+      const nameProximityRegex = new RegExp(
+        `[^.!?]*\\b${this.escapeRegExp(name)}\\b[^.!?]{0,50}`,
+        "gi"
+      );
+      const proximityMatches = Array.from(text.matchAll(nameProximityRegex));
+      let proximityText = "";
+
+      proximityMatches.forEach((match) => {
+        proximityText += match[0] + " ";
+      });
+
+      // Check for cultural indicators in proximity text
+      const cultureSpecific =
+        culturalIndicators[culturalOrigin] || culturalIndicators.western;
+
+      for (const indicator of cultureSpecific.male) {
+        const indicatorRegex = new RegExp(
+          `\\b${this.escapeRegExp(indicator)}\\b`,
+          "i"
+        );
+        if (indicatorRegex.test(proximityText)) {
+          maleScore += 1;
+          evidence = `near term '${indicator}'`;
+          break;
+        }
+      }
+
+      for (const indicator of cultureSpecific.female) {
+        const indicatorRegex = new RegExp(
+          `\\b${this.escapeRegExp(indicator)}\\b`,
+          "i"
+        );
+        if (indicatorRegex.test(proximityText)) {
+          femaleScore += 1;
+          evidence = `near term '${indicator}'`;
+          break;
+        }
+      }
+    }
+
+    return { maleScore, femaleScore, evidence };
   }
-  
-  return result;
-}
 
   /**
    * Check for relationship descriptions that indicate gender
@@ -1022,24 +1345,78 @@ completeGenderAnalysis(name, text, characterMap = {}) {
     });
 
     const maleWords = [
-      "handsome", "muscular", "beard", "moustache", "stubble", "broad-shouldered",
-      "rugged", "masculine", "gentleman", "fellow", "stocky", "paternal", "strong",
-      "manly", "chiseled", "goatee", "sideburns", "chest hair", "adam's apple",
-      "baritone", "bass voice", "gruff", "virile", "brawny", "husky"
+      "handsome",
+      "muscular",
+      "beard",
+      "moustache",
+      "stubble",
+      "broad-shouldered",
+      "rugged",
+      "masculine",
+      "gentleman",
+      "fellow",
+      "stocky",
+      "paternal",
+      "strong",
+      "manly",
+      "chiseled",
+      "goatee",
+      "sideburns",
+      "chest hair",
+      "adam's apple",
+      "baritone",
+      "bass voice",
+      "gruff",
+      "virile",
+      "brawny",
+      "husky"
     ];
 
     const femaleWords = [
-      "beautiful", "pretty", "gorgeous", "lovely", "pregnant", "makeup", "slender",
-      "feminine", "graceful", "voluptuous", "maternal", "lady", "slim", "elegant",
-      "petite", "curvy", "dress", "gown", "skirt", "blouse", "heels", "lipstick",
-      "eyeliner", "mascara", "bosom", "breasts", "cleavage", "hips", "waist",
-      "motherly", "womanly", "soft-spoken", "gentle", "dainty"
+      "beautiful",
+      "pretty",
+      "gorgeous",
+      "lovely",
+      "pregnant",
+      "makeup",
+      "slender",
+      "feminine",
+      "graceful",
+      "voluptuous",
+      "maternal",
+      "lady",
+      "slim",
+      "elegant",
+      "petite",
+      "curvy",
+      "dress",
+      "gown",
+      "skirt",
+      "blouse",
+      "heels",
+      "lipstick",
+      "eyeliner",
+      "mascara",
+      "bosom",
+      "breasts",
+      "cleavage",
+      "hips",
+      "waist",
+      "motherly",
+      "womanly",
+      "soft-spoken",
+      "gentle",
+      "dainty"
     ];
 
     // Check for male descriptors
     for (const word of maleWords) {
       const regex = new RegExp(
-        `\\b${this.escapeRegExp(name)}[^.!?]*\\b${this.escapeRegExp(word)}\\b|\\b${this.escapeRegExp(word)}\\b[^.!?]*\\b${this.escapeRegExp(name)}\\b`,
+        `\\b${this.escapeRegExp(name)}[^.!?]*\\b${this.escapeRegExp(
+          word
+        )}\\b|\\b${this.escapeRegExp(word)}\\b[^.!?]*\\b${this.escapeRegExp(
+          name
+        )}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -1052,7 +1429,11 @@ completeGenderAnalysis(name, text, characterMap = {}) {
     // Check for female descriptors
     for (const word of femaleWords) {
       const regex = new RegExp(
-        `\\b${this.escapeRegExp(name)}[^.!?]*\\b${this.escapeRegExp(word)}\\b|\\b${this.escapeRegExp(word)}\\b[^.!?]*\\b${this.escapeRegExp(name)}\\b`,
+        `\\b${this.escapeRegExp(name)}[^.!?]*\\b${this.escapeRegExp(
+          word
+        )}\\b|\\b${this.escapeRegExp(word)}\\b[^.!?]*\\b${this.escapeRegExp(
+          name
+        )}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -1078,7 +1459,9 @@ completeGenderAnalysis(name, text, characterMap = {}) {
 
     // Find appearance descriptions
     const appearanceRegex = new RegExp(
-      `\\b${this.escapeRegExp(name)}(?:'s)?\\b[^.!?]*(\\bappearance\\b|\\blooked\\b|\\bdressed\\b|\\bwore\\b|\\bfigure\\b|\\bface\\b|\\bhair\\b|\\bfeatures\\b)[^.!?]*[.!?]`,
+      `\\b${this.escapeRegExp(
+        name
+      )}(?:'s)?\\b[^.!?]*(\\bappearance\\b|\\blooked\\b|\\bdressed\\b|\\bwore\\b|\\bfigure\\b|\\bface\\b|\\bhair\\b|\\bfeatures\\b)[^.!?]*[.!?]`,
       "gi"
     );
 
@@ -1090,20 +1473,64 @@ completeGenderAnalysis(name, text, characterMap = {}) {
     });
 
     const maleAppearance = [
-      "short hair", "crew cut", "buzz cut", "flat chest", "broad shoulders",
-      "tall and strong", "muscular build", "chiseled jaw", "square jaw", "strong jaw",
-      "adam's apple", "facial hair", "stubble", "large hands", "barrel chest",
-      "deep voice", "baritone", "bass voice", "men's clothing", "men's fashion",
-      "suit and tie", "tuxedo", "male uniform", "his physique"
+      "short hair",
+      "crew cut",
+      "buzz cut",
+      "flat chest",
+      "broad shoulders",
+      "tall and strong",
+      "muscular build",
+      "chiseled jaw",
+      "square jaw",
+      "strong jaw",
+      "adam's apple",
+      "facial hair",
+      "stubble",
+      "large hands",
+      "barrel chest",
+      "deep voice",
+      "baritone",
+      "bass voice",
+      "men's clothing",
+      "men's fashion",
+      "suit and tie",
+      "tuxedo",
+      "male uniform",
+      "his physique"
     ];
 
     const femaleAppearance = [
-      "long hair", "flowing hair", "braided hair", "ponytail", "bun", "curves",
-      "slender waist", "hourglass figure", "feminine figure", "soft features",
-      "delicate features", "full lips", "long lashes", "high cheekbones", "smooth skin",
-      "small hands", "narrow shoulders", "ample bosom", "bust", "breast", "cleavage",
-      "hips", "women's clothing", "women's fashion", "dress", "skirt", "blouse",
-      "her physique", "makeup", "painted nails", "manicure"
+      "long hair",
+      "flowing hair",
+      "braided hair",
+      "ponytail",
+      "bun",
+      "curves",
+      "slender waist",
+      "hourglass figure",
+      "feminine figure",
+      "soft features",
+      "delicate features",
+      "full lips",
+      "long lashes",
+      "high cheekbones",
+      "smooth skin",
+      "small hands",
+      "narrow shoulders",
+      "ample bosom",
+      "bust",
+      "breast",
+      "cleavage",
+      "hips",
+      "women's clothing",
+      "women's fashion",
+      "dress",
+      "skirt",
+      "blouse",
+      "her physique",
+      "makeup",
+      "painted nails",
+      "manicure"
     ];
 
     // Check for male appearance descriptors

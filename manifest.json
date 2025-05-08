@@ -35,8 +35,9 @@
         "*://*.webnovel.com/*"
       ],
       "js": [
-        "genderUtils.js",
-        "dialogueUtils.js",
+        "utils/genderUtils.js",
+        "utils/dialogueUtils.js",
+        "utils/novelUtils.js",
         "enhancerIntegration.js",
         "ollamaClient.js",
         "toaster.js",

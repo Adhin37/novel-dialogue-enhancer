@@ -18,13 +18,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       novelCharacterMaps[novelId] = {};
     }
 
-    novelCharacterMaps[novelId] = {
-      ...novelCharacterMaps[novelId],
-      ...request.characters
-    };
+    // For each character in the new map
+    Object.entries(request.characters).forEach(([charName, charData]) => {
+      // If character already exists in our stored map
+      if (novelCharacterMaps[novelId][charName]) {
+        const existingChar = novelCharacterMaps[novelId][charName];
+
+        // Merge appearances count
+        const newAppearances =
+          (existingChar.appearances || 0) + (charData.appearances || 1);
+
+        // Keep the higher confidence gender assessment
+        let mergedGender = existingChar.gender;
+        let mergedConfidence = existingChar.confidence || 0;
+        let mergedEvidence = existingChar.evidence || [];
+
+        // If new data has better confidence, use it instead
+        if (charData.confidence > mergedConfidence) {
+          mergedGender = charData.gender;
+          mergedConfidence = charData.confidence;
+          mergedEvidence = charData.evidence || [];
+        }
+        // If new data has same confidence but more evidence, include new evidence
+        else if (
+          charData.confidence === mergedConfidence &&
+          charData.evidence
+        ) {
+          // Add new evidence that doesn't already exist
+          charData.evidence.forEach((item) => {
+            if (!mergedEvidence.includes(item)) {
+              mergedEvidence.push(item);
+            }
+          });
+        }
+
+        // Update the existing character with merged data
+        novelCharacterMaps[novelId][charName] = {
+          ...existingChar,
+          gender: mergedGender,
+          confidence: mergedConfidence,
+          appearances: newAppearances,
+          evidence: mergedEvidence
+        };
+      } else {
+        novelCharacterMaps[novelId][charName] = charData;
+      }
+    });
 
     // Store in sync storage (with size limit handling)
-    storeNovelCharacterMaps();
+    storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
     return false;
@@ -75,7 +117,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false; // Default case
 });
 
-function storeNovelCharacterMaps() {
+function storeNovelCharacterMaps(novelCharacterMaps) {
   // Chrome storage has limits, so we need to manage size
   // Calculate size of all character maps
   const serialized = JSON.stringify(novelCharacterMaps);
