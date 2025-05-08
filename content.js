@@ -1,7 +1,7 @@
 // content.js
 let contentElement = null;
 let settings = {
-  enhancerEnabled: true,
+  isExtensionPaused: true,
   preserveNames: true,
   fixPronouns: true
 };
@@ -18,20 +18,21 @@ function init() {
   toaster = new Toaster();
   ollamaClient = new OllamaClient();
   chrome.storage.sync.get(
-    ["enhancerEnabled", "preserveNames", "fixPronouns"],
+    ["isExtensionPaused", "preserveNames", "fixPronouns"],
     function (data) {
       settings = {
-        enhancerEnabled:
-          data.enhancerEnabled !== undefined ? data.enhancerEnabled : true,
+        isExtensionPaused:
+          data.isExtensionPaused !== undefined ? data.isExtensionPaused : true,
         preserveNames:
           data.preserveNames !== undefined ? data.preserveNames : true,
-        fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true
+        fixPronouns:
+          data.fixPronouns !== undefined ? data.fixPronouns : true
       };
 
       setTimeout(() => {
         checkOllamaStatus();
 
-        if (settings.enhancerEnabled) {
+        if (!settings.isExtensionPaused) {
           enhancePage();
         }
       }, 1000);
@@ -181,7 +182,7 @@ async function enhancePage() {
 
     await enhancePageWithLLM();
 
-    const stats = enhancerIntegration.getEnhancementStats();
+    const stats = enhancerIntegration.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
 
     toaster.finishProgress();
@@ -331,8 +332,8 @@ async function enhancePageWithLLM() {
       }
     }
 
-    enhancerIntegration.setTotalDialoguesEnhanced(
-      enhancerIntegration.getTotalDialoguesEnhanced() + paragraphs.length || 1
+    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(
+      enhancerIntegration.statsUtils.getTotalDialoguesEnhanced() + paragraphs.length || 1
     );
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
   } catch (error) {
@@ -385,7 +386,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 
     enhancePage()
       .then((result) => {
-        const stats = enhancerIntegration.getEnhancementStats();
+        const stats = enhancerIntegration.statsUtils.getStats();
         try {
           sendResponse({
             status: "enhanced",
@@ -433,7 +434,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
 init();
 
 const observer = new MutationObserver(function (mutations) {
-  if (settings.enhancerEnabled && !isEnhancing && !terminateRequested) {
+  if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
     let newContentAdded = false;
 
     mutations.forEach((mutation) => {

@@ -10,22 +10,11 @@ class EnhancerIntegration {
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
     this.novelUtils = new NovelUtils();
-
-    this.setTotalDialoguesEnhanced(0);
-    this.setTotalPronounsFixed(0);
-    this.setTotalCharactersDetected(0);
-    this.setProcessingTime(0);
+    this.statsUtils = new StatsUtils();
 
     console.log(
       "Novel Dialogue Enhancer: Integration module initialized with LLM support"
     );
-
-    this.setEnhancementStats({
-      totalDialoguesEnhanced: this.getTotalDialoguesEnhanced(),
-      totalPronounsFixed: this.getTotalPronounsFixed(),
-      totalCharactersDetected: this.getTotalCharactersDetected(),
-      processingTime: this.getProcessingTime()
-    });
   }
 
   /**
@@ -47,9 +36,7 @@ class EnhancerIntegration {
         dialoguePatterns.colonSeparatedDialogue.length +
         dialoguePatterns.actionDialogue.length;
 
-      this.setTotalDialoguesEnhanced(
-        this.getTotalDialoguesEnhanced() + dialogueCount
-      );
+      this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
 
       // Create character summary for LLM context
       const characterArray = Object.entries(characterMap).map(
@@ -77,14 +64,14 @@ class EnhancerIntegration {
       );
 
       const endTime = performance.now();
-      this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
+      this.statsUtils.setProcessingTime(endTime - startTime);
 
       return enhancedText;
     } catch (error) {
       console.error("Error enhancing text:", error);
 
       const endTime = performance.now();
-      this.setProcessingTime(this.getProcessingTime() + (endTime - startTime));
+      this.statsUtils.setProcessingTime(endTime - startTime);
 
       return text;
     }
@@ -102,7 +89,7 @@ class EnhancerIntegration {
     const startCharCount = Object.keys(characterMap).length;
 
     // Get novel ID to retrieve existing character data
-    const novelId = this.generateNovelId();
+    const novelId = this.novelUtils.updateNovelId(window.location.href, document.title);
 
     // Try to get existing character map for this novel first
     if (novelId) {
@@ -169,9 +156,7 @@ class EnhancerIntegration {
 
     // Track new characters found
     const newCharCount = Object.keys(characterMap).length - startCharCount;
-    this.setTotalCharactersDetected(
-      this.getTotalCharactersDetected() + newCharCount
-    );
+    this.statsUtils.setTotalCharactersDetected(newCharCount);
 
     // Sync character map with background
     if (novelId && Object.keys(characterMap).length > 0) {
@@ -220,39 +205,6 @@ class EnhancerIntegration {
         }
       );
     });
-  }
-
-  /**
-   * Generate a novel identifier based on URL and title
-   * @return {string} - Unique novel identifier
-   */
-  generateNovelId() {
-    const url = window.location.href;
-    const title = document.title;
-
-    let domain = new URL(url).hostname.replace(/^www\./, "");
-    let novelName = "";
-
-    if (title) {
-      const titleParts = title.split(/[|\-–—:]/);
-      if (titleParts.length > 0) {
-        novelName = titleParts[0].trim();
-      }
-    }
-
-    if (!novelName) {
-      novelName = title.replace(/[^\w\s]/g, "").trim();
-    }
-
-    const novelId = `${domain}_${novelName}`
-      .toLowerCase()
-      .replace(/[^\w]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/_(\d+)(?=\.\w+$)/, "")
-      .substring(0, 50);
-
-    console.log(`Generated novel ID: ${novelId}`);
-    return novelId;
   }
 
   /**
@@ -399,7 +351,7 @@ class EnhancerIntegration {
    */
   async enhanceTextWithLLM(text, characterSummary) {
     try {
-      const novelId = this.generateNovelId();
+      const novelId = this.novelUtils.updateNovelId(window.location.href, document.title);
 
       // Add context about the novel and writing style
       const novelInfo = await this.dialogueUtils.analyzeNovelStyle(
@@ -414,9 +366,6 @@ class EnhancerIntegration {
         novelInfo
       );
 
-      // Extract only the enhanced text response (removing any prompt or instruction text)
-      const cleanedText = this.cleanLLMResponse(enhancedText);
-
       console.log("Text enhancement complete!");
 
       return cleanedText;
@@ -427,117 +376,11 @@ class EnhancerIntegration {
   }
 
   /**
-   * Clean the LLM response to extract only the enhanced text
-   * @param {string} llmResponse - Raw LLM response
-   * @return {string} - Cleaned enhanced text
-   */
-  cleanLLMResponse(llmResponse) {
-    // If the response contains markdown code blocks, remove them
-    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
-
-    // Remove potential explanations or notes at the beginning/end
-    cleanedText = cleanedText.replace(
-      /^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i,
-      ""
-    );
-
-    // Remove any final notes
-    cleanedText = cleanedText.replace(
-      /(Note:.*$)|(I hope this helps.*$)/im,
-      ""
-    );
-
-    return cleanedText.trim();
-  }
-
-  /**
-   * Escape special characters for regex
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   */
-  escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  /**
    * Get the current enhancement statistics
    * @return {object} - Enhancement statistics
    */
-  getEnhancementStats() {
-    return {
-      totalDialoguesEnhanced: this.getTotalDialoguesEnhanced(),
-      totalPronounsFixed: this.getTotalPronounsFixed(),
-      totalCharactersDetected: this.getTotalCharactersDetected(),
-      processingTime: Math.round(this.getProcessingTime())
-    };
-  }
-
-  setEnhancementStats(stats) {
-    this.enhancementStats = stats;
-  }
-
-  /**
-   * Set the current totalDialoguesEnhanced
-   * @param {number} totalDialoguesEnhanced - Number of dialogues enhanced
-   */
-  setTotalDialoguesEnhanced(totalDialoguesEnhanced) {
-    this.totalDialoguesEnhanced = totalDialoguesEnhanced;
-  }
-
-  /**
-   * Set the current totalPronounsFixed
-   * @param {number} totalPronounsFixed - Number of pronouns fixed
-   */
-  setTotalPronounsFixed(totalPronounsFixed) {
-    this.totalPronounsFixed = totalPronounsFixed;
-  }
-
-  /**
-   * Set the current totalCharactersDetected
-   * @param {number} totalCharactersDetected - Number of characters detected
-   */
-  setTotalCharactersDetected(totalCharactersDetected) {
-    this.totalCharactersDetected = totalCharactersDetected;
-  }
-
-  /**
-   * Set the current processingTime
-   * @param {number} processingTime - Processing time in ms
-   */
-  setProcessingTime(processingTime) {
-    this.processingTime = processingTime;
-  }
-
-  /**
-   * Get the current totalDialoguesEnhanced
-   * @return {number} - Total dialogues enhanced
-   */
-  getTotalDialoguesEnhanced() {
-    return this.totalDialoguesEnhanced;
-  }
-
-  /**
-   * Get the current totalPronounsFixed
-   * @return {number} - Total pronouns fixed
-   */
-  getTotalPronounsFixed() {
-    return this.totalPronounsFixed;
-  }
-
-  /**
-   * Get the current totalCharactersDetected
-   * @return {number} - Total characters detected
-   */
-  getTotalCharactersDetected() {
-    return this.totalCharactersDetected;
-  }
-
-  /**
-   * Get the current processingTime
-   * @return {number} - Processing time in ms
-   */
-  getProcessingTime() {
-    return this.processingTime;
+  getStats() {
+    return this.statsUtils.getStats();
   }
 }
 

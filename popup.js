@@ -29,12 +29,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
   chrome.storage.sync.get(
     {
-      enhancerEnabled: true,
+      isExtensionPaused: true,
       preserveNames: true,
       fixPronouns: true
     },
     function (items) {
-      isExtensionPaused = !items.enhancerEnabled;
+      isExtensionPaused = !items.isExtensionPaused;
       updatePauseButton();
       preserveNamesToggle.checked = items.preserveNames;
       fixPronounsToggle.checked = items.fixPronouns;
@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   pauseButton.addEventListener("click", function () {
     isExtensionPaused = !isExtensionPaused;
-    chrome.storage.sync.set({ enhancerEnabled: !isExtensionPaused });
+    chrome.storage.sync.set({ isExtensionPaused: !isExtensionPaused });
 
     if (isExtensionPaused) {
       chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
@@ -138,7 +138,7 @@ document.addEventListener("DOMContentLoaded", function () {
             chrome.tabs.sendMessage(tabs[0].id, {
               action: "enhanceNow",
               settings: {
-                enhancerEnabled: !isExtensionPaused,
+                isExtensionPaused: !isExtensionPaused,
                 preserveNames: preserveNamesToggle.checked,
                 fixPronouns: fixPronounsToggle.checked
               }

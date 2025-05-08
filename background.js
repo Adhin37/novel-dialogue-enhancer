@@ -347,7 +347,7 @@ function checkOllamaAvailability(sendResponse) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(
     [
-      "enhancerEnabled",
+      "isExtensionPaused",
       "preserveNames",
       "fixPronouns",
       "modelName",
@@ -356,17 +356,22 @@ chrome.runtime.onInstalled.addListener(() => {
       "disabledPages"
     ],
     (data) => {
-      const defaults = {};
-
-      if (data.enhancerEnabled === undefined) defaults.enhancerEnabled = true;
-      if (data.preserveNames === undefined) defaults.preserveNames = true;
-      if (data.fixPronouns === undefined) defaults.fixPronouns = true;
-      if (data.modelName === undefined) defaults.modelName = "qwen3:8b";
-      if (data.maxChunkSize === undefined) defaults.maxChunkSize = 4000;
-      if (data.timeout === undefined) defaults.timeout = 180;
-      if (data.disabledPages === undefined) defaults.disabledPages = [];
-
-      if (Object.keys(defaults).length > 0) {
+      const defaults = {
+        isExtensionPaused: true,
+        preserveNames: true,
+        fixPronouns: true,
+        modelName: "qwen3:8b",
+        maxChunkSize: 4000,
+        timeout: 180,
+        disabledPages: []
+      };
+      try {
+        chrome.storage.sync.set({ ...defaults, ...data });
+      } catch (error) {
+        console.error(
+          "Error merging settings, using default settings instead:\n",
+          error
+        );
         chrome.storage.sync.set(defaults);
       }
     }

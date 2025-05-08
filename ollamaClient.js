@@ -56,7 +56,11 @@ class OllamaClient {
    * @param {string} characterContext - Character information for context
    * @return {Promise<string>} - Enhanced text
    */
-  async enhanceWithLLM(text, characterContext = "", novelInfo = { style: "standard narrative", tone: "neutral" }) {
+  async enhanceWithLLM(
+    text,
+    characterContext = "",
+    novelInfo = { style: "standard narrative", tone: "neutral" }
+  ) {
     console.time("enhanceWithLLM");
     try {
       // Make sure Ollama is available first
@@ -82,7 +86,12 @@ class OllamaClient {
         // Build context that includes surrounding text and character information
         const contextInfo = this.buildChunkContext(chunks, i);
 
-        const prompt = this.createEnhancedPrompt(chunk, characterContext,contextInfo, novelInfo);
+        const prompt = this.createEnhancedPrompt(
+          chunk,
+          characterContext,
+          contextInfo,
+          novelInfo
+        );
 
         // Create cache key based on chunk content and prompt
         const cacheKey = this.hashString(chunk + contextInfo);
@@ -122,7 +131,7 @@ class OllamaClient {
 
       const enhancedText = enhancedChunks.join("\n\n");
       console.timeEnd("enhanceWithLLM");
-      return enhancedText;
+      return this.cleanLLMResponse(enhancedText);
     } catch (err) {
       console.timeEnd("enhanceWithLLM");
       console.error("LLM enhancement failed:", err);
@@ -168,7 +177,7 @@ class OllamaClient {
    * @param {string} contextInfo - Context information including characters
    * @return {string} - Complete prompt for LLM
    */
-  createEnhancedPrompt(chunk, characterContext,contextInfo, novelInfo) {
+  createEnhancedPrompt(chunk, characterContext, contextInfo, novelInfo) {
     return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following web novel text to improve dialogue attribution and clarity.
 The novel's style is ${novelInfo.style} with a ${novelInfo.tone} tone.
 
@@ -314,9 +323,7 @@ ${chunk}`;
             return reject(new Error("Invalid response from Ollama"));
           }
 
-          const enhancedText = this.cleanLLMResponse(
-            response.enhancedText || ""
-          );
+          const enhancedText = this.cleanLLMResponse(response.enhancedText);
           resolve(enhancedText);
         }
       );
@@ -446,6 +453,30 @@ ${chunk}`;
   clearCache() {
     this.cache.clear();
     console.log("Cleared OllamaClient cache");
+  }
+
+  /**
+   * Clean the LLM response to extract only the enhanced text
+   * @param {string} llmResponse - Raw LLM response
+   * @return {string} - Cleaned enhanced text
+   */
+  cleanLLMResponse(llmResponse) {
+    // If the response contains markdown code blocks, remove them
+    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
+
+    // Remove potential explanations or notes at the beginning/end
+    cleanedText = cleanedText.replace(
+      /^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i,
+      ""
+    );
+
+    // Remove any final notes
+    cleanedText = cleanedText.replace(
+      /(Note:.*$)|(I hope this helps.*$)/im,
+      ""
+    );
+
+    return cleanedText.trim();
   }
 }
 
