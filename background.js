@@ -167,133 +167,115 @@ function handleOllamaRequest(request, sendResponse) {
       topP: 0.9
     },
     (data) => {
-      if (!request.data.temperature) {
-        request.data.temperature = data.temperature;
-      }
-
-      if (!request.data.top_p) {
-        request.data.top_p = data.topP;
-      }
-
+      const requestData = prepareRequestData(request.data, data);
+      
       console.log("Sending Ollama request:", {
-        model: request.data.model,
-        promptLength: request.data.prompt.length,
-        max_tokens: request.data.max_tokens,
-        temperature: request.data.temperature,
-        top_p: request.data.top_p,
-        stream: request.data.stream || false,
+        model: requestData.model,
+        promptLength: requestData.prompt.length,
+        max_tokens: requestData.max_tokens,
+        temperature: requestData.temperature,
+        top_p: requestData.top_p,
+        stream: requestData.stream || false,
         timeout: data.timeout + " seconds",
-        options: request.data.options || {}
+        options: requestData.options || {}
       });
 
-      const controller = new AbortController();
-      const requestId = Date.now().toString();
-      activeRequestControllers.set(requestId, controller);
-
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        data.timeout * 1000
-      );
-
-      if (request.data.stream == false) {
-        fetch(DEFAULT_OLLAMA_URL + "/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(request.data),
-          signal: controller.signal
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`Ollama HTTP error: ${response.status}`);
-            }
-            return response.text();
-          })
-          .then((rawText) => {
-            console.log(
-              "Raw Ollama response (first 100 chars):",
-              rawText.substring(0, 100)
-            );
-            try {
-              let enhancedText = "";
-
-              if (rawText.includes("\n")) {
-                const lines = rawText.split("\n").filter((line) => line.trim());
-                for (const line of lines) {
-                  try {
-                    const data = JSON.parse(line);
-                    if (data.response) {
-                      enhancedText += data.response;
-                    }
-                  } catch (lineError) {
-                    console.warn("Error parsing JSON line:", lineError);
-                  }
-                }
-              } else {
-                const data = JSON.parse(rawText);
-                enhancedText = data.response || data.choices?.[0]?.text?.trim();
-              }
-
-              if (!enhancedText) {
-                console.warn(
-                  "No text found in Ollama response:",
-                  rawText.substring(0, 200)
-                );
-                throw new Error("No text found in Ollama response");
-              }
-
-              console.log(
-                "Ollama request successful, response length:",
-                enhancedText.length
-              );
-              sendResponse({ enhancedText });
-            } catch (parseError) {
-              console.error("JSON parsing error:", parseError);
-              console.error(
-                "Raw response that caused parsing error:",
-                rawText.substring(0, 500)
-              );
-              sendResponse({
-                error: `JSON parsing error: ${parseError.message}`
-              });
-            }
-          })
-          .catch((error) => {
-            if (error.name === "AbortError") {
-              const isUserTerminated =
-                controller.signal.reason === "USER_TERMINATED";
-
-              if (isUserTerminated) {
-                console.log("Ollama request was manually terminated");
-                sendResponse({
-                  error: "Request was terminated",
-                  terminated: true
-                });
-              } else {
-                console.error(
-                  "Ollama request timed out after",
-                  data.timeout,
-                  "ms"
-                );
-                sendResponse({
-                  error: `Request timed out after ${
-                    data.timeout / 1000
-                  } seconds`
-                });
-              }
-            } else {
-              console.error("Ollama request failed:", error);
-              sendResponse({ error: error.message });
-            }
-          })
-          .finally(() => {
-            clearTimeout(timeoutId);
-            activeRequestControllers.delete(requestId);
-          });
+      if (requestData.stream === false) {
+        processNonStreamingRequest(requestData, data.timeout, sendResponse);
       } else {
         sendResponse({ error: "Invalid stream value" });
       }
     }
   );
+}
+
+function prepareRequestData(requestData, settings) {
+  return {
+    ...requestData,
+    temperature: requestData.temperature || settings.temperature,
+    top_p: requestData.top_p || settings.topP
+  };
+}
+
+function processNonStreamingRequest(requestData, timeout, sendResponse) {
+  const controller = new AbortController();
+  const requestId = Date.now().toString();
+  activeRequestControllers.set(requestId, controller);
+
+  const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
+
+  fetch(DEFAULT_OLLAMA_URL + "/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestData),
+    signal: controller.signal
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Ollama HTTP error: ${response.status}`);
+      }
+      return response.text();
+    })
+    .then(rawText => processOllamaResponse(rawText, sendResponse))
+    .catch(error => handleOllamaError(error, controller, timeout, sendResponse))
+    .finally(() => {
+      clearTimeout(timeoutId);
+      activeRequestControllers.delete(requestId);
+    });
+}
+
+function processOllamaResponse(rawText, sendResponse) {
+  console.log("Raw Ollama response (first 100 chars):", rawText.substring(0, 100));
+  
+  try {
+    let enhancedText = "";
+
+    if (rawText.includes("\n")) {
+      const lines = rawText.split("\n").filter(line => line.trim());
+      for (const line of lines) {
+        try {
+          const data = JSON.parse(line);
+          if (data.response) {
+            enhancedText += data.response;
+          }
+        } catch (lineError) {
+          console.warn("Error parsing JSON line:", lineError);
+        }
+      }
+    } else {
+      const data = JSON.parse(rawText);
+      enhancedText = data.response || data.choices?.[0]?.text?.trim();
+    }
+
+    if (!enhancedText) {
+      console.warn("No text found in Ollama response:", rawText.substring(0, 200));
+      throw new Error("No text found in Ollama response");
+    }
+
+    console.log("Ollama request successful, response length:", enhancedText.length);
+    sendResponse({ enhancedText });
+  } catch (parseError) {
+    console.error("JSON parsing error:", parseError);
+    console.error("Raw response that caused parsing error:", rawText.substring(0, 500));
+    sendResponse({ error: `JSON parsing error: ${parseError.message}` });
+  }
+}
+
+function handleOllamaError(error, controller, timeout, sendResponse) {
+  if (error.name === "AbortError") {
+    const isUserTerminated = controller.signal.reason === "USER_TERMINATED";
+
+    if (isUserTerminated) {
+      console.log("Ollama request was manually terminated");
+      sendResponse({ error: "Request was terminated", terminated: true });
+    } else {
+      console.error("Ollama request timed out after", timeout, "ms");
+      sendResponse({ error: `Request timed out after ${timeout / 1000} seconds` });
+    }
+  } else {
+    console.error("Ollama request failed:", error);
+    sendResponse({ error: error.message });
+  }
 }
 
 function checkOllamaAvailability(sendResponse) {

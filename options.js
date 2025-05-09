@@ -14,8 +14,43 @@ document.addEventListener("DOMContentLoaded", function () {
   const whitelistItemsContainer = document.getElementById("whitelist-items");
   const clearAllBtn = document.getElementById("clear-all");
   const closeBtn = document.getElementById("close-btn");
+  const modelSuggestions = document.querySelectorAll(".model-suggestion");
 
+  // Apply dynamic gradient to sliders
+  function updateSliderBackground(slider) {
+    const value = (slider.value - slider.min) / (slider.max - slider.min) * 100;
+    slider.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, #ddd ${value}%, #ddd 100%)`;
+  }
+
+  // Update sliders on input
+  function setupSlider(slider, valueElement) {
+    updateSliderBackground(slider);
+    slider.addEventListener("input", function() {
+      valueElement.textContent = this.value;
+      updateSliderBackground(this);
+    });
+  }
+
+  // Load whitelist data
   loadWhitelist();
+
+  // Setup model suggestions
+  modelSuggestions.forEach(suggestion => {
+    suggestion.addEventListener("click", function() {
+      modelNameInput.value = this.dataset.model;
+      // Add small feedback animation
+      this.style.transform = "scale(0.95)";
+      setTimeout(() => {
+        this.style.transform = "scale(1)";
+      }, 150);
+    });
+  });
+
+  // Initialize sliders
+  setupSlider(temperatureSlider, temperatureValue);
+  setupSlider(topPSlider, topPValue);
+  setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
+  setupSlider(timeoutSlider, timeoutValue);
 
   clearAllBtn.addEventListener("click", function () {
     if (
@@ -78,6 +113,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  // Load saved settings
   chrome.storage.sync.get(
     {
       modelName: "qwen3:8b",
@@ -96,24 +132,14 @@ document.addEventListener("DOMContentLoaded", function () {
       temperatureValue.textContent = data.temperature;
       topPSlider.value = data.topP;
       topPValue.textContent = data.topP;
+      
+      // Update slider backgrounds after loading values
+      updateSliderBackground(temperatureSlider);
+      updateSliderBackground(topPSlider);
+      updateSliderBackground(maxChunkSizeSlider);
+      updateSliderBackground(timeoutSlider);
     }
   );
-
-  maxChunkSizeSlider.addEventListener("input", function () {
-    maxChunkSizeValue.textContent = this.value;
-  });
-
-  timeoutSlider.addEventListener("input", function () {
-    timeoutValue.textContent = this.value;
-  });
-
-  temperatureSlider.addEventListener("input", function () {
-    temperatureValue.textContent = this.value;
-  });
-
-  topPSlider.addEventListener("input", function () {
-    topPValue.textContent = this.value;
-  });
 
   saveButton.addEventListener("click", function () {
     const maxChunkSize = parseInt(maxChunkSizeSlider.value);
@@ -130,22 +156,26 @@ document.addEventListener("DOMContentLoaded", function () {
         topP: topP
       },
       function () {
-        const saveButton = document.getElementById("save");
-        const originalText = saveButton.textContent;
-        saveButton.textContent = "Settings Saved!";
-        saveButton.style.backgroundColor = "#4CAF50";
+        // Show save feedback
+        const feedback = document.createElement("div");
+        feedback.className = "save-feedback";
+        feedback.textContent = "Settings Saved Successfully!";
+        document.body.appendChild(feedback);
 
-        setTimeout(function () {
-          saveButton.textContent = originalText;
-          saveButton.style.backgroundColor = "#2196F3";
-        }, 1500);
+        // Remove feedback after animation completes
+        setTimeout(() => {
+          if (feedback && feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+          }
+        }, 2500);
       }
     );
   });
 
-  testOllamaButton.addEventListener("click", async function () {
+  testOllamaButton.addEventListener("click", function () {
     ollamaStatus.textContent = "Testing Ollama connection...";
     ollamaStatus.className = "status-message pending";
+    ollamaStatus.style.display = "block";
 
     try {
       chrome.runtime.sendMessage(

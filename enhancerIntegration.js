@@ -24,57 +24,51 @@ class EnhancerIntegration {
    */
   async enhanceText(text) {
     const startTime = performance.now();
-
+  
     try {
       // Extract character information if not already provided
       const characterMap = this.extractCharacterNames(text);
-
+  
       // Get dialogue patterns for statistics
       const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
-      const dialogueCount =
-        dialoguePatterns.quotedDialogue.length +
-        dialoguePatterns.colonSeparatedDialogue.length +
-        dialoguePatterns.actionDialogue.length;
-
+      const dialogueCount = this.countDialogues(dialoguePatterns);
       this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
-
+  
       // Create character summary for LLM context
-      const characterArray = Object.entries(characterMap).map(
-        ([name, data]) => ({
-          name,
-          gender: data.gender,
-          appearances: data.appearances
-        })
-      );
-
-      const characterSummary =
-        this.dialogueUtils.createDialogueSummary(characterArray);
-
+      const characterSummary = this.dialogueUtils.createDialogueSummary(this.mapCharactersToArray(characterMap));
+  
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
-
+  
       // Use the ollamaClient directly, passing the character summary
-      const enhancedText = await this.enhanceTextWithLLM(
-        text,
-        characterSummary
-      );
-
-      const endTime = performance.now();
-      this.statsUtils.setProcessingTime(endTime - startTime);
-
+      const enhancedText = await this.enhanceTextWithLLM(text, characterSummary);
+  
       return enhancedText;
     } catch (error) {
       console.error("Error enhancing text:", error);
-
+      return text;
+    } finally {
       const endTime = performance.now();
       this.statsUtils.setProcessingTime(endTime - startTime);
-
-      return text;
     }
+  }
+  
+  countDialogues(dialoguePatterns) {
+    return dialoguePatterns.quotedDialogue.length +
+           dialoguePatterns.colonSeparatedDialogue.length +
+           dialoguePatterns.actionDialogue.length;
+  }
+  
+  mapCharactersToArray(characterMap) {
+    return Object.entries(characterMap).map(([name, data]) => ({
+      name,
+      gender: data.gender,
+      appearances: data.appearances
+    }));
   }
 
   /**
@@ -87,89 +81,81 @@ class EnhancerIntegration {
     console.log("Extracting character names and genders...");
     const characterMap = { ...existingMap };
     const startCharCount = Object.keys(characterMap).length;
-
+  
     // Get novel ID to retrieve existing character data
     const novelId = this.novelUtils.updateNovelId(window.location.href, document.title);
-
+  
     // Try to get existing character map for this novel first
     if (novelId) {
-      this.getExistingCharacterMap(novelId, characterMap)
-        .then((existingNovelMap) => {
-          // Merge with existing map if available
-          Object.entries(existingNovelMap).forEach(([name, data]) => {
-            if (!characterMap[name]) {
-              characterMap[name] = { ...data };
-            }
-          });
-        })
-        .catch((err) => {
-          console.warn("Failed to fetch existing character map:", err);
-        });
+      this.loadExistingCharacterData(novelId, characterMap);
     }
-
+  
     // Get dialogue patterns
     const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
-
+  
     // Extract characters from dialogue
-    const characterNames =
-      this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
-
+    const characterNames = this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
+  
     // Process each character name
-    characterNames.forEach((name) => {
-      if (!characterMap[name]) {
-        const gender = this.genderUtils.guessGender(name, text, characterMap);
-        characterMap[name] = {
-          gender,
-          appearances: 1
-        };
-      } else {
-        // Increment appearances counter
-        characterMap[name].appearances =
-          (characterMap[name].appearances || 0) + 1;
-
-        // If gender was previously unknown but we have more context now, try again
-        if (
-          characterMap[name].gender === "unknown" ||
-          characterMap[name].confidence < 0.7
-        ) {
-          const updatedGender = this.genderUtils.guessGender(
-            name,
-            text,
-            characterMap
-          );
-
-          // Only update if we have better confidence
-          if (updatedGender.confidence > (characterMap[name].confidence || 0)) {
-            characterMap[name].gender = updatedGender.gender;
-            characterMap[name].confidence = updatedGender.confidence;
-            characterMap[name].evidence = updatedGender.evidence;
-          }
-        }
-      }
-    });
-
+    characterNames.forEach(name => this.processCharacterName(name, text, characterMap));
+  
     // Look for additional names using more patterns
     this.extractAdditionalNames(text, characterMap);
-
+  
     // Clean up characters
     this.cleanupCharacterMap(characterMap);
-
+  
     // Track new characters found
     const newCharCount = Object.keys(characterMap).length - startCharCount;
     this.statsUtils.setTotalCharactersDetected(newCharCount);
-
+  
     // Sync character map with background
     if (novelId && Object.keys(characterMap).length > 0) {
       this.syncCharacterMap(characterMap, novelId);
     }
-
-    console.log(
-      `Extracted ${
-        Object.keys(characterMap).length
-      } characters for novel ${novelId}:`,
-      characterMap
-    );
+  
+    console.log(`Extracted ${Object.keys(characterMap).length} characters for novel ${novelId}:`, characterMap);
     return characterMap;
+  }
+  
+  loadExistingCharacterData(novelId, characterMap) {
+    this.getExistingCharacterMap(novelId, characterMap)
+      .then(existingNovelMap => {
+        // Merge with existing map if available
+        Object.entries(existingNovelMap).forEach(([name, data]) => {
+          if (!characterMap[name]) {
+            characterMap[name] = { ...data };
+          }
+        });
+      })
+      .catch(err => {
+        console.warn("Failed to fetch existing character map:", err);
+      });
+  }
+  
+  processCharacterName(name, text, characterMap) {
+    if (!characterMap[name]) {
+      const gender = this.genderUtils.guessGender(name, text, characterMap);
+      characterMap[name] = {
+        gender,
+        appearances: 1
+      };
+    } else {
+      // Increment appearances counter
+      characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
+  
+      // If gender was previously unknown but we have more context now, try again
+      if (characterMap[name].gender === "unknown" || characterMap[name].confidence < 0.7) {
+        const updatedGender = this.genderUtils.guessGender(name, text, characterMap);
+  
+        // Only update if we have better confidence
+        if (updatedGender.confidence > (characterMap[name].confidence || 0)) {
+          characterMap[name].gender = updatedGender.gender;
+          characterMap[name].confidence = updatedGender.confidence;
+          characterMap[name].evidence = updatedGender.evidence;
+        }
+      }
+    }
   }
 
   /**

@@ -62,11 +62,7 @@ class OllamaClient {
    * @param {string} characterContext - Character information for context
    * @return {Promise<string>} - Enhanced text
    */
-  async enhanceWithLLM(
-    text,
-    characterContext = "",
-    novelInfo = { style: "standard narrative", tone: "neutral" }
-  ) {
+  async enhanceWithLLM(text, characterContext = "", novelInfo = { style: "standard narrative", tone: "neutral" }) {
     console.time("enhanceWithLLM");
     try {
       // Make sure Ollama is available first
@@ -74,74 +70,64 @@ class OllamaClient {
       if (!ollamaStatus.available) {
         throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
       }
-
+  
       const settings = await this.getLLMSettings();
-      console.log(
-        `Using Ollama model: ${settings.modelName} with temperature: ${settings.temperature}`
-      );
-
+      console.log(`Using Ollama model: ${settings.modelName} with temperature: ${settings.temperature}`);
+  
       const chunks = this.splitIntoChunks(text, settings.maxChunkSize);
-
-      const enhancedChunks = [];
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        console.log(
-          `Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`
-        );
-
-        // Build context that includes surrounding text and character information
-        const contextInfo = this.buildChunkContext(chunks, i);
-
-        const prompt = this.createEnhancedPrompt(
-          chunk,
-          characterContext,
-          contextInfo,
-          novelInfo
-        );
-
-        // Create cache key based on chunk content and prompt
-        const cacheKey = this.hashString(chunk + contextInfo);
-
-        let enhancedChunk;
-        // Check if we have this result cached
-        if (this.cache.has(cacheKey)) {
-          console.log(`Using cached result for chunk ${i + 1}`);
-          enhancedChunk = this.cache.get(cacheKey);
-        } else {
-          try {
-            enhancedChunk = await this.processChunkWithLLM(
-              settings.modelName,
-              prompt,
-              settings
-            );
-            // Cache the result
-            this.cache.set(cacheKey, enhancedChunk);
-            console.log(
-              `Successfully enhanced chunk ${i + 1}/${chunks.length}`
-            );
-          } catch (chunkError) {
-            console.warn(
-              `Failed to enhance chunk ${i + 1}, using original:`,
-              chunkError
-            );
-            enhancedChunk = chunk;
-          }
-        }
-
-        enhancedChunks.push(enhancedChunk);
-
-        if (i < chunks.length - 1) {
-          await new Promise((resolve) => setTimeout(resolve, this.BATCH_DELAY));
-        }
-      }
-
+      const enhancedChunks = await this.processChunks(chunks, characterContext, novelInfo, settings);
+  
       const enhancedText = enhancedChunks.join("\n\n");
       console.timeEnd("enhanceWithLLM");
       return this.cleanLLMResponse(enhancedText);
     } catch (err) {
       console.timeEnd("enhanceWithLLM");
       console.error("LLM enhancement failed:", err);
-      throw err; // Propagate error for better error handling in EnhancerIntegration
+      throw err;
+    }
+  }
+  
+  async processChunks(chunks, characterContext, novelInfo, settings) {
+    const enhancedChunks = [];
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(`Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`);
+  
+      // Build context that includes surrounding text and character information
+      const contextInfo = this.buildChunkContext(chunks, i);
+      const prompt = this.createEnhancedPrompt(chunk, characterContext, contextInfo, novelInfo);
+      
+      // Create cache key based on chunk content and prompt
+      const cacheKey = this.hashString(chunk + contextInfo);
+  
+      const enhancedChunk = await this.getEnhancedChunk(cacheKey, settings.modelName, prompt, settings, chunk);
+      enhancedChunks.push(enhancedChunk);
+  
+      if (i < chunks.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, this.BATCH_DELAY));
+      }
+    }
+    
+    return enhancedChunks;
+  }
+  
+  async getEnhancedChunk(cacheKey, modelName, prompt, settings, originalChunk) {
+    // Check if we have this result cached
+    if (this.cache.has(cacheKey)) {
+      console.log("Using cached result for chunk");
+      return this.cache.get(cacheKey);
+    }
+    
+    try {
+      const enhancedChunk = await this.processChunkWithLLM(modelName, prompt, settings);
+      // Cache the result
+      this.cache.set(cacheKey, enhancedChunk);
+      console.log("Successfully enhanced chunk");
+      return enhancedChunk;
+    } catch (chunkError) {
+      console.warn("Failed to enhance chunk, using original:", chunkError);
+      return originalChunk;
     }
   }
 
@@ -221,61 +207,57 @@ ${chunk}`;
     if (text.length <= maxChunkSize) {
       return [text];
     }
-
+  
     const chunks = [];
-    // Try to split on paragraph boundaries first
     const paragraphs = text.split(/\n\n|\r\n\r\n/);
     let currentChunk = "";
-
+  
     for (const paragraph of paragraphs) {
-      // If adding this paragraph would exceed the chunk size, start a new chunk
-      if (
-        currentChunk.length + paragraph.length + 2 > maxChunkSize &&
-        currentChunk.length > 0
-      ) {
-        chunks.push(currentChunk.trim());
-        currentChunk = paragraph;
-      } else {
-        currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
-      }
-
-      // Handle extremely long paragraphs by splitting on sentence boundaries
-      if (paragraph.length > maxChunkSize) {
-        if (currentChunk === paragraph) {
-          const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
-          currentChunk = "";
-
-          for (const sentence of sentences) {
-            if (
-              currentChunk.length + sentence.length > maxChunkSize &&
-              currentChunk.length > 0
-            ) {
-              chunks.push(currentChunk.trim());
-              currentChunk = sentence;
-            } else {
-              currentChunk += (currentChunk ? " " : "") + sentence;
-            }
-          }
-
-          if (currentChunk) {
-            chunks.push(currentChunk.trim());
-            currentChunk = "";
-          }
+      // Handle normal paragraphs
+      if (paragraph.length <= maxChunkSize) {
+        if (currentChunk.length + paragraph.length + 2 > maxChunkSize && currentChunk.length > 0) {
+          chunks.push(currentChunk.trim());
+          currentChunk = paragraph;
+        } else {
+          currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
         }
+      } 
+      // Handle extremely long paragraphs by splitting on sentence boundaries
+      else {
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk.trim());
+          currentChunk = "";
+        }
+        
+        this.splitLongParagraph(paragraph, maxChunkSize, chunks);
       }
     }
-
+  
     // Add any remaining text as the final chunk
     if (currentChunk) {
       chunks.push(currentChunk.trim());
     }
-
-    console.log(
-      `Split text into ${chunks.length} chunks (avg size: ${Math.round(
-        text.length / chunks.length
-      )})`
-    );
+  
+    console.log(`Split text into ${chunks.length} chunks (avg size: ${Math.round(text.length / chunks.length)})`);
     return chunks;
+  }
+  
+  splitLongParagraph(paragraph, maxChunkSize, chunks) {
+    const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
+    let currentChunk = "";
+    
+    for (const sentence of sentences) {
+      if (currentChunk.length + sentence.length > maxChunkSize && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = sentence;
+      } else {
+        currentChunk += (currentChunk ? " " : "") + sentence;
+      }
+    }
+    
+    if (currentChunk) {
+      chunks.push(currentChunk.trim());
+    }
   }
 
   /**
