@@ -14,49 +14,70 @@ document.addEventListener("DOMContentLoaded", function () {
   let whitelistedSites = [];
   let isExtensionPaused = false;
 
-  // Get current tab info
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    if (tabs && tabs.length > 0) {
-      const url = new URL(tabs[0].url);
-      currentTabUrl = tabs[0].url;
-      currentTabHostname = url.hostname;
-      currentSite.textContent = currentTabHostname;
-
-      // Check if the site is whitelisted
-      chrome.storage.sync.get("whitelistedSites", (data) => {
-        whitelistedSites = data.whitelistedSites || [];
-        updateWhitelistButton(
-          isSiteWhitelisted(currentTabHostname, whitelistedSites)
-        );
-      });
-
-      // Check site permission status
-      chrome.runtime.sendMessage(
-        { action: "checkSitePermission", url: currentTabUrl },
-        (response) => {
-          if (!(response && response.hasPermission)) {
-            updateWhitelistButton(false);
-          }
-        }
-      );
-    }
-  });
-
-  // Load extension state
+  // First, load the whitelist data from storage
   chrome.storage.sync.get(
     {
+      whitelistedSites: [],
       isExtensionPaused: true,
       preserveNames: true,
       fixPronouns: true
     },
     (items) => {
+      // Store loaded data first
+      whitelistedSites = items.whitelistedSites || [];
       isExtensionPaused = !items.isExtensionPaused;
-      updatePauseButton();
       preserveNamesToggle.checked = items.preserveNames;
       fixPronounsToggle.checked = items.fixPronouns;
-      updateStatus();
+      
+      // Now that we have the whitelist, process the current tab
+      processCurrentTab();
+      
+      // Update UI states
+      updatePauseButton();
     }
   );
+
+  function processCurrentTab() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        const url = new URL(tabs[0].url);
+        currentTabUrl = tabs[0].url;
+        currentTabHostname = url.hostname;
+        currentSite.textContent = currentTabHostname;
+
+        updateStatus();
+
+        // Check if the site is a chrome:// URL
+        const isChromePage = currentTabUrl.startsWith("chrome");
+
+        // Disable whitelist functionality for chrome:// pages
+        if (isChromePage) {
+          whitelistButton.disabled = true;
+          whitelistButton.classList.add("disabled");
+          whitelistText.textContent = "Not Available";
+          enhanceNowBtn.disabled = true;
+          enhanceNowBtn.classList.add("disabled");
+          statusMessage.textContent = "Enhancement not available on this page";
+        } else {
+          // Check if the site is whitelisted using our loaded data
+          const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
+          updateWhitelistButton(isWhitelisted);
+          updateEnhanceButton(isWhitelisted);
+
+          // Check site permission status
+          chrome.runtime.sendMessage(
+            { action: "checkSitePermission", url: currentTabUrl },
+            (response) => {
+              if (!(response && response.hasPermission)) {
+                updateWhitelistButton(false);
+                updateEnhanceButton(false);
+              }
+            }
+          );
+        }
+      }
+    });
+  }
 
   // Handle pause/resume button
   pauseButton.addEventListener("click", () => {
@@ -115,6 +136,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
               // Update UI
               updateWhitelistButton(false);
+              updateEnhanceButton(false);
 
               // Show temporary status message
               statusMessage.textContent = `${currentTabHostname} removed from whitelist`;
@@ -143,6 +165,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
               // Update UI
               updateWhitelistButton(true);
+              updateEnhanceButton(true);
 
               // Show temporary status message
               statusMessage.textContent =
@@ -168,11 +191,11 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Toggle settings
-  preserveNamesToggle.addEventListener("change", () => {
+  preserveNamesToggle.addEventListener("change", function() {
     chrome.storage.sync.set({ preserveNames: this.checked });
   });
 
-  fixPronounsToggle.addEventListener("change", () => {
+  fixPronounsToggle.addEventListener("change", function() {
     chrome.storage.sync.set({ fixPronouns: this.checked });
   });
 
@@ -235,6 +258,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // Update enhance button status based on whitelist
+  function updateEnhanceButton(isWhitelisted) {
+    if (isWhitelisted && !isExtensionPaused) {
+      enhanceNowBtn.disabled = false;
+      enhanceNowBtn.classList.remove("disabled");
+    } else {
+      enhanceNowBtn.disabled = true;
+      enhanceNowBtn.classList.add("disabled");
+    }
+  }
+
   // Update pause button
   function updatePauseButton() {
     if (isExtensionPaused) {
@@ -244,21 +278,34 @@ document.addEventListener("DOMContentLoaded", function () {
       pauseButton.classList.remove("paused");
       pauseButton.title = "Pause Extension";
     }
+    
+    // Also update enhance button state when pause state changes
+    const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
+    updateEnhanceButton(isWhitelisted);
   }
 
   // Update status message
   function updateStatus() {
     if (isExtensionPaused) {
       statusMessage.textContent = "Extension paused";
+      updateEnhanceButton(false); // Disable enhance button when paused
       return;
     }
 
-    if (isSiteWhitelisted(currentTabHostname, whitelistedSites)) {
-      statusMessage.textContent = "Whitelisted site - enhancement active";
+    if (!currentTabHostname) {
+      statusMessage.textContent = "Loading...";
       return;
     }
 
-    statusMessage.textContent = "Ready to enhance";
+    const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
+    if (isWhitelisted) {
+      statusMessage.textContent = "Enhancement active";
+      updateEnhanceButton(true);
+      return;
+    }
+
+    statusMessage.textContent = "Please whitelist this site to enable enhancement";
+    updateEnhanceButton(false);
   }
 
   // Send page status update to content script

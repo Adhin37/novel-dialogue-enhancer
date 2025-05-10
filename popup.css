@@ -25,6 +25,8 @@ body {
   --divider-color: #e1e1e1;
   --status-bg: #f5f5f5;
   --shadow-color: rgba(0, 0, 0, 0.1);
+  --disabled-bg: #e0e0e0;
+  --disabled-color: #888;
 }
 
 [data-theme="dark"] {
@@ -43,6 +45,8 @@ body {
   --divider-color: #333333;
   --status-bg: #252525;
   --shadow-color: rgba(0, 0, 0, 0.3);
+  --disabled-bg: #333333;
+  --disabled-color: #777777;
 }
 
 [data-theme="dark"] body {
@@ -224,15 +228,15 @@ button#enhance-now-btn {
   width: 100%;
   font-weight: 600;
   margin-top: 10px;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
   box-shadow: 0 2px 4px var(--shadow-color);
 }
 
-button#enhance-now-btn:hover {
+button#enhance-now-btn:hover:not(:disabled) {
   background-color: var(--success-dark);
 }
 
-button#enhance-now-btn:active {
+button#enhance-now-btn:active:not(:disabled) {
   background-color: var(--success-dark);
   transform: translateY(1px);
 }
@@ -263,4 +267,18 @@ button#enhance-now-btn:active {
 
 .footer a:hover {
   text-decoration: underline;
+}
+
+.disabled {
+  opacity: 0.6;
+  cursor: not-allowed !important;
+  background-color: var(--disabled-bg) !important;
+  color: var(--disabled-color) !important;
+  box-shadow: none !important;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .disabled {
+  background-color: var(--disabled-bg) !important;
+  color: var(--disabled-color) !important;
 }

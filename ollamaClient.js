@@ -347,11 +347,10 @@ ${chunk}`;
    * @return {Promise<object>} - Availability status
    */
   async checkOllamaAvailability() {
-    // Return cached result if we checked recently (within 30 seconds)
-    const now = Date.now();
+    const lastCheckTime = 30000;
     if (
       this.lastAvailabilityCheck &&
-      now - this.lastAvailabilityCheck < 30000 &&
+      Date.now() - this.lastAvailabilityCheck < lastCheckTime &&
       this.availabilityCache
     ) {
       return this.availabilityCache;

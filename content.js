@@ -18,6 +18,8 @@ let maxRetries = 3;
 function init() {
   enhancerIntegration = new EnhancerIntegration();
   toaster = new Toaster();
+  toaster.createToaster();
+
   chrome.storage.sync.get(
     ["isExtensionPaused", "preserveNames", "fixPronouns"],
     function (data) {
@@ -29,10 +31,10 @@ function init() {
         fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true
       };
 
-      setTimeout(() => {
-        checkOllamaStatus();
+      setTimeout(async () => {
+        const isAvailable = await checkOllamaStatus();
 
-        if (!settings.isExtensionPaused) {
+        if (!settings.isExtensionPaused && isAvailable) {
           enhancePage();
         }
       }, 1000);
@@ -68,27 +70,13 @@ async function checkOllamaStatus() {
 
   if (status && status.available) {
     console.log(`Ollama is running (v${status.version})`);
+    return true;
   } else {
     const reason = status ? status.reason : "Unknown error";
     console.warn(`Ollama is not available: ${reason}`);
+    toaster.showError(`Ollama is not available: ${reason}`);
 
-    chrome.runtime.sendMessage(
-      {
-        action: "showNotification",
-        data: {
-          title: "Ollama Not Available",
-          message: `LLM enhancement requires Ollama to be running. Ollama is not available (${reason}). Please start Ollama and try again.`
-        }
-      },
-      (response) => {
-        if (chrome.runtime.lastError) {
-          console.warn(
-            "Could not send notification:",
-            chrome.runtime.lastError
-          );
-        }
-      }
-    );
+    return false;
   }
 }
 
@@ -147,8 +135,6 @@ function findContentElement() {
 async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
   console.time("enhancePage");
-
-  toaster.createToaster();
 
   if (isEnhancing) {
     pendingEnhancement = true;

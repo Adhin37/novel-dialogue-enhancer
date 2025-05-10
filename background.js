@@ -511,16 +511,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "checkOllamaAvailability") {
     checkOllamaAvailability(sendResponse);
     return true;
-  } else if (request.action === "showNotification") {
-    chrome.notifications.create({
-      type: "basic",
-      iconUrl: "images/icon128.png",
-      title: request.data.title,
-      message: request.data.message
-    });
+  } 
 
-    sendResponse({ status: "notification_sent" });
-    return false; // No async response needed
-  }
   return false; // Default case
 });

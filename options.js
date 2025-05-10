@@ -83,6 +83,26 @@ document.addEventListener("DOMContentLoaded", function () {
     // Remove paths, query parameters, etc.
     domain = domain.split("/")[0];
 
+    // Check if it's a chrome:// URL
+    if (domain.startsWith("chrome")) {
+      // Show error feedback
+      const feedback = document.createElement("div");
+      feedback.className = "save-feedback warning";
+      feedback.textContent =
+        "Chrome internal pages cannot be added to whitelist";
+      document.body.appendChild(feedback);
+
+      setTimeout(() => {
+        if (feedback && feedback.parentNode) {
+          feedback.parentNode.removeChild(feedback);
+        }
+      }, 2500);
+
+      siteModal.style.display = "none";
+      siteUrlInput.value = "";
+      return;
+    }
+
     chrome.runtime.sendMessage(
       {
         action: "addSiteToWhitelist",
@@ -353,9 +373,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Initialize all functionality
   function init() {
     initTabs();
-  
+
     syncThemeSwitchWithState();
-  
+
     window
       .matchMedia("(prefers-color-scheme: dark)")
       .addEventListener("change", (e) => {
@@ -366,9 +386,9 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         });
       });
-  
+
     loadWhitelist();
-  
+
     modelSuggestions.forEach((suggestion) => {
       suggestion.addEventListener("click", function () {
         modelNameInput.value = this.dataset.model;
@@ -378,24 +398,24 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 150);
       });
     });
-  
+
     setupSlider(temperatureSlider, temperatureValue);
     setupSlider(topPSlider, topPValue);
     setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
     setupSlider(timeoutSlider, timeoutValue);
-  
+
     clearAllBtn.addEventListener("click", function () {
       if (
         confirm("Are you sure you want to remove all sites from the whitelist?")
       ) {
         chrome.storage.sync.set({ whitelistedSites: [] }, function () {
           loadWhitelist();
-          
+
           const feedback = document.createElement("div");
           feedback.className = "save-feedback";
           feedback.textContent = "All sites removed from whitelist";
           document.body.appendChild(feedback);
-  
+
           setTimeout(() => {
             if (feedback && feedback.parentNode) {
               feedback.parentNode.removeChild(feedback);
@@ -404,9 +424,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       }
     });
-  
+
     resetButton.addEventListener("click", resetSettings);
-  
+
     chrome.storage.sync.get(
       {
         modelName: "qwen3:8b",
@@ -425,7 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
         temperatureValue.textContent = data.temperature;
         topPSlider.value = data.topP;
         topPValue.textContent = data.topP;
-  
+
         updateAllSliderBackgrounds();
       }
     );
