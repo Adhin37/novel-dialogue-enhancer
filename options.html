@@ -1,20 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Novel Dialogue Enhancer - Settings</title>
     <link rel="stylesheet" href="options.css" />
     <link rel="icon" href="images/icon128.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
   </head>
 
   <body>
     <div class="wrapper">
       <header>
-        <img src="images/icon128.png" alt="Novel Dialogue Enhancer" class="header-icon">
+        <img
+          src="images/icon128.png"
+          alt="Novel Dialogue Enhancer"
+          class="header-icon"
+        />
         <h1>Novel Dialogue Enhancer</h1>
         <p>Configure your settings for optimal dialogue enhancement</p>
       </header>
@@ -22,7 +29,7 @@
       <div class="theme-toggle">
         <span class="theme-icon light-icon">☀️</span>
         <label class="switch">
-          <input type="checkbox" id="theme-switch">
+          <input type="checkbox" id="theme-switch" />
           <span class="slider round"></span>
         </label>
         <span class="theme-icon dark-icon">🌙</span>
@@ -48,9 +55,15 @@
                   Specify which Ollama model to use for text enhancement.
                 </div>
                 <div class="model-suggestions">
-                  <span class="model-suggestion" data-model="qwen3:8b">qwen3:8b</span>
-                  <span class="model-suggestion" data-model="llama3:8b">llama3:8b</span>
-                  <span class="model-suggestion" data-model="phi3:medium">phi3:medium</span>
+                  <span class="model-suggestion" data-model="qwen3:8b"
+                    >qwen3:8b</span
+                  >
+                  <span class="model-suggestion" data-model="llama3:8b"
+                    >llama3:8b</span
+                  >
+                  <span class="model-suggestion" data-model="phi3:medium"
+                    >phi3:medium</span
+                  >
                 </div>
               </div>
             </div>
@@ -75,10 +88,12 @@
                   <span>Creative</span>
                 </div>
                 <div class="hint">
-                  Controls creativity vs. predictability. Lower values (0.1-0.4) produce more consistent outputs, while higher values (0.7-1.0) increase creativity.
+                  Controls creativity vs. predictability. Lower values (0.1-0.4)
+                  produce more consistent outputs, while higher values (0.7-1.0)
+                  increase creativity.
                 </div>
               </div>
-              
+
               <div class="slider-container">
                 <label for="top-p">
                   Top P (Nucleus Sampling)
@@ -97,7 +112,8 @@
                   <span>Diverse</span>
                 </div>
                 <div class="hint">
-                  Controls diversity of language. Lower values focus on likely words, higher values permit more diverse vocabulary.
+                  Controls diversity of language. Lower values focus on likely
+                  words, higher values permit more diverse vocabulary.
                 </div>
               </div>
             </div>
@@ -110,7 +126,9 @@
               <div class="slider-container">
                 <label for="max-chunk-size">
                   Maximum Chunk Size
-                  <span id="max-chunk-size-value" class="slider-value">8000</span>
+                  <span id="max-chunk-size-value" class="slider-value"
+                    >8000</span
+                  >
                 </label>
                 <input
                   type="range"
@@ -125,7 +143,8 @@
                   <span>16K</span>
                 </div>
                 <div class="hint">
-                  Sets the maximum size of text chunks sent to Ollama. Lower values are faster but may reduce quality.
+                  Sets the maximum size of text chunks sent to Ollama. Lower
+                  values are faster but may reduce quality.
                 </div>
               </div>
 
@@ -158,10 +177,15 @@
                 <button id="test-ollama" class="button button-secondary">
                   <span class="button-icon">🔌</span> Test Ollama Connection
                 </button>
-                <div id="ollama-status" class="status-message" style="display: none;"></div>
+                <div
+                  id="ollama-status"
+                  class="status-message"
+                  style="display: none"
+                ></div>
               </div>
               <div class="hint">
-                Make sure Ollama is running on your system before testing the connection.
+                Make sure Ollama is running on your system before testing the
+                connection.
               </div>
             </div>
           </div>
@@ -171,16 +195,19 @@
             <div class="card">
               <h3>Site Whitelist</h3>
               <div class="hint">
-                Only websites in this list will be processed by the Novel Dialogue Enhancer.
+                Only websites in this list will be processed by the Novel
+                Dialogue Enhancer.
               </div>
               <div class="whitelist-container">
                 <div id="whitelist-items">
                   <div class="empty-list">No sites in whitelist</div>
                 </div>
               </div>
+
               <button id="add-site" class="button button-secondary">
-                <span class="button-icon">➕</span> Add Current Site
+                <span class="button-icon">➕</span> Add Site Manually
               </button>
+
               <button id="clear-all" class="button button-danger">
                 <span class="button-icon">🗑️</span> Clear All Sites
               </button>
@@ -193,18 +220,28 @@
               <h3>About Novel Dialogue Enhancer</h3>
               <div class="about-content">
                 <p>
-                  Novel Dialogue Enhancer is a browser extension that uses AI to improve translated novel dialogues, making them sound more natural and fluent.
+                  Novel Dialogue Enhancer is a browser extension that uses AI to
+                  improve translated novel dialogues, making them sound more
+                  natural and fluent.
                 </p>
                 <p>
-                  <strong>Version:</strong> 1.0<br>
-                  <strong>Requirements:</strong> Ollama must be installed and running on your local machine.
+                  <strong>Version:</strong> 1.0<br />
+                  <strong>Requirements:</strong> Ollama must be installed and
+                  running on your local machine.
                 </p>
                 <h4>How to Use:</h4>
                 <ol>
-                  <li>Install and set up <a href="https://ollama.com" target="_blank">Ollama</a> on your computer</li>
+                  <li>
+                    Install and set up
+                    <a href="https://ollama.com" target="_blank">Ollama</a> on
+                    your computer
+                  </li>
                   <li>Add your favorite novel sites to the whitelist</li>
                   <li>Configure your preferences on this page</li>
-                  <li>Click the extension icon when browsing a supported novel site</li>
+                  <li>
+                    Click the extension icon when browsing a supported novel
+                    site
+                  </li>
                 </ol>
                 <h4>Supported Websites:</h4>
                 <ul>
@@ -226,6 +263,29 @@
         <button id="reset" class="button button-secondary">
           <span class="button-icon">↩️</span> Reset to Defaults
         </button>
+      </div>
+
+      <div id="site-modal" class="modal">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Add Site to Whitelist</h3>
+            <span class="close-modal">&times;</span>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="site-url">Website URL</label>
+              <input id="site-url" type="text" placeholder="https://www.example.com" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="add-site-confirm" class="button button-primary">
+              <span class="button-icon">✓</span> Add Site
+            </button>
+            <button id="cancel-add-site" class="button button-secondary">
+              <span class="button-icon">✕</span> Cancel
+            </button>
+          </div>
+        </div>
       </div>
     </div>
     <script src="detectDarkMode.js"></script>
