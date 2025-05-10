@@ -38,6 +38,7 @@
         "utils/genderUtils.js",
         "utils/dialogueUtils.js",
         "utils/novelUtils.js",
+        "utils/statsUtils.js",
         "enhancerIntegration.js",
         "ollamaClient.js",
         "toaster.js",

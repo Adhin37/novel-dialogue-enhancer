@@ -5,17 +5,60 @@ body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: #333;
   background-color: #f8f9fa;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Dark mode variables and overrides */
+:root {
+  --primary-color: #2196f3;
+  --primary-dark: #1976d2;
+  --success-color: #4caf50;
+  --success-dark: #2e7d32;
+  --background-color: #f8f9fa;
+  --card-background: #fff;
+  --text-color: #333;
+  --text-secondary: #666;
+  --border-color: #e1e1e1;
+  --toggle-bg: #ccc;
+  --button-bg: #f0f0f0;
+  --button-hover: #e0e0e0;
+  --divider-color: #e1e1e1;
+  --status-bg: #f5f5f5;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] {
+  --primary-color: #2196f3;
+  --primary-dark: #64b5f6;
+  --success-color: #4caf50;
+  --success-dark: #81c784;
+  --background-color: #121212;
+  --card-background: #1e1e1e;
+  --text-color: #e0e0e0;
+  --text-secondary: #aaaaaa;
+  --border-color: #333333;
+  --toggle-bg: #555555;
+  --button-bg: #333333;
+  --button-hover: #444444;
+  --divider-color: #333333;
+  --status-bg: #252525;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] body {
+  color: var(--text-color);
+  background-color: var(--background-color);
 }
 
 .header {
   padding: 15px;
-  background-color: #2196f3;
+  background-color: var(--primary-color);
   color: white;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 2px solid #1976d2;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-bottom: 2px solid var(--primary-dark);
+  box-shadow: 0 2px 4px var(--shadow-color);
 }
 
 .header h1 {
@@ -56,11 +99,11 @@ body {
 }
 
 .whitelist-section {
-  background-color: #fff;
+  background-color: var(--card-background);
   border-radius: 8px;
   padding: 12px;
   margin-bottom: 15px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 
 .site-info {
@@ -78,8 +121,8 @@ body {
 }
 
 .whitelist-button {
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
+  background-color: var(--button-bg);
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   padding: 6px 12px;
   cursor: pointer;
@@ -88,20 +131,21 @@ body {
   gap: 6px;
   transition: all 0.2s;
   font-size: 12px;
+  color: var(--text-color);
 }
 
 .whitelist-button.active {
-  background-color: #2196f3;
-  border-color: #1976d2;
+  background-color: var(--primary-color);
+  border-color: var(--primary-dark);
   color: white;
 }
 
 .whitelist-button:hover {
-  background-color: #e0e0e0;
+  background-color: var(--button-hover);
 }
 
 .whitelist-button.active:hover {
-  background-color: #1976d2;
+  background-color: var(--primary-dark);
 }
 
 .toggle-container {
@@ -109,10 +153,10 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 15px;
-  background-color: #fff;
+  background-color: var(--card-background);
   padding: 10px 12px;
   border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 
 .toggle {
@@ -135,7 +179,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: var(--toggle-bg);
   transition: 0.3s;
   border-radius: 34px;
 }
@@ -153,11 +197,11 @@ body {
 }
 
 input:checked + .slider {
-  background-color: #2196f3;
+  background-color: var(--primary-color);
 }
 
 input:focus + .slider {
-  box-shadow: 0 0 1px #2196f3;
+  box-shadow: 0 0 1px var(--primary-color);
 }
 
 input:checked + .slider:before {
@@ -166,12 +210,12 @@ input:checked + .slider:before {
 
 .divider {
   height: 1px;
-  background-color: #e1e1e1;
+  background-color: var(--divider-color);
   margin: 15px 0;
 }
 
 button#enhance-now-btn {
-  background-color: #4caf50;
+  background-color: var(--success-color);
   color: white;
   padding: 12px 15px;
   border: none;
@@ -181,15 +225,15 @@ button#enhance-now-btn {
   font-weight: 600;
   margin-top: 10px;
   transition: background-color 0.2s;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px var(--shadow-color);
 }
 
 button#enhance-now-btn:hover {
-  background-color: #2e7d32;
+  background-color: var(--success-dark);
 }
 
 button#enhance-now-btn:active {
-  background-color: #3a853c;
+  background-color: var(--success-dark);
   transform: translateY(1px);
 }
 
@@ -197,23 +241,23 @@ button#enhance-now-btn:active {
   margin-top: 15px;
   text-align: center;
   font-style: italic;
-  color: #666;
+  color: var(--text-secondary);
   padding: 10px;
   border-radius: 8px;
   font-size: 13px;
-  background-color: #f5f5f5;
+  background-color: var(--status-bg);
 }
 
 .footer {
   padding: 12px 15px;
-  border-top: 1px solid #e1e1e1;
+  border-top: 1px solid var(--border-color);
   text-align: center;
   font-size: 12px;
-  background-color: #fff;
+  background-color: var(--card-background);
 }
 
 .footer a {
-  color: #2196f3;
+  color: var(--primary-color);
   text-decoration: none;
 }
 
