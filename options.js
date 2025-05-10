@@ -88,7 +88,7 @@ document.addEventListener("DOMContentLoaded", function () {
         action: "addSiteToWhitelist",
         url: "https://" + domain // Adding protocol for URL parsing in background.js
       },
-      function (response) {
+      (response) => {
         if (response && response.success) {
           // Hide modal
           siteModal.style.display = "none";
@@ -254,7 +254,7 @@ document.addEventListener("DOMContentLoaded", function () {
         action: "removeSiteFromWhitelist",
         hostname: site
       },
-      function (response) {
+      (response) => {
         if (response && response.success) {
           // Show feedback
           const feedback = document.createElement("div");
@@ -284,7 +284,7 @@ document.addEventListener("DOMContentLoaded", function () {
             action: "addSiteToWhitelist",
             url: tabs[0].url
           },
-          function (response) {
+          (response) => {
             if (response && response.success) {
               // Show feedback
               const feedback = document.createElement("div");

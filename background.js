@@ -281,8 +281,23 @@ function requestPermission(domain) {
           action: "addSiteToWhitelist", 
           url: "https://" + domain 
         },
-        function(response) {
-          loadWhitelist();
+        (response) => {
+          if (response && response.success) {
+            // Show feedback
+            const feedback = document.createElement("div");
+            feedback.className = "save-feedback success";
+            feedback.textContent = response.message;
+            document.body.appendChild(feedback);
+
+            setTimeout(() => {
+              if (feedback && feedback.parentNode) {
+                feedback.parentNode.removeChild(feedback);
+              }
+            }, 2500);
+
+            // Reload the list
+            loadWhitelist();
+          }
         }
       );
     } else {

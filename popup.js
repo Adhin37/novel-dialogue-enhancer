@@ -1,6 +1,5 @@
 document.addEventListener("DOMContentLoaded", function () {
   const pauseButton = document.getElementById("pause-button");
-  const pauseIcon = document.getElementById("pause-icon");
   const whitelistButton = document.getElementById("whitelist-button");
   const whitelistText = document.getElementById("whitelist-text");
   const preserveNamesToggle = document.getElementById("preserve-names-toggle");
@@ -11,29 +10,46 @@ document.addEventListener("DOMContentLoaded", function () {
   const pauseBtn = document.getElementById("pause-button");
 
   let currentTabUrl = "";
+  let currentTabHostname = "";
   let whitelistedSites = [];
   let isExtensionPaused = false;
 
-  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+  // Get current tab info
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (tabs && tabs.length > 0) {
       const url = new URL(tabs[0].url);
-      currentTabUrl = url.hostname;
-      currentSite.textContent = currentTabUrl;
+      currentTabUrl = tabs[0].url;
+      currentTabHostname = url.hostname;
+      currentSite.textContent = currentTabHostname;
 
-      chrome.storage.sync.get("whitelistedSites", function (data) {
+      // Check if the site is whitelisted
+      chrome.storage.sync.get("whitelistedSites", (data) => {
         whitelistedSites = data.whitelistedSites || [];
-        updateWhitelistButton(whitelistedSites.includes(currentTabUrl));
+        updateWhitelistButton(
+          isSiteWhitelisted(currentTabHostname, whitelistedSites)
+        );
       });
+
+      // Check site permission status
+      chrome.runtime.sendMessage(
+        { action: "checkSitePermission", url: currentTabUrl },
+        (response) => {
+          if (!(response && response.hasPermission)) {
+            updateWhitelistButton(false);
+          }
+        }
+      );
     }
   });
 
+  // Load extension state
   chrome.storage.sync.get(
     {
       isExtensionPaused: true,
       preserveNames: true,
       fixPronouns: true
     },
-    function (items) {
+    (items) => {
       isExtensionPaused = !items.isExtensionPaused;
       updatePauseButton();
       preserveNamesToggle.checked = items.preserveNames;
@@ -42,12 +58,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   );
 
-  pauseButton.addEventListener("click", function () {
+  // Handle pause/resume button
+  pauseButton.addEventListener("click", () => {
     isExtensionPaused = !isExtensionPaused;
     chrome.storage.sync.set({ isExtensionPaused: !isExtensionPaused });
 
     if (isExtensionPaused) {
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs && tabs.length > 0) {
           try {
             chrome.tabs.sendMessage(tabs[0].id, {
@@ -70,95 +87,144 @@ document.addEventListener("DOMContentLoaded", function () {
     updateStatus();
   });
 
-  pauseBtn.addEventListener("click", function () {
+  pauseBtn.addEventListener("click", () => {
     document.getElementById("header").classList.toggle("paused");
   });
 
-  whitelistButton.addEventListener("click", function () {
-    if (currentTabUrl) {
-      const isCurrentlyWhitelisted = whitelistedSites.includes(currentTabUrl);
+  // Handle whitelist button
+  whitelistButton.addEventListener("click", () => {
+    if (currentTabHostname) {
+      const isCurrentlyWhitelisted = isSiteWhitelisted(
+        currentTabHostname,
+        whitelistedSites
+      );
 
       if (isCurrentlyWhitelisted) {
-        whitelistedSites = whitelistedSites.filter(
-          (site) => site !== currentTabUrl
+        // Remove from whitelist
+        chrome.runtime.sendMessage(
+          {
+            action: "removeSiteFromWhitelist",
+            hostname: currentTabHostname
+          },
+          (response) => {
+            if (response && response.success) {
+              // Update the local whitelist array
+              whitelistedSites = whitelistedSites.filter(
+                (site) => site !== currentTabHostname
+              );
+
+              // Update UI
+              updateWhitelistButton(false);
+
+              // Show temporary status message
+              statusMessage.textContent = `${currentTabHostname} removed from whitelist`;
+              setTimeout(() => {
+                updateStatus();
+              }, 2000);
+
+              // Send message to content script
+              sendPageStatusUpdate(false);
+            }
+          }
         );
       } else {
-        whitelistedSites.push(currentTabUrl);
-      }
+        // Add to whitelist - first check if we need permissions
+        chrome.runtime.sendMessage(
+          {
+            action: "addSiteToWhitelist",
+            url: currentTabUrl
+          },
+          (response) => {
+            if (response && response.success) {
+              // Update the local whitelist array
+              if (!whitelistedSites.includes(currentTabHostname)) {
+                whitelistedSites.push(currentTabHostname);
+              }
 
-      chrome.storage.sync.set({ whitelistedSites: whitelistedSites });
+              // Update UI
+              updateWhitelistButton(true);
 
-      updateWhitelistButton(!isCurrentlyWhitelisted);
+              // Show temporary status message
+              statusMessage.textContent =
+                response.message || `${currentTabHostname} added to whitelist`;
+              setTimeout(() => {
+                updateStatus();
+              }, 2000);
 
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        if (tabs && tabs.length > 0) {
-          try {
-            chrome.tabs.sendMessage(tabs[0].id, {
-              action: "updatePageStatus",
-              disabled: !isCurrentlyWhitelisted
-            });
-          } catch (error) {
-            console.error("Failed to send page status update:", error);
+              // Send message to content script
+              sendPageStatusUpdate(true);
+            } else {
+              // Show error
+              statusMessage.textContent =
+                response.message || "Failed to add site to whitelist";
+              setTimeout(() => {
+                updateStatus();
+              }, 2000);
+            }
           }
-        }
-      });
-
-      updateStatus();
+        );
+      }
     }
   });
 
-  preserveNamesToggle.addEventListener("change", function () {
+  // Toggle settings
+  preserveNamesToggle.addEventListener("change", () => {
     chrome.storage.sync.set({ preserveNames: this.checked });
   });
 
-  fixPronounsToggle.addEventListener("change", function () {
+  fixPronounsToggle.addEventListener("change", () => {
     chrome.storage.sync.set({ fixPronouns: this.checked });
   });
 
-  enhanceNowBtn.addEventListener("click", function () {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+  // Enhance now button
+  enhanceNowBtn.addEventListener("click", () => {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
         statusMessage.textContent = "Error: No active tab found";
         return;
       }
 
       try {
-        chrome.tabs.sendMessage(
-          tabs[0].id,
-          { action: "ping" },
-          function (response) {
-            if (chrome.runtime.lastError) {
-              statusMessage.textContent = "Extension not ready on this page";
-              setTimeout(() => {
-                statusMessage.textContent = "Ready";
-              }, 2000);
-              return;
-            }
-
-            chrome.tabs.sendMessage(tabs[0].id, {
-              action: "enhanceNow",
-              settings: {
-                isExtensionPaused: !isExtensionPaused,
-                preserveNames: preserveNamesToggle.checked,
-                fixPronouns: fixPronounsToggle.checked
-              }
-            });
-
-            statusMessage.textContent = "Enhancement applied!";
+        chrome.tabs.sendMessage(tabs[0].id, { action: "ping" }, (response) => {
+          if (chrome.runtime.lastError) {
+            statusMessage.textContent = "Extension not ready on this page";
             setTimeout(() => {
-              statusMessage.textContent = "Ready";
+              updateStatus();
             }, 2000);
+            return;
           }
-        );
+
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: "enhanceNow",
+            settings: {
+              isExtensionPaused: !isExtensionPaused,
+              preserveNames: preserveNamesToggle.checked,
+              fixPronouns: fixPronounsToggle.checked
+            }
+          });
+
+          statusMessage.textContent = "Enhancement applied!";
+          setTimeout(() => {
+            updateStatus();
+          }, 2000);
+        });
       } catch (error) {
         statusMessage.textContent = "Error: " + error.message;
         setTimeout(() => {
-          statusMessage.textContent = "Ready";
+          updateStatus();
         }, 2000);
       }
     });
   });
 
+  // Helper function to check if a site is whitelisted
+  function isSiteWhitelisted(hostname, whitelistedSites) {
+    return whitelistedSites.some(
+      (site) => hostname === site || hostname.endsWith("." + site)
+    );
+  }
+
+  // Update whitelist button
   function updateWhitelistButton(isWhitelisted) {
     if (isWhitelisted) {
       whitelistButton.classList.add("active");
@@ -169,6 +235,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // Update pause button
   function updatePauseButton() {
     if (isExtensionPaused) {
       pauseButton.classList.add("paused");
@@ -179,17 +246,34 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // Update status message
   function updateStatus() {
     if (isExtensionPaused) {
       statusMessage.textContent = "Extension paused";
       return;
     }
 
-    if (whitelistedSites.includes(currentTabUrl)) {
+    if (isSiteWhitelisted(currentTabHostname, whitelistedSites)) {
       statusMessage.textContent = "Whitelisted site - enhancement active";
       return;
     }
 
     statusMessage.textContent = "Ready to enhance";
+  }
+
+  // Send page status update to content script
+  function sendPageStatusUpdate(isWhitelisted) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        try {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: "updatePageStatus",
+            disabled: !isWhitelisted
+          });
+        } catch (error) {
+          console.error("Failed to send page status update:", error);
+        }
+      }
+    });
   }
 });
