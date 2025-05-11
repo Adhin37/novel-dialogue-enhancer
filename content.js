@@ -25,10 +25,13 @@ function init() {
     function (data) {
       settings = {
         isExtensionPaused:
-          data.isExtensionPaused !== undefined ? data.isExtensionPaused : true,
+          data.isExtensionPaused !== undefined
+            ? Boolean(data.isExtensionPaused)
+            : true,
         preserveNames:
-          data.preserveNames !== undefined ? data.preserveNames : true,
-        fixPronouns: data.fixPronouns !== undefined ? data.fixPronouns : true
+          data.preserveNames !== undefined ? Boolean(data.preserveNames) : true,
+        fixPronouns:
+          data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
       };
 
       setTimeout(async () => {
@@ -44,7 +47,7 @@ function init() {
 
 /**
  * Checks the availability of Ollama
- * @return {Promise<void>}
+ * @return {Promise<boolean>}
  */
 async function checkOllamaStatus() {
   console.log("Checking Ollama status...");
@@ -72,7 +75,9 @@ async function checkOllamaStatus() {
     console.log(`Ollama is running (v${status.version})`);
     return true;
   } else {
-    const reason = status ? status.reason : "Unknown error";
+    const reason = status
+      ? DOMPurify.sanitize(status.reason || "Unknown error")
+      : "Unknown error";
     console.warn(`Ollama is not available: ${reason}`);
     toaster.showError(`Ollama is not available: ${reason}`);
 
@@ -98,33 +103,41 @@ function findContentElement() {
   ];
 
   for (const selector of contentSelectors) {
-    const element = document.querySelector(selector);
-    if (element) {
-      return element;
+    try {
+      const element = document.querySelector(selector);
+      if (element) {
+        return element;
+      }
+    } catch (error) {
+      console.error(`Error with selector "${selector}":`, error);
     }
   }
 
   let largestTextBlock = null;
   let maxTextLength = 0;
 
-  const paragraphContainers = document.querySelectorAll(
-    "div, article, section"
-  );
+  try {
+    const paragraphContainers = document.querySelectorAll(
+      "div, article, section"
+    );
 
-  paragraphContainers.forEach((container) => {
-    const paragraphs = container.querySelectorAll("p");
-    if (paragraphs.length >= 5) {
-      let totalText = "";
-      paragraphs.forEach((p) => {
-        totalText += p.textContent;
-      });
+    paragraphContainers.forEach((container) => {
+      const paragraphs = container.querySelectorAll("p");
+      if (paragraphs.length >= 5) {
+        let totalText = "";
+        paragraphs.forEach((p) => {
+          totalText += p.textContent;
+        });
 
-      if (totalText.length > maxTextLength) {
-        maxTextLength = totalText.length;
-        largestTextBlock = container;
+        if (totalText.length > maxTextLength) {
+          maxTextLength = totalText.length;
+          largestTextBlock = container;
+        }
       }
-    }
-  });
+    });
+  } catch (error) {
+    console.error("Error finding content element:", error);
+  }
 
   return largestTextBlock;
 }
@@ -175,8 +188,11 @@ async function enhancePage() {
     const ollamaStatus =
       await enhancerIntegration.ollamaClient.checkOllamaAvailability();
     if (!ollamaStatus.available) {
-      toaster.showError(`Ollama not available: ${ollamaStatus.reason}`);
-      throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
+      const safeReason = DOMPurify.sanitize(
+        ollamaStatus.reason || "Unknown error"
+      );
+      toaster.showError(`Ollama not available: ${safeReason}`);
+      throw new Error(`Ollama not available: ${safeReason}`);
     }
 
     await enhancePageWithLLM();
@@ -185,7 +201,9 @@ async function enhancePage() {
     toaster.finishProgress();
   } catch (error) {
     console.error("Novel Dialogue Enhancer: Enhancement error", error);
-    toaster.showError(`Enhancement failed: ${error.message}`);
+    toaster.showError(
+      `Enhancement failed: ${DOMPurify.sanitize(error.message)}`
+    );
   } finally {
     if (typeof observer !== "undefined" && observer) {
       setTimeout(
@@ -236,7 +254,9 @@ async function enhancePageWithLLM() {
       "Novel Dialogue Enhancer: LLM enhancement failed completely",
       error
     );
-    toaster.showError("LLM enhancement failed: " + error.message);
+    toaster.showError(
+      "LLM enhancement failed: " + DOMPurify.sanitize(error.message)
+    );
     throw error;
   } finally {
     console.timeEnd("LLMEnhancement");
@@ -244,7 +264,7 @@ async function enhancePageWithLLM() {
 }
 
 async function processSingleContentBlock() {
-  const originalText = contentElement.innerHTML;
+  const originalText = contentElement.textContent;
 
   if (terminateRequested) {
     console.log("LLM enhancement terminated by user before processing");
@@ -263,7 +283,7 @@ async function processSingleContentBlock() {
     return;
   }
 
-  contentElement.innerHTML = llmEnhancedText;
+  contentElement.innerHTML = DOMPurify.sanitize(llmEnhancedText);
   toaster.updateProgress(1, 1, true);
 }
 
@@ -309,7 +329,7 @@ async function processParagraphBatch(
     startIndex + chunkSize
   );
 
-  let batchText = batch.map((p) => p.innerHTML).join("\n\n");
+  let batchText = batch.map((p) => p.textContent).join("\n\n");
 
   try {
     console.log(
@@ -333,7 +353,7 @@ async function processParagraphBatch(
     const enhancedParagraphs = llmEnhanced.split("\n\n");
 
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
-      batch[j].innerHTML = enhancedParagraphs[j];
+      batch[j].innerHTML = DOMPurify.sanitize(enhancedParagraphs[j]);
     }
 
     toaster.updateProgress(
@@ -390,11 +410,30 @@ function handleTerminationRequest() {
 }
 
 chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+  if (!request || typeof request !== "object" || !request.action) {
+    console.error("Invalid message format received");
+    return false;
+  }
+
   if (request.action === "ping") {
     sendResponse({ status: "ok" });
     return false;
   } else if (request.action === "enhanceNow") {
-    settings = request.settings;
+    // Validate settings object before applying
+    if (request.settings && typeof request.settings === "object") {
+      // Use safe defaults if properties are missing
+      settings = {
+        isExtensionPaused: Boolean(
+          request.settings.isExtensionPaused ?? settings.isExtensionPaused
+        ),
+        preserveNames: Boolean(
+          request.settings.preserveNames ?? settings.preserveNames
+        ),
+        fixPronouns: Boolean(
+          request.settings.fixPronouns ?? settings.fixPronouns
+        )
+      };
+    }
 
     enhancePage()
       .then((result) => {
@@ -430,7 +469,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     sendResponse({ status: "terminating" });
     return false;
   } else if (request.action === "updatePageStatus") {
-    console.log(`Page status updated: disabled=${request.disabled}`);
+    console.log(`Page status updated: disabled=${Boolean(request.disabled)}`);
 
     if (request.disabled) {
       handleTerminationRequest();
@@ -443,7 +482,38 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   return false;
 });
 
-init();
+// Load DOMPurify from CDN if it doesn't exist
+function loadDOMPurify() {
+  if (typeof DOMPurify === "undefined") {
+    const script = document.createElement("script");
+    script.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.8/purify.min.js";
+    script.integrity =
+      "sha512-M72cBdA/Qj2VTT/e8/vpv1RRwGuR5i5hAzWJM8ySCCistLcVHLfbVn5OrWUxUflZM2H3fEwPLcqR7e5/UdUgTQ==";
+    script.crossOrigin = "anonymous";
+    script.referrerPolicy = "no-referrer";
+    script.onload = function () {
+      console.log("DOMPurify loaded");
+      init();
+    };
+    script.onerror = function () {
+      console.error(
+        "Failed to load DOMPurify, falling back to minimal sanitization"
+      );
+      window.DOMPurify = {
+        sanitize: function (dirty) {
+          const div = document.createElement("div");
+          div.textContent = dirty;
+          return div.innerHTML;
+        }
+      };
+      init();
+    };
+    document.head.appendChild(script);
+  } else {
+    init();
+  }
+}
 
 const observer = new MutationObserver(function (mutations) {
   if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
@@ -470,6 +540,9 @@ const observer = new MutationObserver(function (mutations) {
     }
   }
 });
+
+// Start safely with DOMPurify loaded
+loadDOMPurify();
 
 setTimeout(() => {
   const contentElement = findContentElement();

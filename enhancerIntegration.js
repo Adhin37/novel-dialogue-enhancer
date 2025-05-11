@@ -24,29 +24,37 @@ class EnhancerIntegration {
    */
   async enhanceText(text) {
     const startTime = performance.now();
-  
+
     try {
+      const sanitizedText = this.sanitizeText(text);
+
       // Extract character information if not already provided
-      const characterMap = this.extractCharacterNames(text);
-  
+      const characterMap = this.extractCharacterNames(sanitizedText);
+
       // Get dialogue patterns for statistics
-      const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
+      const dialoguePatterns =
+        this.dialogueUtils.extractDialoguePatterns(sanitizedText);
       const dialogueCount = this.countDialogues(dialoguePatterns);
       this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
-  
+
       // Create character summary for LLM context
-      const characterSummary = this.dialogueUtils.createDialogueSummary(this.mapCharactersToArray(characterMap));
-  
+      const characterSummary = this.dialogueUtils.createDialogueSummary(
+        this.mapCharactersToArray(characterMap)
+      );
+
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
-  
+
       // Use the ollamaClient directly, passing the character summary
-      const enhancedText = await this.enhanceTextWithLLM(text, characterSummary);
-  
+      const enhancedText = await this.enhanceTextWithLLM(
+        sanitizedText,
+        characterSummary
+      );
+
       return enhancedText;
     } catch (error) {
       console.error("Error enhancing text:", error);
@@ -56,13 +64,15 @@ class EnhancerIntegration {
       this.statsUtils.setProcessingTime(endTime - startTime);
     }
   }
-  
+
   countDialogues(dialoguePatterns) {
-    return dialoguePatterns.quotedDialogue.length +
-           dialoguePatterns.colonSeparatedDialogue.length +
-           dialoguePatterns.actionDialogue.length;
+    return (
+      dialoguePatterns.quotedDialogue.length +
+      dialoguePatterns.colonSeparatedDialogue.length +
+      dialoguePatterns.actionDialogue.length
+    );
   }
-  
+
   mapCharactersToArray(characterMap) {
     return Object.entries(characterMap).map(([name, data]) => ({
       name,
@@ -81,46 +91,57 @@ class EnhancerIntegration {
     console.log("Extracting character names and genders...");
     const characterMap = { ...existingMap };
     const startCharCount = Object.keys(characterMap).length;
-  
+
     // Get novel ID to retrieve existing character data
-    const novelId = this.novelUtils.updateNovelId(window.location.href, document.title);
-  
+    const novelId = this.novelUtils.updateNovelId(
+      window.location.href,
+      document.title
+    );
+
     // Try to get existing character map for this novel first
     if (novelId) {
       this.loadExistingCharacterData(novelId, characterMap);
     }
-  
+
     // Get dialogue patterns
     const dialoguePatterns = this.dialogueUtils.extractDialoguePatterns(text);
-  
+
     // Extract characters from dialogue
-    const characterNames = this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
-  
+    const characterNames =
+      this.dialogueUtils.extractCharactersFromDialogue(dialoguePatterns);
+
     // Process each character name
-    characterNames.forEach(name => this.processCharacterName(name, text, characterMap));
-  
+    characterNames.forEach((name) =>
+      this.processCharacterName(name, text, characterMap)
+    );
+
     // Look for additional names using more patterns
     this.extractAdditionalNames(text, characterMap);
-  
+
     // Clean up characters
     this.cleanupCharacterMap(characterMap);
-  
+
     // Track new characters found
     const newCharCount = Object.keys(characterMap).length - startCharCount;
     this.statsUtils.setTotalCharactersDetected(newCharCount);
-  
+
     // Sync character map with background
     if (novelId && Object.keys(characterMap).length > 0) {
       this.syncCharacterMap(characterMap, novelId);
     }
-  
-    console.log(`Extracted ${Object.keys(characterMap).length} characters for novel ${novelId}:`, characterMap);
+
+    console.log(
+      `Extracted ${
+        Object.keys(characterMap).length
+      } characters for novel ${novelId}:`,
+      characterMap
+    );
     return characterMap;
   }
-  
+
   loadExistingCharacterData(novelId, characterMap) {
     this.getExistingCharacterMap(novelId, characterMap)
-      .then(existingNovelMap => {
+      .then((existingNovelMap) => {
         // Merge with existing map if available
         Object.entries(existingNovelMap).forEach(([name, data]) => {
           if (!characterMap[name]) {
@@ -128,34 +149,71 @@ class EnhancerIntegration {
           }
         });
       })
-      .catch(err => {
+      .catch((err) => {
         console.warn("Failed to fetch existing character map:", err);
       });
   }
-  
+
   processCharacterName(name, text, characterMap) {
-    if (!characterMap[name]) {
-      const gender = this.genderUtils.guessGender(name, text, characterMap);
-      characterMap[name] = {
+    // Add validation for name
+    if (!name || typeof name !== "string" || name.length > 50) {
+      return; // Skip invalid names
+    }
+
+    // Sanitize name to prevent potential injection
+    const sanitizedName = this.sanitizeText(name);
+
+    if (!characterMap[sanitizedName]) {
+      const gender = this.genderUtils.guessGender(
+        sanitizedName,
+        text,
+        characterMap
+      );
+      characterMap[sanitizedName] = {
         gender,
         appearances: 1
       };
     } else {
       // Increment appearances counter
-      characterMap[name].appearances = (characterMap[name].appearances || 0) + 1;
-  
+      characterMap[sanitizedName].appearances =
+        (characterMap[sanitizedName].appearances || 0) + 1;
+
       // If gender was previously unknown but we have more context now, try again
-      if (characterMap[name].gender === "unknown" || characterMap[name].confidence < 0.7) {
-        const updatedGender = this.genderUtils.guessGender(name, text, characterMap);
-  
+      if (
+        characterMap[sanitizedName].gender === "unknown" ||
+        characterMap[sanitizedName].confidence < 0.7
+      ) {
+        const updatedGender = this.genderUtils.guessGender(
+          sanitizedName,
+          text,
+          characterMap
+        );
+
         // Only update if we have better confidence
-        if (updatedGender.confidence > (characterMap[name].confidence || 0)) {
-          characterMap[name].gender = updatedGender.gender;
-          characterMap[name].confidence = updatedGender.confidence;
-          characterMap[name].evidence = updatedGender.evidence;
+        if (
+          updatedGender.confidence >
+          (characterMap[sanitizedName].confidence || 0)
+        ) {
+          characterMap[sanitizedName].gender = updatedGender.gender;
+          characterMap[sanitizedName].confidence = updatedGender.confidence;
+          characterMap[sanitizedName].evidence = updatedGender.evidence;
         }
       }
     }
+  }
+
+  /**
+   * Sanitize text to prevent XSS and other injection attacks
+   * @param {string} text - Text to sanitize
+   * @return {string} - Sanitized text
+   */
+  sanitizeText(text) {
+    if (!text || typeof text !== "string") return "";
+
+    // Basic HTML sanitization
+    const temp = document.createElement("div");
+    temp.textContent = text;
+    return temp.innerHTML;
   }
 
   /**
@@ -164,16 +222,33 @@ class EnhancerIntegration {
    * @param {object} currentMap - Current character map
    * @return {Promise<object>} - Promise resolving to existing character map
    */
-  getExistingCharacterMap(novelId, currentMap = {}) {
+  async getExistingCharacterMap(novelId, currentMap = {}) {
     return new Promise((resolve, reject) => {
       if (!novelId) {
         resolve(currentMap);
         return;
       }
 
+      // Add timeout to prevent hanging
+      const timeoutId = setTimeout(() => {
+        console.warn("Character map retrieval timed out");
+        resolve(currentMap);
+      }, x5000);
+
       chrome.runtime.sendMessage(
         { action: "getCharacterMap", novelId },
         (response) => {
+          clearTimeout(timeoutId);
+
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "Error retrieving character map:",
+              chrome.runtime.lastError
+            );
+            resolve(currentMap);
+            return;
+          }
+
           if (response && response.status === "ok") {
             console.log(
               `Retrieved existing character map for novel ${novelId} with ${
@@ -199,8 +274,11 @@ class EnhancerIntegration {
    * @param {object} characterMap - Character map to update
    */
   extractAdditionalNames(text, characterMap) {
+    // Limit text size to prevent ReDoS attacks
+    const maxTextLength = 100000; // 100KB
+    const processedText = text.substring(0, maxTextLength);
     const namePatterns = [
-      // Character said pattern
+      // Character said pattern - same as before
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
 
       // "Text" attribution pattern
@@ -219,9 +297,21 @@ class EnhancerIntegration {
       /(Xiao\s[A-Z][a-z]+)/g
     ];
 
+    // Set a limit on matches to prevent DoS
+    const maxMatches = 1000;
+    let totalMatches = 0;
+
     for (const pattern of namePatterns) {
       let match;
-      while ((match = pattern.exec(text)) !== null) {
+      let patternMatches = 0;
+
+      while (
+        (match = pattern.exec(processedText)) !== null &&
+        totalMatches < maxMatches &&
+        patternMatches < 200
+      ) {
+        patternMatches++;
+        totalMatches++;
         // Determine which capture group contains the name based on pattern
         let name;
         if (pattern === namePatterns[1]) {
@@ -321,10 +411,32 @@ class EnhancerIntegration {
       return;
     }
 
+    // Validate characterMap before sending
+    if (!characterMap || typeof characterMap !== "object") {
+      console.warn("Invalid character map provided for sync");
+      return;
+    }
+
+    // Validate and sanitize the data before sending
+    const sanitizedCharMap = {};
+    Object.entries(characterMap).forEach(([name, data]) => {
+      // Only include valid entries
+      if (name && typeof name === "string" && name.length <= 50) {
+        sanitizedCharMap[name] = {
+          gender: data.gender || "unknown",
+          confidence: parseFloat(data.confidence) || 0,
+          appearances: parseInt(data.appearances) || 1,
+          evidence: Array.isArray(data.evidence)
+            ? data.evidence.filter((e) => typeof e === "string").slice(0, 10)
+            : []
+        };
+      }
+    });
+
     console.log(`Syncing character map for novel: ${novelId}`);
     chrome.runtime.sendMessage({
       action: "updateCharacterMap",
-      characters: characterMap,
+      characters: sanitizedCharMap,
       novelId: novelId
     });
   }
@@ -337,7 +449,10 @@ class EnhancerIntegration {
    */
   async enhanceTextWithLLM(text, characterSummary) {
     try {
-      const novelId = this.novelUtils.updateNovelId(window.location.href, document.title);
+      const novelId = this.novelUtils.updateNovelId(
+        window.location.href,
+        document.title
+      );
 
       // Add context about the novel and writing style
       const novelInfo = await this.dialogueUtils.analyzeNovelStyle(
@@ -354,7 +469,7 @@ class EnhancerIntegration {
 
       console.log("Text enhancement complete!");
 
-      return cleanedText;
+      return enhancedText;
     } catch (error) {
       console.error("LLM enhancement error:", error);
       throw error;

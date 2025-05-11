@@ -3,40 +3,62 @@ let activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 
+/**
+ * Stores novel character maps in Chrome storage with size management
+ * @param {object} novelCharacterMaps - The character maps to store
+ */
 function storeNovelCharacterMaps(novelCharacterMaps) {
-  // Chrome storage has limits, so we need to manage size
-  // Calculate size of all character maps
-  const serialized = JSON.stringify(novelCharacterMaps);
-  const sizeInBytes = new Blob([serialized]).size;
+  try {
+    const serialized = JSON.stringify(novelCharacterMaps);
+    const sizeInBytes = new Blob([serialized]).size;
 
-  // If we're approaching size limits (100KB is a safe limit)
-  if (sizeInBytes > 100000) {
-    console.warn(
-      "Character maps getting too large, pruning older/smaller entries"
-    );
+    if (sizeInBytes > 100000) {
+      console.warn(
+        "Character maps getting too large, pruning older/smaller entries"
+      );
 
-    // Get novels with least characters and remove them
-    const novelEntries = Object.entries(novelCharacterMaps);
+      if (!novelCharacterMaps || typeof novelCharacterMaps !== "object") {
+        console.error("Invalid novelCharacterMaps object");
+        return;
+      }
 
-    // Sort by character count (ascending)
-    novelEntries.sort(
-      (a, b) => Object.keys(a[1]).length - Object.keys(b[1]).length
-    );
+      // Get novels with least characters and remove them
+      const novelEntries = Object.entries(novelCharacterMaps);
 
-    // Remove bottom 20% of novels
-    const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
-    for (let i = 0; i < toRemove; i++) {
-      if (novelEntries[i]) {
-        delete novelCharacterMaps[novelEntries[i][0]];
+      // Sort by character count (ascending)
+      novelEntries.sort(
+        (a, b) =>
+          Object.keys(a[1] || {}).length - Object.keys(b[1] || {}).length
+      );
+
+      const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
+      for (let i = 0; i < toRemove; i++) {
+        if (novelEntries[i]) {
+          delete novelCharacterMaps[novelEntries[i][0]];
+        }
       }
     }
-  }
 
-  // Store the updated maps
-  chrome.storage.local.set({ novelCharacterMaps });
+    chrome.storage.local.set({ novelCharacterMaps }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error storing character maps:",
+          chrome.runtime.lastError
+        );
+      }
+    });
+  } catch (error) {
+    console.error("Error processing character maps:", error);
+  }
 }
 
 function handleOllamaRequest(request, sendResponse) {
+  // Validate request data
+  if (!request || !request.data) {
+    sendResponse({ error: "Invalid request data" });
+    return;
+  }
+
   chrome.storage.sync.get(
     {
       timeout: 200,
@@ -44,23 +66,49 @@ function handleOllamaRequest(request, sendResponse) {
       topP: 0.9
     },
     (data) => {
-      const requestData = prepareRequestData(request.data, data);
+      if (chrome.runtime.lastError) {
+        sendResponse({
+          error:
+            "Error retrieving settings: " + chrome.runtime.lastError.message
+        });
+        return;
+      }
 
-      console.log("Sending Ollama request:", {
-        model: requestData.model,
-        promptLength: requestData.prompt.length,
-        max_tokens: requestData.max_tokens,
-        temperature: requestData.temperature,
-        top_p: requestData.top_p,
-        stream: requestData.stream || false,
-        timeout: data.timeout + " seconds",
-        options: requestData.options || {}
-      });
+      try {
+        const requestData = prepareRequestData(request.data, data);
 
-      if (requestData.stream === false) {
-        processNonStreamingRequest(requestData, data.timeout, sendResponse);
-      } else {
-        sendResponse({ error: "Invalid stream value" });
+        // Validate important fields
+        if (!requestData.model || typeof requestData.model !== "string") {
+          throw new Error("Invalid model specification");
+        }
+
+        if (!requestData.prompt || typeof requestData.prompt !== "string") {
+          throw new Error("Invalid prompt");
+        }
+
+        // Limit prompt size
+        if (requestData.prompt.length > 32000) {
+          requestData.prompt = requestData.prompt.substring(0, 32000);
+        }
+
+        console.log("Sending Ollama request:", {
+          model: requestData.model,
+          promptLength: requestData.prompt.length,
+          max_tokens: requestData.max_tokens,
+          temperature: requestData.temperature,
+          top_p: requestData.top_p,
+          stream: requestData.stream || false,
+          timeout: data.timeout + " seconds",
+          options: requestData.options || {}
+        });
+
+        if (requestData.stream === false) {
+          processNonStreamingRequest(requestData, data.timeout, sendResponse);
+        } else {
+          sendResponse({ error: "Invalid stream value" });
+        }
+      } catch (error) {
+        sendResponse({ error: error.message });
       }
     }
   );
@@ -75,16 +123,33 @@ function prepareRequestData(requestData, settings) {
 }
 
 function processNonStreamingRequest(requestData, timeout, sendResponse) {
+  // Validate Ollama URL
+  const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
+
+  // Ensure timeout is a reasonable number
+  timeout =
+    typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
+
   const controller = new AbortController();
   const requestId = Date.now().toString();
   activeRequestControllers.set(requestId, controller);
 
   const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
 
-  fetch(DEFAULT_OLLAMA_URL + "/api/generate", {
+  // Sanitize request data before sending
+  const safeRequestData = {
+    model: String(requestData.model || ""),
+    prompt: String(requestData.prompt || ""),
+    max_tokens: parseInt(requestData.max_tokens) || 1024,
+    temperature: parseFloat(requestData.temperature) || 0.4,
+    top_p: parseFloat(requestData.top_p) || 0.9,
+    stream: false
+  };
+
+  fetch(ollamaUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(requestData),
+    body: JSON.stringify(safeRequestData),
     signal: controller.signal
   })
     .then((response) => {
@@ -176,25 +241,41 @@ function checkOllamaAvailability(sendResponse) {
     `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
   );
 
+  // Create AbortController with reasonable timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+
   fetch(DEFAULT_OLLAMA_URL + "/api/version", {
     method: "GET",
     headers: { "Content-Type": "application/json" },
-    signal: AbortSignal.timeout(10000)
+    signal: controller.signal
   })
     .then((response) => {
       if (response.ok) {
         return response.json().then((data) => {
           console.log(`Ollama version check successful: ${data.version}`);
 
+          // Create new controller for models request
+          const modelsController = new AbortController();
+          const modelsTimeoutId = setTimeout(
+            () => modelsController.abort(),
+            5000
+          );
+
           fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
             method: "GET",
             headers: { "Content-Type": "application/json" },
-            signal: AbortSignal.timeout(5000)
+            signal: modelsController.signal
           })
             .then((modelsResponse) => modelsResponse.json())
             .then((modelsData) => {
-              const availableModels =
-                modelsData.models?.map((m) => m.name) || [];
+              // Validate model data
+              const availableModels = Array.isArray(modelsData.models)
+                ? modelsData.models
+                    .filter((m) => m && m.name)
+                    .map((m) => m.name)
+                : [];
+
               console.log(
                 `Ollama is available, version: ${
                   data.version
@@ -211,7 +292,8 @@ function checkOllamaAvailability(sendResponse) {
                 `Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`
               );
               sendResponse({ available: true, version: data.version });
-            });
+            })
+            .finally(() => clearTimeout(modelsTimeoutId));
         });
       } else {
         console.warn(
@@ -226,16 +308,41 @@ function checkOllamaAvailability(sendResponse) {
     .catch((err) => {
       console.warn("Ollama availability check failed:", err);
       sendResponse({ available: false, reason: err.message });
-    });
+    })
+    .finally(() => clearTimeout(timeoutId));
 }
 
 // Function to check if a site is whitelisted
 function isSiteWhitelisted(url) {
   try {
+    // Validate URL format
+    if (!url || typeof url !== "string" || !url.startsWith("http")) {
+      console.warn("Invalid URL format:", url);
+      return Promise.resolve(false);
+    }
+
     const hostname = new URL(url).hostname;
+
+    if (!hostname) {
+      console.warn("No hostname found in URL:", url);
+      return Promise.resolve(false);
+    }
+
     return new Promise((resolve) => {
       chrome.storage.sync.get("whitelistedSites", (data) => {
-        const whitelistedSites = data.whitelistedSites || [];
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Error retrieving whitelisted sites:",
+            chrome.runtime.lastError
+          );
+          resolve(false);
+          return;
+        }
+
+        const whitelistedSites = Array.isArray(data.whitelistedSites)
+          ? data.whitelistedSites
+          : [];
+
         // Check if hostname or any of its parent domains are in the whitelist
         const isWhitelisted = whitelistedSites.some(
           (whitelistedSite) =>
@@ -271,48 +378,51 @@ async function checkSitePermission(url) {
 // Function to request permissions for a domain
 function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
-  
-  chrome.permissions.request({
-    origins: [origin]
-  }, function(granted) {
-    if (granted) {
-      chrome.runtime.sendMessage(
-        { 
-          action: "addSiteToWhitelist", 
-          url: "https://" + domain 
-        },
-        (response) => {
-          if (response && response.success) {
-            // Show feedback
-            const feedback = document.createElement("div");
-            feedback.className = "save-feedback success";
-            feedback.textContent = response.message;
-            document.body.appendChild(feedback);
 
-            setTimeout(() => {
-              if (feedback && feedback.parentNode) {
-                feedback.parentNode.removeChild(feedback);
-              }
-            }, 2500);
+  chrome.permissions.request(
+    {
+      origins: [origin]
+    },
+    function (granted) {
+      if (granted) {
+        chrome.runtime.sendMessage(
+          {
+            action: "addSiteToWhitelist",
+            url: "https://" + domain
+          },
+          (response) => {
+            if (response && response.success) {
+              // Show feedback
+              const feedback = document.createElement("div");
+              feedback.className = "save-feedback success";
+              feedback.textContent = response.message;
+              document.body.appendChild(feedback);
 
-            // Reload the list
-            loadWhitelist();
+              setTimeout(() => {
+                if (feedback && feedback.parentNode) {
+                  feedback.parentNode.removeChild(feedback);
+                }
+              }, 2500);
+
+              // Reload the list
+              loadWhitelist();
+            }
           }
-        }
-      );
-    } else {
-      const feedback = document.createElement("div");
-      feedback.className = "save-feedback warning";
-      feedback.textContent = `Permission denied for ${domain}`;
-      document.body.appendChild(feedback);
+        );
+      } else {
+        const feedback = document.createElement("div");
+        feedback.className = "save-feedback warning";
+        feedback.textContent = `Permission denied for ${domain}`;
+        document.body.appendChild(feedback);
 
-      setTimeout(() => {
-        if (feedback && feedback.parentNode) {
-          feedback.parentNode.removeChild(feedback);
-        }
-      }, 2500);
+        setTimeout(() => {
+          if (feedback && feedback.parentNode) {
+            feedback.parentNode.removeChild(feedback);
+          }
+        }, 2500);
+      }
     }
-  });
+  );
 }
 
 // Helper function to show feedback messages
@@ -511,7 +621,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "checkOllamaAvailability") {
     checkOllamaAvailability(sendResponse);
     return true;
-  } 
+  }
 
   return false; // Default case
 });
