@@ -10,7 +10,7 @@ let pendingEnhancement = false;
 let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
-let maxRetries = 3;
+const maxRetries = 3;
 
 /**
  * Initializes the extension
@@ -22,7 +22,7 @@ function init() {
 
   chrome.storage.sync.get(
     ["isExtensionPaused", "preserveNames", "fixPronouns"],
-    function (data) {
+    (data) => {
       settings = {
         isExtensionPaused:
           data.isExtensionPaused !== undefined
@@ -144,6 +144,7 @@ function findContentElement() {
 
 /**
  * Main function to enhance the page content using LLM
+ * @return {boolean} - Whether enhancement was successful
  */
 async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
@@ -329,7 +330,7 @@ async function processParagraphBatch(
     startIndex + chunkSize
   );
 
-  let batchText = batch.map((p) => p.textContent).join("\n\n");
+  const batchText = batch.map((p) => p.textContent).join("\n\n");
 
   try {
     console.log(
@@ -409,7 +410,7 @@ function handleTerminationRequest() {
   }
 }
 
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || typeof request !== "object" || !request.action) {
     console.error("Invalid message format received");
     return false;
@@ -515,7 +516,7 @@ function loadDOMPurify() {
   }
 }
 
-const observer = new MutationObserver(function (mutations) {
+const observer = new MutationObserver((mutations) => {
   if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
     let newContentAdded = false;
 

@@ -45,7 +45,7 @@ class GenderUtils {
 
     let maleScore = 0;
     let femaleScore = 0;
-    let evidence = [];
+    const evidence = [];
 
     // Identify likely cultural origin of name
     const culturalOrigin = this.detectNameCulturalOrigin(name, text);
@@ -293,7 +293,7 @@ class GenderUtils {
       ]
     };
 
-    let culturalScores = {
+    const culturalScores = {
       chinese: 0,
       japanese: 0,
       korean: 0,
@@ -1201,7 +1201,6 @@ class GenderUtils {
       }
     }
 
-    // If no direct evidence found, look for nearby cultural indicators
     if (!evidence) {
       // Find text segments within 50 characters of name mentions
       const nameProximityRegex = new RegExp(

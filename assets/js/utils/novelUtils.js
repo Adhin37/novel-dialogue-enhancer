@@ -17,7 +17,7 @@ class NovelUtils {
    * @return {string} - Unique novel identifier
    */
   updateNovelId(url,title) {
-    let domain = new URL(url).hostname.replace(/^www\./, "");
+    const domain = new URL(url).hostname.replace(/^www\./, "");
     let novelName = "";
 
     if (title) {

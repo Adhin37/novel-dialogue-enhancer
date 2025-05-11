@@ -3,7 +3,7 @@
   "version": "1.0",
   "description": "Enhances translated novel dialogues to sound more natural",
   "options_ui": {
-    "page": "options.html",
+    "page": "options/options.html",
     "open_in_tab": true
   },
   "permissions": [
@@ -19,11 +19,11 @@
     "http://localhost:11434/*"
   ],
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "popup/popup.html",
     "default_icon": {
-      "16": "images/icon16.png",
-      "48": "images/icon48.png",
-      "128": "images/icon128.png"
+      "16": "assets/icons/icon16.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
     }
   },
   "content_scripts": [
@@ -35,20 +35,20 @@
         "*://*.webnovel.com/*"
       ],
       "js": [
-        "utils/genderUtils.js",
-        "utils/dialogueUtils.js",
-        "utils/novelUtils.js",
-        "utils/statsUtils.js",
-        "enhancerIntegration.js",
-        "ollamaClient.js",
-        "toaster.js",
-        "content.js"
+        "assets/js/utils/genderUtils.js",
+        "assets/js/utils/dialogueUtils.js",
+        "assets/js/utils/novelUtils.js",
+        "assets/js/utils/statsUtils.js",
+        "assets/js/enhancerIntegration.js",
+        "assets/js/ollamaClient.js",
+        "assets/js/toaster.js",
+        "content/content.js"
       ],
       "run_at": "document_idle"
     }
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background/background.js"
   },
   "manifest_version": 3
 }

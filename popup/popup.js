@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", () => {
   const pauseButton = document.getElementById("pause-button");
   const whitelistButton = document.getElementById("whitelist-button");
   const whitelistText = document.getElementById("whitelist-text");
@@ -14,6 +14,10 @@ document.addEventListener("DOMContentLoaded", function () {
   let whitelistedSites = [];
   let isExtensionPaused = false;
 
+  if (window.darkModeManager) {
+    window.darkModeManager.init();
+  }
+
   // First, load the whitelist data from storage
   chrome.storage.sync.get(
     {
@@ -28,56 +32,32 @@ document.addEventListener("DOMContentLoaded", function () {
       isExtensionPaused = !items.isExtensionPaused;
       preserveNamesToggle.checked = items.preserveNames;
       fixPronounsToggle.checked = items.fixPronouns;
-      
+
       // Now that we have the whitelist, process the current tab
       processCurrentTab();
-      
+
       // Update UI states
       updatePauseButton();
     }
   );
 
-  function processCurrentTab() {
+  document.getElementById("whitelist-button").addEventListener("click", () => {
+    // Get current site URL
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs && tabs.length > 0) {
-        const url = new URL(tabs[0].url);
-        currentTabUrl = tabs[0].url;
-        currentTabHostname = url.hostname;
-        currentSite.textContent = currentTabHostname;
+      const url = tabs[0].url;
 
-        updateStatus();
-
-        // Check if the site is a chrome:// URL
-        const isChromePage = currentTabUrl.startsWith("chrome");
-
-        // Disable whitelist functionality for chrome:// pages
-        if (isChromePage) {
-          whitelistButton.disabled = true;
-          whitelistButton.classList.add("disabled");
-          whitelistText.textContent = "Not Available";
-          enhanceNowBtn.disabled = true;
-          enhanceNowBtn.classList.add("disabled");
-          statusMessage.textContent = "Enhancement not available on this page";
-        } else {
-          // Check if the site is whitelisted using our loaded data
-          const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
-          updateWhitelistButton(isWhitelisted);
-          updateEnhanceButton(isWhitelisted);
-
-          // Check site permission status
-          chrome.runtime.sendMessage(
-            { action: "checkSitePermission", url: currentTabUrl },
-            (response) => {
-              if (!(response && response.hasPermission)) {
-                updateWhitelistButton(false);
-                updateEnhanceButton(false);
-              }
-            }
-          );
+      chrome.runtime.sendMessage(
+        { action: "addSiteToWhitelist", url: url },
+        (response) => {
+          if (response && response.success) {
+            showFeedback(response.message, "success");
+          } else {
+            showFeedback(response.message || "Failed to add site", "warning");
+          }
         }
-      }
+      );
     });
-  }
+  });
 
   // Handle pause/resume button
   pauseButton.addEventListener("click", () => {
@@ -191,11 +171,11 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // Toggle settings
-  preserveNamesToggle.addEventListener("change", function() {
+  preserveNamesToggle.addEventListener("change", function () {
     chrome.storage.sync.set({ preserveNames: this.checked });
   });
 
-  fixPronounsToggle.addEventListener("change", function() {
+  fixPronounsToggle.addEventListener("change", function () {
     chrome.storage.sync.set({ fixPronouns: this.checked });
   });
 
@@ -278,9 +258,12 @@ document.addEventListener("DOMContentLoaded", function () {
       pauseButton.classList.remove("paused");
       pauseButton.title = "Pause Extension";
     }
-    
+
     // Also update enhance button state when pause state changes
-    const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
+    const isWhitelisted = isSiteWhitelisted(
+      currentTabHostname,
+      whitelistedSites
+    );
     updateEnhanceButton(isWhitelisted);
   }
 
@@ -297,14 +280,18 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    const isWhitelisted = isSiteWhitelisted(currentTabHostname, whitelistedSites);
+    const isWhitelisted = isSiteWhitelisted(
+      currentTabHostname,
+      whitelistedSites
+    );
     if (isWhitelisted) {
       statusMessage.textContent = "Enhancement active";
       updateEnhanceButton(true);
       return;
     }
 
-    statusMessage.textContent = "Please whitelist this site to enable enhancement";
+    statusMessage.textContent =
+      "Please whitelist this site to enable enhancement";
     updateEnhanceButton(false);
   }
 
@@ -319,6 +306,52 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         } catch (error) {
           console.error("Failed to send page status update:", error);
+        }
+      }
+    });
+  }
+
+  /**
+   * Processes the current tab to update UI states
+   */
+  function processCurrentTab() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs && tabs.length > 0) {
+        const url = new URL(tabs[0].url);
+        currentTabUrl = tabs[0].url;
+        currentTabHostname = url.hostname;
+        currentSite.textContent = currentTabHostname;
+
+        updateStatus();
+
+        // Check if the site is a chrome:// URL
+        const isChromePage = currentTabUrl.startsWith("chrome");
+        if (isChromePage) {
+          whitelistButton.disabled = true;
+          whitelistButton.classList.add("disabled");
+          whitelistText.textContent = "Not Available";
+          enhanceNowBtn.disabled = true;
+          enhanceNowBtn.classList.add("disabled");
+          statusMessage.textContent = "Enhancement not available on this page";
+        } else {
+          // Check if the site is whitelisted using our loaded data
+          const isWhitelisted = isSiteWhitelisted(
+            currentTabHostname,
+            whitelistedSites
+          );
+          updateWhitelistButton(isWhitelisted);
+          updateEnhanceButton(isWhitelisted);
+
+          // Check site permission status
+          chrome.runtime.sendMessage(
+            { action: "checkSitePermission", url: currentTabUrl },
+            (response) => {
+              if (!(response && response.hasPermission)) {
+                updateWhitelistButton(false);
+                updateEnhanceButton(false);
+              }
+            }
+          );
         }
       }
     });

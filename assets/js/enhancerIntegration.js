@@ -225,15 +225,14 @@ class EnhancerIntegration {
   async getExistingCharacterMap(novelId, currentMap = {}) {
     return new Promise((resolve, reject) => {
       if (!novelId) {
-        resolve(currentMap);
-        return;
+        return reject(new Error("No novel ID provided"));
       }
 
       // Add timeout to prevent hanging
       const timeoutId = setTimeout(() => {
         console.warn("Character map retrieval timed out");
-        resolve(currentMap);
-      }, x5000);
+        return reject(new Error("Character map retrieval timed out"));
+      }, 5000);
 
       chrome.runtime.sendMessage(
         { action: "getCharacterMap", novelId },
@@ -245,8 +244,7 @@ class EnhancerIntegration {
               "Error retrieving character map:",
               chrome.runtime.lastError
             );
-            resolve(currentMap);
-            return;
+            return reject(new Error("Error retrieving character map"));
           }
 
           if (response && response.status === "ok") {
@@ -257,11 +255,12 @@ class EnhancerIntegration {
             );
             resolve(response.characterMap || {});
           } else {
+            const errorMessage = response?.message || "Unknown error";
             console.warn(
               "Failed to get character map:",
-              response?.message || "Unknown error"
+              errorMessage
             );
-            resolve(currentMap); // Return current map if retrieval fails
+            return reject(new Error(`Failed to get character map: ${errorMessage}`));
           }
         }
       );

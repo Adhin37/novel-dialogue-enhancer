@@ -19,7 +19,6 @@ class DialogueUtils {
       actionDialogue: []
     };
 
-    // Extract quoted dialogue: "This is dialogue," said Character.
     const quotedPattern = /"([^"]+)"\s*,?\s*([^.!?]+?)(?:\.|!|\?)/g;
     let match;
     while ((match = quotedPattern.exec(text)) !== null) {
@@ -30,7 +29,6 @@ class DialogueUtils {
       });
     }
 
-    // Extract colon dialogue: Character: "This is dialogue."
     const colonPattern = /([^:]+):\s*"([^"]+)"/g;
     while ((match = colonPattern.exec(text)) !== null) {
       dialoguePatterns.colonSeparatedDialogue.push({
@@ -40,7 +38,6 @@ class DialogueUtils {
       });
     }
 
-    // Extract action dialogue: Character did something. "This is dialogue."
     const actionPattern =
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+([^.!?]*[.!?])\s+"([^"]+)"/g;
     while ((match = actionPattern.exec(text)) !== null) {
@@ -63,18 +60,13 @@ class DialogueUtils {
   extractCharactersFromDialogue(dialoguePatterns) {
     const characters = new Set();
 
-    // Extract from quoted dialogue
     dialoguePatterns.quotedDialogue.forEach((item) => {
       const attribution = item.attribution.trim();
 
-      // Skip if attribution is too long (likely not a simple attribution)
       if (attribution.length > 100) return;
 
-      // Check for common dialogue attribution patterns
       const patterns = [
-        // "Text," said Character.
         /\b(said|asked|replied|shouted|whispered|exclaimed|muttered|responded|commented)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})/i,
-        // "Text," Character said.
         /\b([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(said|asked|replied|shouted|whispered|exclaimed|muttered|responded|commented)/i
       ];
 
@@ -91,7 +83,6 @@ class DialogueUtils {
       }
     });
 
-    // Extract from colon dialogue
     dialoguePatterns.colonSeparatedDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
@@ -99,7 +90,6 @@ class DialogueUtils {
       }
     });
 
-    // Extract from action dialogue
     dialoguePatterns.actionDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
@@ -118,38 +108,28 @@ class DialogueUtils {
   extractCharacterName(text) {
     if (!text) return null;
 
-    // Clean up the text
     text = text.trim();
 
-    // Handle common cases where we get paragraphs or sentences instead of names
     if (text.length > 50) {
-      // Too long to be a reasonable name, try to extract name patterns
       const namePatterns = [
-        // Match titles followed by names: "Master Wong", "Lady Chen"
         /\b(Master|Lady|Lord|Sir|Madam|Miss|Mr\.|Mrs\.|Ms\.)[\s]+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/,
-        // Match common East Asian name patterns (2-3 characters, capitalized)
         /\b([A-Z][a-z]+\s[A-Z][a-z]+(?:\s[A-Z][a-z]+)?)\b/,
-        // Match a character name at the beginning of a sentence
         /^([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+/
       ];
 
       for (const pattern of namePatterns) {
         const match = text.match(pattern);
         if (match) {
-          // For title matches, return the full title + name
           if (pattern === namePatterns[0]) {
             return match[0].trim();
           }
-          // Otherwise return just the name portion
           return match[1] ? match[1].trim() : match[0].trim();
         }
       }
 
-      // If we can't find a clear name pattern, this is probably not a character name
       return null;
     }
 
-    // Check for individual pronouns which are not character names
     const pronouns = [
       "He",
       "She",
@@ -169,7 +149,6 @@ class DialogueUtils {
       return null;
     }
 
-    // Check if it's a common non-name word or sentence starter
     const nonNameWords = [
       "The",
       "Then",
@@ -233,7 +212,6 @@ class DialogueUtils {
       return null;
     }
 
-    // Check if text is a sentence (contains certain verbs or ending punctuation)
     if (
       text.includes(" ") &&
       (/\s(is|was|are|were|have|had|do|did|can|could|will|would|should|shall|may|might|must)\s/.test(
@@ -241,32 +219,24 @@ class DialogueUtils {
       ) ||
         /[.!?]/.test(text))
     ) {
-      // This is likely a sentence, not a name
       return null;
     }
 
-    // Check if it starts with capital letter (typical for names)
     if (!/^[A-Z]/.test(text)) {
       return null;
     }
 
-    // If there's a period at the end, remove it (could be from a title abbreviation)
     if (text.endsWith(".")) {
       text = text.slice(0, -1).trim();
     }
 
-    // Check if it looks like a composite name (e.g. "Yue Zhong")
-    // Common pattern for character names in novels, especially Asian novels
     if (/^[A-Z][a-z]+\s[A-Z][a-z]+(\s[A-Z][a-z]+)?$/.test(text)) {
       return text;
     }
 
-    // Check if it's a single capitalized word (Western first names or single-character names)
     if (/^[A-Z][a-z]+$/.test(text)) {
       return text;
     }
-
-    // Check for name with title
     const titlePattern =
       /^(Master|Lady|Lord|Sir|Madam|Miss|Mr\.|Mrs\.|Ms\.)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/;
     const titleMatch = text.match(titlePattern);
@@ -274,13 +244,10 @@ class DialogueUtils {
       return text;
     }
 
-    // Check for "Xiao" prefix (common in Chinese novels)
     if (/^Xiao\s[A-Z][a-z]+$/.test(text)) {
       return text;
     }
 
-    // If we got here but the text is short (less than 20 chars) and capitalized,
-    // it might still be a name, but let's do one more check to exclude short sentences
     if (
       text.length < 20 &&
       !text.includes(",") &&
@@ -293,12 +260,7 @@ class DialogueUtils {
     return null;
   }
 
-  /**
-   * Analyze novel style from text and history
-   * @param {string} text - Current text to analyze
-   * @param {string} novelId - Novel identifier
-   * @return {object} - Novel style information
-   */
+
   /**
    * Analyze novel style from text and history
    * @param {string} text - Current text to analyze
@@ -307,11 +269,16 @@ class DialogueUtils {
    */
   async analyzeNovelStyle(text, novelId) {
     try {
-      // Check if we have stored style information
-      const response = await new Promise((resolve) => {
+      const response = await new Promise((resolve, reject) => {
         chrome.runtime.sendMessage(
           { action: "getNovelStyle", novelId: novelId },
-          resolve
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.error("Error getting novel style:", chrome.runtime.lastError);
+              return reject(chrome.runtime.lastError);
+            }
+            resolve(response);
+          }
         );
       });
 
@@ -319,15 +286,12 @@ class DialogueUtils {
         return response.style;
       }
 
-      // Initialize style detection variables
       let style = "standard narrative";
       let tone = "neutral";
       let confidence = 0;
 
-      // Extract a sample for analysis (max 5000 chars to avoid performance issues)
       const sample = text.substring(0, 5000);
 
-      // Genre pattern detection (weighted scoring system)
       const genrePatterns = {
         "eastern cultivation": {
           keywords: [
@@ -517,17 +481,14 @@ class DialogueUtils {
         }
       };
 
-      // Score each genre
       const genreScores = {};
       for (const [genre, patterns] of Object.entries(genrePatterns)) {
         let score = 0;
 
-        // Check for regex patterns
         if (patterns.regex.test(sample)) {
           score += 3;
         }
 
-        // Count keyword occurrences
         for (const keyword of patterns.keywords) {
           const regex = new RegExp("\\b" + keyword + "\\b", "gi");
           const matches = sample.match(regex);
@@ -539,19 +500,15 @@ class DialogueUtils {
         genreScores[genre] = score;
       }
 
-      // Find the genre with the highest score
       let maxScore = 0;
       for (const [genre, score] of Object.entries(genreScores)) {
         if (score > maxScore) {
           maxScore = score;
           style = genre;
-          confidence = Math.min(score / 10, 1); // Normalize confidence (0-1)
+          confidence = Math.min(score / 10, 1);
         }
       }
 
-      // Additional style indicators
-
-      // First person narrative check
       const firstPersonIndicators = [
         "I said",
         "I replied",
@@ -561,13 +518,11 @@ class DialogueUtils {
         "I saw"
       ];
       const firstPersonCount = firstPersonIndicators.reduce(
-        (count, indicator) => {
-          return (
+        (count, indicator) => (
             count +
             (sample.match(new RegExp("\\b" + indicator + "\\b", "gi")) || [])
               .length
-          );
-        },
+          ),
         0
       );
 
@@ -575,7 +530,6 @@ class DialogueUtils {
         style = style + " (first-person)";
       }
 
-      // Check for present tense narration
       const presentTenseIndicators = [
         /\bI say\b/,
         /\bhe says\b/,
@@ -588,9 +542,7 @@ class DialogueUtils {
       ];
 
       const presentTenseCount = presentTenseIndicators.reduce(
-        (count, regex) => {
-          return count + (sample.match(regex) || []).length;
-        },
+        (count, regex) => count + (sample.match(regex) || []).length,
         0
       );
 
@@ -598,7 +550,6 @@ class DialogueUtils {
         style = style + " (present tense)";
       }
 
-      // Analyze writing style (dialogue-heavy vs descriptive)
       const dialogueMarks = (sample.match(/["']/g) || []).length;
       const sentenceCount = (sample.match(/[.!?]/g) || []).length;
 
@@ -608,8 +559,6 @@ class DialogueUtils {
         style = style + " (descriptive)";
       }
 
-      // Tone analysis
-      // Check for emotional words
       const tonePatterns = {
         formal: [
           /\b(therefore|thus|hence|accordingly|consequently|nevertheless|moreover|furthermore)\b/i,
@@ -649,7 +598,6 @@ class DialogueUtils {
         ]
       };
 
-      // Score each tone
       const toneScores = {};
       for (const [toneName, patterns] of Object.entries(tonePatterns)) {
         let score = 0;
@@ -662,7 +610,6 @@ class DialogueUtils {
         toneScores[toneName] = score;
       }
 
-      // Find the tone with the highest score
       maxScore = 0;
       for (const [toneName, score] of Object.entries(toneScores)) {
         if (score > maxScore) {
@@ -671,7 +618,6 @@ class DialogueUtils {
         }
       }
 
-      // Check for sentence length (short sentences often indicate action-oriented or tense writing)
       const sentences = sample.match(/[^.!?]+[.!?]+/g) || [];
       if (sentences.length > 0) {
         const avgSentenceLength = sample.length / sentences.length;
@@ -685,13 +631,10 @@ class DialogueUtils {
         }
       }
 
-      // Check capitalization patterns for emphasis style
       const allCapsWords = sample.match(/\b[A-Z]{2,}\b/g) || [];
       if (allCapsWords.length > 5) {
         tone = tone + " with emphasis";
       }
-
-      // Check for unusual punctuation patterns
       const ellipses = (sample.match(/\.\.\./g) || []).length;
       const exclamations = (sample.match(/!/g) || []).length;
 
@@ -703,7 +646,6 @@ class DialogueUtils {
         tone = tone + " with intensity";
       }
 
-      // Save this analysis for future use
       const styleInfo = {
         style,
         tone,
@@ -737,17 +679,14 @@ class DialogueUtils {
     let summary =
       "CHARACTER INFORMATION (to help maintain proper pronouns and gender references):\n";
 
-    // Create a copy of the array before sorting to avoid modifying the original
     const sortedCharacters = [...characters].sort(
       (a, b) => (b.appearances || 0) - (a.appearances || 0)
     );
 
-    // Only include significant characters (appeared more than once)
     const significantCharacters = sortedCharacters.filter(
       (c) => c.appearances > 1
     );
 
-    // Limit to top 10 characters to keep the summary concise
     const displayCharacters =
       significantCharacters.length > 0
         ? significantCharacters.slice(0, 10)
