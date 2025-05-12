@@ -391,33 +391,12 @@ function requestPermission(domain) {
           },
           (response) => {
             if (response && response.success) {
-              // Show feedback
-              const feedback = document.createElement("div");
-              feedback.className = "save-feedback success";
-              feedback.textContent = response.message;
-              document.body.appendChild(feedback);
-
-              setTimeout(() => {
-                if (feedback && feedback.parentNode) {
-                  feedback.parentNode.removeChild(feedback);
-                }
-              }, 2500);
-
-              // Reload whitelist
+              showFeedback(response.message, 'success');
             }
           }
         );
       } else {
-        const feedback = document.createElement("div");
-        feedback.className = "save-feedback warning";
-        feedback.textContent = `Permission denied for ${domain}`;
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          if (feedback && feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
-          }
-        }, 2500);
+        showFeedback(`Permission denied for ${domain}`, 'warning');
       }
     }
   );

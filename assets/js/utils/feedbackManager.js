@@ -23,7 +23,7 @@ function showFeedback(message, type = '', duration = 2500, container = null) {
   targetContainer.appendChild(feedback);
 
   // Automatically remove after duration
-  const timeoutId = setTimeout(() => {
+  setTimeout(() => {
     if (feedback && feedback.parentNode) {
       feedback.parentNode.removeChild(feedback);
     }
