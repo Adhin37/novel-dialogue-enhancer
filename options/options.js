@@ -73,17 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
     domain = domain.split("/")[0];
 
     if (domain.startsWith("chrome")) {
-      const feedback = document.createElement("div");
-      feedback.className = "save-feedback warning";
-      feedback.textContent =
-        "Chrome internal pages cannot be added to whitelist";
-      document.body.appendChild(feedback);
-
-      setTimeout(() => {
-        if (feedback && feedback.parentNode) {
-          feedback.parentNode.removeChild(feedback);
-        }
-      }, 2500);
+      window.feedbackManager.show("Chrome internal pages cannot be added to whitelist", "warning");
 
       siteModal.style.display = "none";
       siteUrlInput.value = "";
@@ -101,29 +91,11 @@ document.addEventListener("DOMContentLoaded", () => {
           siteModal.style.display = "none";
           siteUrlInput.value = "";
 
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = response.message;
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show(response.message, "success");
 
           loadWhitelist();
         } else {
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback warning";
-          feedback.textContent = response.message || "Error adding site";
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show(response.message || "Error adding site", "warning");
 
           siteModal.style.display = "none";
           siteUrlInput.value = "";
@@ -266,16 +238,7 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (response && response.success) {
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = `Removed ${site} from whitelist`;
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show(`Removed ${site} from whitelist`, "success");
 
           loadWhitelist();
         }
@@ -312,18 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (url.protocol.startsWith("chrome")) {
             focusModal("Chrome pages can't be added to the whitelist");
-            const feedback = document.createElement("div");
-            feedback.className = "save-feedback warning";
-            feedback.textContent =
-              "Chrome pages can't be added. Enter a site manually.";
-            document.body.appendChild(feedback);
-
-            setTimeout(() => {
-              if (feedback && feedback.parentNode) {
-                feedback.parentNode.removeChild(feedback);
-              }
-            }, 2500);
-
+            window.feedbackManager.show("Chrome pages can't be added. Enter a site manually.", "warning");
             return;
           }
 
@@ -367,16 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         updateAllSliderBackgrounds();
 
-        const feedback = document.createElement("div");
-        feedback.className = "save-feedback";
-        feedback.textContent = "Settings Reset to Defaults!";
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          if (feedback && feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
-          }
-        }, 2500);
+        window.feedbackManager.show("Settings Reset to Defaults!", "success");
       });
     }
   }
@@ -424,16 +367,7 @@ document.addEventListener("DOMContentLoaded", () => {
         chrome.storage.sync.set({ whitelistedSites: [] }, () => {
           loadWhitelist();
 
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = "All sites removed from whitelist";
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show("All sites removed from whitelist", "success");
         });
       }
     });
@@ -478,15 +412,7 @@ document.addEventListener("DOMContentLoaded", () => {
           topP: topP
         },
         () => {
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = "Settings Saved Successfully!";
-          document.body.appendChild(feedback);
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show("Settings Saved Successfully!", "success");
         }
       );
     });

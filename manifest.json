@@ -2,6 +2,11 @@
   "name": "Novel Dialogue Enhancer",
   "version": "1.0",
   "description": "Enhances translated novel dialogues to sound more natural",
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
   "options_ui": {
     "page": "options/options.html",
     "open_in_tab": true
@@ -17,6 +22,9 @@
     "*://*.wuxiaworld.com/*",
     "*://*.webnovel.com/*",
     "http://localhost:11434/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -35,6 +43,7 @@
         "*://*.webnovel.com/*"
       ],
       "js": [
+        "assets/js/lib/purify.min.js",
         "assets/js/utils/genderUtils.js",
         "assets/js/utils/dialogueUtils.js",
         "assets/js/utils/novelUtils.js",

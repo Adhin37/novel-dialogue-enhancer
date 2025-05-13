@@ -375,45 +375,23 @@ async function checkSitePermission(url) {
 }
 
 // Function to request permissions for a domain
-function requestPermission(domain) {
+async function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
 
-  chrome.permissions.request(
-    {
-      origins: [origin]
-    },
-    (granted) => {
-      if (granted) {
-        chrome.runtime.sendMessage(
-          {
-            action: "addSiteToWhitelist",
-            url: "https://" + domain
-          },
-          (response) => {
-            if (response && response.success) {
-              showFeedback(response.message, 'success');
-            }
-          }
-        );
-      } else {
-        showFeedback(`Permission denied for ${domain}`, 'warning');
+  return new Promise((resolve) =>
+    chrome.permissions.request(
+      {
+        origins: [origin]
+      },
+      (granted) => {
+        if (granted) {
+          resolve(true);
+        } else {
+          resolve(false);
+        }
       }
-    }
+    )
   );
-}
-
-// Helper function to show feedback messages
-function showFeedback(message, isWarning = false) {
-  const feedback = document.createElement("div");
-  feedback.className = isWarning ? "save-feedback warning" : "save-feedback";
-  feedback.textContent = message;
-  document.body.appendChild(feedback);
-
-  setTimeout(() => {
-    if (feedback && feedback.parentNode) {
-      feedback.parentNode.removeChild(feedback);
-    }
-  }, 2500);
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -545,18 +523,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const url = request.url;
     try {
       const hostname = new URL(url).hostname;
-      chrome.storage.sync.get("whitelistedSites", (data) => {
+      chrome.storage.sync.get("whitelistedSites", async (data) => {
         const whitelistedSites = data.whitelistedSites || [];
 
         if (!whitelistedSites.includes(hostname)) {
-          requestPermission(hostname);
-          whitelistedSites.push(hostname);
-          chrome.storage.sync.set({ whitelistedSites }, () => {
-            sendResponse({
-              success: true,
-              message: `${hostname} added to whitelist`
+          if (await requestPermission(hostname)) {
+            whitelistedSites.push(hostname);
+            chrome.storage.sync.set({ whitelistedSites }, () => {
+              sendResponse({
+                success: true,
+                message: `${hostname} added to whitelist`
+              });
             });
-          });
+          } else {
+            sendResponse({
+              success: false,
+              message: `Permission denied for ${hostname}`
+            });
+          }
         } else {
           sendResponse({
             success: false,
@@ -600,5 +584,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  return false; // Default case
+  return false;
 });

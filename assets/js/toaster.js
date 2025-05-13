@@ -304,7 +304,6 @@ class Toaster {
     }
   
     if (this.progressText) {
-      // Sanitize message
       this.progressText.textContent = message ? String(message) : "";
     }
   

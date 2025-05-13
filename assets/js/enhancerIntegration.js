@@ -87,7 +87,7 @@ class EnhancerIntegration {
    * @param {object} existingMap - Existing character data
    * @return {object} - Updated character map
    */
-  extractCharacterNames(text, existingMap = {}) {
+  async extractCharacterNames(text, existingMap = {}) {
     console.log("Extracting character names and genders...");
     const characterMap = { ...existingMap };
     const startCharCount = Object.keys(characterMap).length;
@@ -100,7 +100,7 @@ class EnhancerIntegration {
 
     // Try to get existing character map for this novel first
     if (novelId) {
-      this.loadExistingCharacterData(novelId, characterMap);
+      this.characterMap = await this.loadExistingCharacterData(novelId, characterMap);
     }
 
     // Get dialogue patterns
@@ -139,18 +139,21 @@ class EnhancerIntegration {
     return characterMap;
   }
 
-  loadExistingCharacterData(novelId, characterMap) {
-    this.getExistingCharacterMap(novelId, characterMap)
+  async loadExistingCharacterData(novelId, characterMap) {
+    return this.getExistingCharacterMap(novelId)
       .then((existingNovelMap) => {
         // Merge with existing map if available
+        const existingMap = { ...characterMap };
         Object.entries(existingNovelMap).forEach(([name, data]) => {
-          if (!characterMap[name]) {
-            characterMap[name] = { ...data };
+          if (!existingMap[name]) {
+            existingMap[name] = { ...data };
           }
         });
+        return existingMap;
       })
       .catch((err) => {
         console.warn("Failed to fetch existing character map:", err);
+        return characterMap;
       });
   }
 

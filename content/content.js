@@ -483,39 +483,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
-// Load DOMPurify from CDN if it doesn't exist
-function loadDOMPurify() {
-  if (typeof DOMPurify === "undefined") {
-    const script = document.createElement("script");
-    script.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.8/purify.min.js";
-    script.integrity =
-      "sha512-M72cBdA/Qj2VTT/e8/vpv1RRwGuR5i5hAzWJM8ySCCistLcVHLfbVn5OrWUxUflZM2H3fEwPLcqR7e5/UdUgTQ==";
-    script.crossOrigin = "anonymous";
-    script.referrerPolicy = "no-referrer";
-    script.onload = function () {
-      console.log("DOMPurify loaded");
-      init();
-    };
-    script.onerror = function () {
-      console.error(
-        "Failed to load DOMPurify, falling back to minimal sanitization"
-      );
-      window.DOMPurify = {
-        sanitize: function (dirty) {
-          const div = document.createElement("div");
-          div.textContent = dirty;
-          return div.innerHTML;
-        }
-      };
-      init();
-    };
-    document.head.appendChild(script);
-  } else {
-    init();
-  }
-}
-
 const observer = new MutationObserver((mutations) => {
   if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
     let newContentAdded = false;
@@ -543,7 +510,7 @@ const observer = new MutationObserver((mutations) => {
 });
 
 // Start safely with DOMPurify loaded
-loadDOMPurify();
+init();
 
 setTimeout(() => {
   const contentElement = findContentElement();

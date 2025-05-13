@@ -50,9 +50,9 @@ document.addEventListener("DOMContentLoaded", () => {
         { action: "addSiteToWhitelist", url: url },
         (response) => {
           if (response && response.success) {
-            showFeedback(response.message, "success");
+            window.feedbackManager.show(response.message, "success");
           } else {
-            showFeedback(response.message || "Failed to add site", "warning");
+            window.feedbackManager.show(response.message || "Failed to add site", "warning");
           }
         }
       );
