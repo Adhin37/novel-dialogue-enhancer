@@ -197,7 +197,7 @@ async function enhancePage() {
     }
 
     await enhancePageWithLLM();
-    const stats = enhancerIntegration.getStats();
+    const stats = enhancerIntegration.statsUtils.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
     toaster.finishProgress();
   } catch (error) {
@@ -245,10 +245,7 @@ async function enhancePageWithLLM() {
       await processMultipleParagraphs(paragraphs);
     }
 
-    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(
-      enhancerIntegration.statsUtils.getTotalDialoguesEnhanced() +
-        (paragraphs.length || 1)
-    );
+    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(paragraphs.length || 1);
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
   } catch (error) {
     console.error(
@@ -339,7 +336,7 @@ async function processParagraphBatch(
       } to LLM (${batchText.length} chars)`
     );
 
-    const llmEnhanced = await enhancerIntegration.enhanceText(batchText);
+    const llmEnhancedText = await enhancerIntegration.enhanceText(batchText);
 
     if (terminateRequested) {
       console.log(
@@ -351,7 +348,7 @@ async function processParagraphBatch(
       return;
     }
 
-    const enhancedParagraphs = llmEnhanced.split("\n\n");
+    const enhancedParagraphs = llmEnhancedText.split("\n\n");
 
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
       batch[j].innerHTML = DOMPurify.sanitize(enhancedParagraphs[j]);
@@ -439,14 +436,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     enhancePage()
       .then((result) => {
         const stats = enhancerIntegration.statsUtils.getStats();
-        try {
-          sendResponse({
-            status: "enhanced",
-            stats: stats
-          });
-        } catch (err) {
-          console.warn("Failed to send response, port may be closed:", err);
-        }
+        sendResponse({
+          status: "enhanced",
+          stats: stats
+        });
       })
       .catch((error) => {
         console.error("Enhancement failed:", error);
