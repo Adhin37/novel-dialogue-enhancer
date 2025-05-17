@@ -552,19 +552,6 @@ input[type="range"]::-moz-range-thumb:hover {
   text-decoration: underline;
 }
 
-.save-feedback {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  background-color: var(--success-color);
-  color: white;
-  padding: 1rem 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow-color);
-  z-index: 100;
-  animation: slideIn 0.3s, fadeOut 0.3s 2s forwards;
-}
-
 @keyframes slideIn {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -714,19 +701,6 @@ input[type="range"]::-moz-range-thumb:hover {
   animation: shake 0.5s;
 }
 
-.save-feedback.success {
-  background-color: var(--success-color);
-}
-
-.save-feedback.warning {
-  background-color: var(--warning-color);
-}
-
-.save-feedback.error {
-  background-color: var(--error-color);
-}
-
-
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
@@ -736,4 +710,11 @@ input[type="range"]::-moz-range-thumb:hover {
 .form-group input[type="text"] {
   width: 100%;
   box-sizing: border-box;
+}
+
+.error-hint {
+  color: var(--error-color) !important;
+  font-weight: 500 !important;
+  animation: fadeIn 0.3s ease;
+  margin-top: 0.75rem !important;
 }

@@ -10,7 +10,7 @@ let pendingEnhancement = false;
 let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
-let maxRetries = 3;
+const maxRetries = 3;
 
 /**
  * Initializes the extension
@@ -22,7 +22,7 @@ function init() {
 
   chrome.storage.sync.get(
     ["isExtensionPaused", "preserveNames", "fixPronouns"],
-    function (data) {
+    (data) => {
       settings = {
         isExtensionPaused:
           data.isExtensionPaused !== undefined
@@ -144,6 +144,7 @@ function findContentElement() {
 
 /**
  * Main function to enhance the page content using LLM
+ * @return {boolean} - Whether enhancement was successful
  */
 async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
@@ -196,7 +197,7 @@ async function enhancePage() {
     }
 
     await enhancePageWithLLM();
-    const stats = enhancerIntegration.getStats();
+    const stats = enhancerIntegration.statsUtils.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
     toaster.finishProgress();
   } catch (error) {
@@ -244,10 +245,7 @@ async function enhancePageWithLLM() {
       await processMultipleParagraphs(paragraphs);
     }
 
-    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(
-      enhancerIntegration.statsUtils.getTotalDialoguesEnhanced() +
-        (paragraphs.length || 1)
-    );
+    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(paragraphs.length || 1);
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
   } catch (error) {
     console.error(
@@ -329,7 +327,7 @@ async function processParagraphBatch(
     startIndex + chunkSize
   );
 
-  let batchText = batch.map((p) => p.textContent).join("\n\n");
+  const batchText = batch.map((p) => p.textContent).join("\n\n");
 
   try {
     console.log(
@@ -338,7 +336,7 @@ async function processParagraphBatch(
       } to LLM (${batchText.length} chars)`
     );
 
-    const llmEnhanced = await enhancerIntegration.enhanceText(batchText);
+    const llmEnhancedText = await enhancerIntegration.enhanceText(batchText);
 
     if (terminateRequested) {
       console.log(
@@ -350,7 +348,7 @@ async function processParagraphBatch(
       return;
     }
 
-    const enhancedParagraphs = llmEnhanced.split("\n\n");
+    const enhancedParagraphs = llmEnhancedText.split("\n\n");
 
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
       batch[j].innerHTML = DOMPurify.sanitize(enhancedParagraphs[j]);
@@ -409,7 +407,7 @@ function handleTerminationRequest() {
   }
 }
 
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || typeof request !== "object" || !request.action) {
     console.error("Invalid message format received");
     return false;
@@ -438,14 +436,10 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
     enhancePage()
       .then((result) => {
         const stats = enhancerIntegration.statsUtils.getStats();
-        try {
-          sendResponse({
-            status: "enhanced",
-            stats: stats
-          });
-        } catch (err) {
-          console.warn("Failed to send response, port may be closed:", err);
-        }
+        sendResponse({
+          status: "enhanced",
+          stats: stats
+        });
       })
       .catch((error) => {
         console.error("Enhancement failed:", error);
@@ -482,40 +476,7 @@ chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
   return false;
 });
 
-// Load DOMPurify from CDN if it doesn't exist
-function loadDOMPurify() {
-  if (typeof DOMPurify === "undefined") {
-    const script = document.createElement("script");
-    script.src =
-      "https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.8/purify.min.js";
-    script.integrity =
-      "sha512-M72cBdA/Qj2VTT/e8/vpv1RRwGuR5i5hAzWJM8ySCCistLcVHLfbVn5OrWUxUflZM2H3fEwPLcqR7e5/UdUgTQ==";
-    script.crossOrigin = "anonymous";
-    script.referrerPolicy = "no-referrer";
-    script.onload = function () {
-      console.log("DOMPurify loaded");
-      init();
-    };
-    script.onerror = function () {
-      console.error(
-        "Failed to load DOMPurify, falling back to minimal sanitization"
-      );
-      window.DOMPurify = {
-        sanitize: function (dirty) {
-          const div = document.createElement("div");
-          div.textContent = dirty;
-          return div.innerHTML;
-        }
-      };
-      init();
-    };
-    document.head.appendChild(script);
-  } else {
-    init();
-  }
-}
-
-const observer = new MutationObserver(function (mutations) {
+const observer = new MutationObserver((mutations) => {
   if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
     let newContentAdded = false;
 
@@ -542,7 +503,7 @@ const observer = new MutationObserver(function (mutations) {
 });
 
 // Start safely with DOMPurify loaded
-loadDOMPurify();
+init();
 
 setTimeout(() => {
   const contentElement = findContentElement();

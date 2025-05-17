@@ -10,3 +10,5 @@
 manifest.json.bak
 dist/
 build/
+node_modules/
+*.zip

@@ -1,0 +1,27 @@
+{
+  "name": "novel-dialogue-enhancer",
+  "version": "1.0.0",
+  "description": "Novel dialogue enhancer",
+  "main": "content.js",
+  "scripts": {
+    "test": "npm run test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Adhin37/novel-dialogue-enhancer.git"
+  },
+  "keywords": [
+    "NDE"
+  ],
+  "author": "Adhin",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Adhin37/novel-dialogue-enhancer/issues"
+  },
+  "homepage": "https://github.com/Adhin37/novel-dialogue-enhancer#readme",
+  "devDependencies": {
+    "@eslint/js": "^9.26.0",
+    "eslint": "^9.26.0",
+    "globals": "^16.1.0"
+  }
+}

@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Novel Dialogue Enhancer - Settings</title>
     <link rel="stylesheet" href="options.css" />
-    <link rel="icon" href="images/icon128.png" />
+    <link rel="stylesheet" href="../assets/css/feedback.css" />
+    <link rel="icon" href="../assets/icons/icon128.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -18,7 +19,7 @@
     <div class="wrapper">
       <header>
         <img
-          src="images/icon128.png"
+          src="../assets/icons/icon128.png"
           alt="Novel Dialogue Enhancer"
           class="header-icon"
         />
@@ -236,12 +237,10 @@
                     <a href="https://ollama.com" target="_blank">Ollama</a> on
                     your computer
                   </li>
-                  <li>Add your favorite novel sites to the whitelist</li>
+                  <li>Pull AI model that you want to run with Ollama (example : <a href="https://ollama.com/library/qwen3" target="_blank">ollama pull qwen3:8b</a>)</li>
+                  <li>Run command <code>ollama serve</code> to make your local AI model available to this extension</li>
+                  <li>Add your favorite novel sites to the whitelist (click extension icon or this page)</li>
                   <li>Configure your preferences on this page</li>
-                  <li>
-                    Click the extension icon when browsing a supported novel
-                    site
-                  </li>
                 </ol>
                 <h4>Supported Websites:</h4>
                 <ul>
@@ -275,9 +274,10 @@
             <div class="form-group">
               <label for="site-url">Website URL</label>
               <input id="site-url" type="text" placeholder="https://www.example.com" />
-            </div>
-            <div class="hint">
-              Don't include the protocol (http:// or https://) and any paths or query parameters.
+              <div class="hint">
+                Don't include the protocol (http:// or https://) and any paths or query parameters at the end.
+              </div>
+              <div id="modal-error" class="hint error-hint" style="display: none;"></div>
             </div>
           </div>
           <div class="modal-footer">
@@ -291,7 +291,8 @@
         </div>
       </div>
     </div>
-    <script src="detectDarkMode.js"></script>
+    <script src="../assets/js/utils/darkModeManager.js"></script>
+    <script src="../assets/js/utils/feedbackManager.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

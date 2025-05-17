@@ -25,23 +25,11 @@ class OllamaClient {
   }
 
   /**
-   * Get the configured LLM model name from storage
-   * @return {Promise<string>} - Model name
-   */
-  async getModelName() {
-    return new Promise((resolve) =>
-      chrome.storage.sync.get({ modelName: this.DEFAULT_MODEL }, (data) =>
-        resolve(data.modelName)
-      )
-    );
-  }
-
-  /**
    * Get the configured settings for LLM processing
    * @return {Promise<object>} - LLM settings
    */
   async getLLMSettings() {
-    return new Promise((resolve) =>
+    return new Promise((resolve, reject) =>
       chrome.storage.sync.get(
         {
           modelName: this.DEFAULT_MODEL,
@@ -51,7 +39,13 @@ class OllamaClient {
           topP: this.DEFAULT_TOP_P,
           contextSize: this.DEFAULT_CONTEXT_SIZE
         },
-        (data) => resolve(data)
+        (data) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error getting LLM settings:", chrome.runtime.lastError);
+            return reject(chrome.runtime.lastError);
+          }
+          resolve(data);
+        }
       )
     );
   }
@@ -341,7 +335,7 @@ ${chunk}`;
 
     return cleanedText.trim();
   }
-
+  
   /**
    * Check Ollama API availability
    * @return {Promise<object>} - Availability status
@@ -437,30 +431,6 @@ ${chunk}`;
   clearCache() {
     this.cache.clear();
     console.log("Cleared OllamaClient cache");
-  }
-
-  /**
-   * Clean the LLM response to extract only the enhanced text
-   * @param {string} llmResponse - Raw LLM response
-   * @return {string} - Cleaned enhanced text
-   */
-  cleanLLMResponse(llmResponse) {
-    // If the response contains markdown code blocks, remove them
-    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
-
-    // Remove potential explanations or notes at the beginning/end
-    cleanedText = cleanedText.replace(
-      /^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i,
-      ""
-    );
-
-    // Remove any final notes
-    cleanedText = cleanedText.replace(
-      /(Note:.*$)|(I hope this helps.*$)/im,
-      ""
-    );
-
-    return cleanedText.trim();
   }
 }
 

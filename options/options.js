@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", () => {
   const modelNameInput = document.getElementById("model-name");
   const saveButton = document.getElementById("save");
   const resetButton = document.getElementById("reset");
@@ -25,78 +25,55 @@ document.addEventListener("DOMContentLoaded", function () {
   const cancelAddSiteBtn = document.getElementById("cancel-add-site");
   const closeModalBtn = document.querySelector(".close-modal");
 
-  addSiteBtn.addEventListener("click", function () {
-    siteModal.style.display = "block";
-    setTimeout(() => siteUrlInput.focus(), 100);
+  addSiteBtn.addEventListener("click", () => {
+    addCurrentSiteToWhitelist();
   });
 
-  closeModalBtn.addEventListener("click", function () {
+  closeModalBtn.addEventListener("click", () => {
     siteModal.style.display = "none";
     siteUrlInput.value = "";
   });
 
-  cancelAddSiteBtn.addEventListener("click", function () {
+  cancelAddSiteBtn.addEventListener("click", () => {
     siteModal.style.display = "none";
     siteUrlInput.value = "";
   });
 
-  // Fix for the modal closing issue: check if the click target is part of the modal content
-  window.addEventListener("click", function (event) {
+  window.addEventListener("click", (event) => {
     if (event.target === siteModal) {
-      // Only close if clicking on the modal background (not its content)
-      // This stops clicks from bubbling up when interacting with form elements
       siteModal.style.display = "none";
       siteUrlInput.value = "";
     }
   });
 
-  // Prevent paste events from bubbling up to the window
-  siteUrlInput.addEventListener("paste", function (event) {
+  siteUrlInput.addEventListener("paste", (event) => {
     event.stopPropagation();
   });
 
-  addSiteConfirmBtn.addEventListener("click", function () {
+  addSiteConfirmBtn.addEventListener("click", () => {
     addSiteManually();
   });
 
-  siteUrlInput.addEventListener("keyup", function (event) {
+  siteUrlInput.addEventListener("keyup", (event) => {
     if (event.key === "Enter") {
       addSiteManually();
     }
   });
 
-  // Add this new function to handle manual site addition
   function addSiteManually() {
     let domain = siteUrlInput.value.trim();
 
-    // Simple domain validation
     if (!domain) {
-      // Show error message in the input field
       siteUrlInput.classList.add("input-error");
       setTimeout(() => siteUrlInput.classList.remove("input-error"), 1500);
       return;
     }
 
-    // Remove protocol if present
     domain = domain.replace(/^(https?:\/\/)?(www\.)?/i, "");
-
-    // Remove paths, query parameters, etc.
     domain = domain.split("/")[0];
 
-    // Check if it's a chrome:// URL
     if (domain.startsWith("chrome")) {
-      // Show error feedback
-      const feedback = document.createElement("div");
-      feedback.className = "save-feedback warning";
-      feedback.textContent =
-        "Chrome internal pages cannot be added to whitelist";
-      document.body.appendChild(feedback);
-
-      setTimeout(() => {
-        if (feedback && feedback.parentNode) {
-          feedback.parentNode.removeChild(feedback);
-        }
-      }, 2500);
+      window.feedbackManager.show("Chrome internal pages cannot be added to whitelist", "warning");
 
       siteModal.style.display = "none";
       siteUrlInput.value = "";
@@ -106,7 +83,7 @@ document.addEventListener("DOMContentLoaded", function () {
     chrome.runtime.sendMessage(
       {
         action: "addSiteToWhitelist",
-        url: "https://" + domain // Adding protocol for URL parsing in background.js
+        url: "https://" + domain
       },
       (response) => {
         if (response && response.success) {
@@ -114,32 +91,11 @@ document.addEventListener("DOMContentLoaded", function () {
           siteModal.style.display = "none";
           siteUrlInput.value = "";
 
-          // Show feedback
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = response.message;
-          document.body.appendChild(feedback);
+          window.feedbackManager.show(response.message, "success");
 
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
-
-          // Reload the list
           loadWhitelist();
         } else {
-          // Show error
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback warning";
-          feedback.textContent = response.message || "Error adding site";
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show(response.message || "Error adding site", "warning");
 
           siteModal.style.display = "none";
           siteUrlInput.value = "";
@@ -148,60 +104,56 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   }
 
-  // Initialize tabs functionality
+  /**
+   * Initializes the tabs functionality
+   */
   function initTabs() {
     tabButtons.forEach((button) => {
       button.addEventListener("click", function () {
-        // Remove active class from all tab buttons and content panes
         tabButtons.forEach((btn) => btn.classList.remove("active"));
         tabPanes.forEach((pane) => pane.classList.remove("active"));
 
-        // Add active class to clicked button
         this.classList.add("active");
 
-        // Show corresponding tab content
         const tabId = this.getAttribute("data-tab");
         document.getElementById(`${tabId}-tab`).classList.add("active");
       });
     });
   }
 
-  // Listen for theme toggle changes
-  themeSwitch.addEventListener("change", function () {
+  themeSwitch.addEventListener("change", () => {
     chrome.storage.sync.set({ darkMode: themeSwitch.checked });
-    setTheme(themeSwitch.checked);
+    darkModeManager.setTheme(themeSwitch.checked);
     updateAllSliderBackgrounds();
   });
 
-  // Set theme based on dark mode state (reference to the function in detectDarkMode.js)
-  function setTheme(isDark) {
-    if (isDark) {
-      document.documentElement.setAttribute("data-theme", "dark");
-    } else {
-      document.documentElement.removeAttribute("data-theme");
-    }
-  }
-
-  // Sync theme switch UI with the actual theme
+  /**
+   * Synchronizes the theme switch state with the UI
+   */
   function syncThemeSwitchWithState() {
-    chrome.storage.sync.get("darkMode", function (data) {
-      // Default to system preference if not set
-      if (data.darkMode === undefined) {
-        const prefersDarkMode = window.matchMedia(
-          "(prefers-color-scheme: dark)"
-        ).matches;
-        themeSwitch.checked = prefersDarkMode;
-      } else {
-        themeSwitch.checked = data.darkMode;
-      }
-
-      // Make sure theme is applied
-      setTheme(themeSwitch.checked);
-      updateAllSliderBackgrounds();
-    });
+    darkModeManager.syncUIWithTheme(themeSwitch);
+    updateAllSliderBackgrounds();
   }
 
-  // Update all slider backgrounds at once
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", (e) => {
+      chrome.storage.sync.get("darkMode", (data) => {
+        if (data.darkMode === undefined) {
+          themeSwitch.checked = e.matches;
+          updateAllSliderBackgrounds();
+        }
+      });
+    });
+
+  document.addEventListener("themeChanged", () => {
+    darkModeManager.syncUIWithTheme(themeSwitch);
+    updateAllSliderBackgrounds();
+  });
+
+  /**
+   * Updates all slider backgrounds at once
+   */
   function updateAllSliderBackgrounds() {
     updateSliderBackground(temperatureSlider);
     updateSliderBackground(topPSlider);
@@ -209,14 +161,18 @@ document.addEventListener("DOMContentLoaded", function () {
     updateSliderBackground(timeoutSlider);
   }
 
-  // Apply dynamic gradient to sliders
+  /**
+   * Updates the slider background based on its value
+   */
   function updateSliderBackground(slider) {
     const value =
       ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
     slider.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, var(--slider-track-bg) ${value}%, var(--slider-track-bg) 100%)`;
   }
 
-  // Update sliders on input
+  /**
+   * Updates the slider background and value on input
+   */
   function setupSlider(slider, valueElement) {
     updateSliderBackground(slider);
     slider.addEventListener("input", function () {
@@ -225,17 +181,21 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  // Load whitelist data
+  /**
+   * Loads the whitelist data from storage and renders it
+   */
   function loadWhitelist() {
-    chrome.storage.sync.get("whitelistedSites", function (data) {
+    chrome.storage.sync.get("whitelistedSites", (data) => {
       const whitelistedSites = data.whitelistedSites || [];
       renderWhitelistedSites(whitelistedSites);
 
-      // Update UI based on count
       clearAllBtn.disabled = whitelistedSites.length === 0;
     });
   }
 
+  /**
+   * Renders the whitelist data in the UI
+   */
   function renderWhitelistedSites(sites) {
     whitelistItemsContainer.innerHTML = "";
 
@@ -245,7 +205,6 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
 
-    // Sort sites alphabetically for better usability
     sites.sort().forEach((site) => {
       const itemElement = document.createElement("div");
       itemElement.className = "whitelist-item";
@@ -257,8 +216,8 @@ document.addEventListener("DOMContentLoaded", function () {
       const removeButton = document.createElement("button");
       removeButton.className = "remove-btn";
       removeButton.textContent = "Remove";
-      removeButton.addEventListener("click", function (event) {
-        event.stopPropagation(); // Prevent event bubbling
+      removeButton.addEventListener("click", (event) => {
+        event.stopPropagation();
         removeSiteFromWhitelist(site);
       });
 
@@ -268,6 +227,9 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
+  /**
+   * Removes a site from the whitelist
+   */
   function removeSiteFromWhitelist(site) {
     chrome.runtime.sendMessage(
       {
@@ -276,58 +238,62 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       (response) => {
         if (response && response.success) {
-          // Show feedback
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = `Removed ${site} from whitelist`;
-          document.body.appendChild(feedback);
+          window.feedbackManager.show(`Removed ${site} from whitelist`, "success");
 
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
-
-          // Reload the list
           loadWhitelist();
         }
       }
     );
   }
 
-  // Add current site to whitelist
+  function focusModal(errorMessage = null) {
+    siteModal.style.display = "block";
+    setTimeout(() => siteUrlInput.focus(), 100);
+
+    const errorElement = document.getElementById("modal-error");
+    if (errorMessage && errorElement) {
+      errorElement.textContent = errorMessage;
+      errorElement.style.display = "block";
+      console.warn(errorMessage);
+
+      setTimeout(() => {
+        errorElement.style.display = "none";
+      }, 5000);
+    } else if (errorElement) {
+      errorElement.style.display = "none";
+    }
+  }
+
+  /**
+   * Adds the current site to the whitelist
+   */
   function addCurrentSiteToWhitelist() {
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0] && tabs[0].url) {
-        chrome.runtime.sendMessage(
-          {
-            action: "addSiteToWhitelist",
-            url: tabs[0].url
-          },
-          (response) => {
-            if (response && response.success) {
-              // Show feedback
-              const feedback = document.createElement("div");
-              feedback.className = "save-feedback";
-              feedback.textContent = response.message;
-              document.body.appendChild(feedback);
+        try {
+          const url = new URL(tabs[0].url);
 
-              setTimeout(() => {
-                if (feedback && feedback.parentNode) {
-                  feedback.parentNode.removeChild(feedback);
-                }
-              }, 2500);
-
-              // Reload the list
-              loadWhitelist();
-            }
+          if (url.protocol.startsWith("chrome")) {
+            focusModal("Chrome pages can't be added to the whitelist");
+            window.feedbackManager.show("Chrome pages can't be added. Enter a site manually.", "warning");
+            return;
           }
-        );
+
+          const domain = url.hostname.replace(/^www\./, "");
+          siteUrlInput.value = domain;
+          focusModal();
+        } catch (e) {
+          focusModal(`Invalid URL: ${e.message}`);
+        }
+      } else {
+        focusModal("No active tab or URL detected");
       }
     });
   }
 
-  // Reset settings to defaults
+  /**
+   * Reset settings to defaults
+   */
   function resetSettings() {
     if (
       confirm("Are you sure you want to reset all settings to default values?")
@@ -340,8 +306,7 @@ document.addEventListener("DOMContentLoaded", function () {
         topP: 0.9
       };
 
-      chrome.storage.sync.set(defaultSettings, function () {
-        // Update UI
+      chrome.storage.sync.set(defaultSettings, () => {
         modelNameInput.value = defaultSettings.modelName;
         maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
         maxChunkSizeValue.textContent = defaultSettings.maxChunkSize;
@@ -352,25 +317,16 @@ document.addEventListener("DOMContentLoaded", function () {
         topPSlider.value = defaultSettings.topP;
         topPValue.textContent = defaultSettings.topP;
 
-        // Update slider backgrounds
         updateAllSliderBackgrounds();
 
-        // Show feedback
-        const feedback = document.createElement("div");
-        feedback.className = "save-feedback";
-        feedback.textContent = "Settings Reset to Defaults!";
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          if (feedback && feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
-          }
-        }, 2500);
+        window.feedbackManager.show("Settings Reset to Defaults!", "success");
       });
     }
   }
 
-  // Initialize all functionality
+  /**
+   * Initialize all functionality
+   */
   function init() {
     initTabs();
 
@@ -379,7 +335,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window
       .matchMedia("(prefers-color-scheme: dark)")
       .addEventListener("change", (e) => {
-        chrome.storage.sync.get("darkMode", function (data) {
+        chrome.storage.sync.get("darkMode", (data) => {
           if (data.darkMode === undefined) {
             themeSwitch.checked = e.matches;
             updateAllSliderBackgrounds();
@@ -390,7 +346,7 @@ document.addEventListener("DOMContentLoaded", function () {
     loadWhitelist();
 
     modelSuggestions.forEach((suggestion) => {
-      suggestion.addEventListener("click", function () {
+      suggestion.addEventListener("click", () => {
         modelNameInput.value = this.dataset.model;
         this.style.transform = "scale(0.95)";
         setTimeout(() => {
@@ -404,23 +360,14 @@ document.addEventListener("DOMContentLoaded", function () {
     setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
     setupSlider(timeoutSlider, timeoutValue);
 
-    clearAllBtn.addEventListener("click", function () {
+    clearAllBtn.addEventListener("click", () => {
       if (
         confirm("Are you sure you want to remove all sites from the whitelist?")
       ) {
-        chrome.storage.sync.set({ whitelistedSites: [] }, function () {
+        chrome.storage.sync.set({ whitelistedSites: [] }, () => {
           loadWhitelist();
 
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = "All sites removed from whitelist";
-          document.body.appendChild(feedback);
-
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+          window.feedbackManager.show("All sites removed from whitelist", "success");
         });
       }
     });
@@ -435,7 +382,7 @@ document.addEventListener("DOMContentLoaded", function () {
         temperature: 0.4,
         topP: 0.9
       },
-      function (data) {
+      (data) => {
         modelNameInput.value = data.modelName;
         maxChunkSizeSlider.value = data.maxChunkSize;
         maxChunkSizeValue.textContent = data.maxChunkSize;
@@ -450,7 +397,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     );
 
-    saveButton.addEventListener("click", function () {
+    saveButton.addEventListener("click", () => {
       const maxChunkSize = parseInt(maxChunkSizeSlider.value);
       const timeout = parseInt(timeoutSlider.value);
       const temperature = parseFloat(temperatureSlider.value);
@@ -464,21 +411,13 @@ document.addEventListener("DOMContentLoaded", function () {
           temperature: temperature,
           topP: topP
         },
-        function () {
-          const feedback = document.createElement("div");
-          feedback.className = "save-feedback";
-          feedback.textContent = "Settings Saved Successfully!";
-          document.body.appendChild(feedback);
-          setTimeout(() => {
-            if (feedback && feedback.parentNode) {
-              feedback.parentNode.removeChild(feedback);
-            }
-          }, 2500);
+        () => {
+          window.feedbackManager.show("Settings Saved Successfully!", "success");
         }
       );
     });
 
-    testOllamaButton.addEventListener("click", function () {
+    testOllamaButton.addEventListener("click", () => {
       ollamaStatus.textContent = "Testing Ollama connection...";
       ollamaStatus.className = "status-message pending";
       ollamaStatus.style.display = "block";

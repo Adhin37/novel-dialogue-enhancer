@@ -1,5 +1,5 @@
 // background.js
-let activeRequestControllers = new Map();
+const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 
@@ -328,15 +328,14 @@ function isSiteWhitelisted(url) {
       return Promise.resolve(false);
     }
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       chrome.storage.sync.get("whitelistedSites", (data) => {
         if (chrome.runtime.lastError) {
           console.error(
             "Error retrieving whitelisted sites:",
             chrome.runtime.lastError
           );
-          resolve(false);
-          return;
+          return reject(false);
         }
 
         const whitelistedSites = Array.isArray(data.whitelistedSites)
@@ -376,67 +375,23 @@ async function checkSitePermission(url) {
 }
 
 // Function to request permissions for a domain
-function requestPermission(domain) {
+async function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
 
-  chrome.permissions.request(
-    {
-      origins: [origin]
-    },
-    function (granted) {
-      if (granted) {
-        chrome.runtime.sendMessage(
-          {
-            action: "addSiteToWhitelist",
-            url: "https://" + domain
-          },
-          (response) => {
-            if (response && response.success) {
-              // Show feedback
-              const feedback = document.createElement("div");
-              feedback.className = "save-feedback success";
-              feedback.textContent = response.message;
-              document.body.appendChild(feedback);
-
-              setTimeout(() => {
-                if (feedback && feedback.parentNode) {
-                  feedback.parentNode.removeChild(feedback);
-                }
-              }, 2500);
-
-              // Reload the list
-              loadWhitelist();
-            }
-          }
-        );
-      } else {
-        const feedback = document.createElement("div");
-        feedback.className = "save-feedback warning";
-        feedback.textContent = `Permission denied for ${domain}`;
-        document.body.appendChild(feedback);
-
-        setTimeout(() => {
-          if (feedback && feedback.parentNode) {
-            feedback.parentNode.removeChild(feedback);
-          }
-        }, 2500);
+  return new Promise((resolve) =>
+    chrome.permissions.request(
+      {
+        origins: [origin]
+      },
+      (granted) => {
+        if (granted) {
+          resolve(true);
+        } else {
+          resolve(false);
+        }
       }
-    }
+    )
   );
-}
-
-// Helper function to show feedback messages
-function showFeedback(message, isWarning = false) {
-  const feedback = document.createElement("div");
-  feedback.className = isWarning ? "save-feedback warning" : "save-feedback";
-  feedback.textContent = message;
-  document.body.appendChild(feedback);
-
-  setTimeout(() => {
-    if (feedback && feedback.parentNode) {
-      feedback.parentNode.removeChild(feedback);
-    }
-  }, 2500);
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -568,18 +523,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const url = request.url;
     try {
       const hostname = new URL(url).hostname;
-      chrome.storage.sync.get("whitelistedSites", (data) => {
-        let whitelistedSites = data.whitelistedSites || [];
+      chrome.storage.sync.get("whitelistedSites", async (data) => {
+        const whitelistedSites = data.whitelistedSites || [];
 
-        // Check if site is already whitelisted
         if (!whitelistedSites.includes(hostname)) {
-          whitelistedSites.push(hostname);
-          chrome.storage.sync.set({ whitelistedSites }, () => {
-            sendResponse({
-              success: true,
-              message: `${hostname} added to whitelist`
+          if (await requestPermission(hostname)) {
+            whitelistedSites.push(hostname);
+            chrome.storage.sync.set({ whitelistedSites }, () => {
+              sendResponse({
+                success: true,
+                message: `${hostname} added to whitelist`
+              });
             });
-          });
+          } else {
+            sendResponse({
+              success: false,
+              message: `Permission denied for ${hostname}`
+            });
+          }
         } else {
           sendResponse({
             success: false,
@@ -623,5 +584,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
-  return false; // Default case
+  return false;
 });
