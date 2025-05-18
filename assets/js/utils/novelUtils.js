@@ -2,10 +2,6 @@
 /**
  * Utility functions for novel processing
  */
-// novelUtils.js
-/**
- * Utility functions for novel processing
- */
 class NovelUtils {
   constructor(url, title) {
     this.url = url;
@@ -16,7 +12,7 @@ class NovelUtils {
     this.characterMap = {};
     console.log("Novel Dialogue Enhancer: Novel Utils initialized");
   }
-
+    
   /**
    * Update the novel identifier based on URL and title
    * @param {string} url - URL of the novel

@@ -202,10 +202,74 @@ class Toaster {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
-
+  
     if (this.progressBar) {
       this.progressBar.style.width = "100%";
       this.progressBar.style.backgroundColor = "#f44336";
+    }
+  
+    if (this.progressIcon) {
+      this.progressIcon.innerHTML = "";
+  
+      const svgNS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("width", "20");
+      svg.setAttribute("height", "20");
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "#f44336");
+      svg.setAttribute("stroke-width", "3");
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+  
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", "12");
+      circle.setAttribute("cy", "12");
+      circle.setAttribute("r", "10");
+      circle.setAttribute("stroke", "#f44336");
+  
+      const line1 = document.createElementNS(svgNS, "line");
+      line1.setAttribute("x1", "15");
+      line1.setAttribute("y1", "9");
+      line1.setAttribute("x2", "9");
+      line1.setAttribute("y2", "15");
+      line1.setAttribute("stroke", "#f44336");
+  
+      const line2 = document.createElementNS(svgNS, "line");
+      line2.setAttribute("x1", "9");
+      line2.setAttribute("y1", "9");
+      line2.setAttribute("x2", "15");
+      line2.setAttribute("y2", "15");
+      line2.setAttribute("stroke", "#f44336");
+  
+      svg.appendChild(circle);
+      svg.appendChild(line1);
+      svg.appendChild(line2);
+  
+      this.progressIcon.appendChild(svg);
+      this.progressIcon.style.animation = "none";
+    }
+  
+    if (this.progressText) {
+      this.progressText.textContent = message || "Operation failed";
+    }
+  
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+    }
+    this.timeoutId = setTimeout(() => {
+      this.removeToaster();
+    }, 5000);
+  }
+  
+  showSuccess(message) {
+    if (!this.toaster || !this.isActive) {
+      this.createToaster();
+    }
+
+    if (this.progressBar) {
+      this.progressBar.style.width = "100%";
+      this.progressBar.style.backgroundColor = "#4caf50";
     }
 
     if (this.progressIcon) {
@@ -217,8 +281,8 @@ class Toaster {
       svg.setAttribute("height", "20");
       svg.setAttribute("viewBox", "0 0 24 24");
       svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "currentColor");
-      svg.setAttribute("stroke-width", "2");
+      svg.setAttribute("stroke", "#4caf50");
+      svg.setAttribute("stroke-width", "3");
       svg.setAttribute("stroke-linecap", "round");
       svg.setAttribute("stroke-linejoin", "round");
 
@@ -226,29 +290,21 @@ class Toaster {
       circle.setAttribute("cx", "12");
       circle.setAttribute("cy", "12");
       circle.setAttribute("r", "10");
+      circle.setAttribute("stroke", "#4caf50");
 
-      const line1 = document.createElementNS(svgNS, "line");
-      line1.setAttribute("x1", "15");
-      line1.setAttribute("y1", "9");
-      line1.setAttribute("x2", "9");
-      line1.setAttribute("y2", "15");
-
-      const line2 = document.createElementNS(svgNS, "line");
-      line2.setAttribute("x1", "9");
-      line2.setAttribute("y1", "9");
-      line2.setAttribute("x2", "15");
-      line2.setAttribute("y2", "15");
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", "M8 12l3 3 6-6");
+      path.setAttribute("stroke", "#4caf50");
 
       svg.appendChild(circle);
-      svg.appendChild(line1);
-      svg.appendChild(line2);
+      svg.appendChild(path);
 
       this.progressIcon.appendChild(svg);
       this.progressIcon.style.animation = "none";
     }
 
     if (this.progressText) {
-      this.progressText.textContent = message || "Enhancement failed";
+      this.progressText.textContent = message || "Operation successful!";
     }
 
     if (this.timeoutId) {
@@ -256,7 +312,7 @@ class Toaster {
     }
     this.timeoutId = setTimeout(() => {
       this.removeToaster();
-    }, 5000);
+    }, 3000);
   }
 
   showMessage(message, duration = 3000) {

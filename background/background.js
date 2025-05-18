@@ -551,7 +551,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } catch (e) {
       sendResponse({ success: false, message: `Invalid URL: ${e.message}` });
     }
-    return true; // Will send response asynchronously
+    return true;
   } else if (request.action === "removeSiteFromWhitelist") {
     const hostname = request.hostname;
     chrome.storage.sync.get("whitelistedSites", (data) => {
@@ -561,10 +561,53 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ success: true });
       });
     });
-    return true; // Will send response asynchronously
+    return true;
   } else if (request.action === "ollamaRequest") {
     handleOllamaRequest(request, sendResponse);
-    return true; // We'll send a response asynchronously
+    return true;
+  } else if (request.action === "checkActiveTabPermission") {
+    if (!request.url) {
+      sendResponse({ hasPermission: false, error: "No URL provided" });
+      return false;
+    }
+
+    try {
+      const url = request.url;
+      isSiteWhitelisted(url)
+        .then((isWhitelisted) => {
+          if (isWhitelisted) {
+            sendResponse({ hasPermission: true, whitelisted: true });
+            return;
+          }
+
+          const origin = new URL(url).origin + "/*";
+          return chrome.permissions
+            .contains({
+              origins: [origin]
+            })
+            .then((hasPermission) => {
+              sendResponse({
+                hasPermission: hasPermission,
+                whitelisted: false
+              });
+            });
+        })
+        .catch((error) => {
+          console.error("Error checking active tab permission:", error);
+          sendResponse({
+            hasPermission: false,
+            error: error.message || "Unknown error occurred"
+          });
+        });
+    } catch (error) {
+      console.error("Exception in checkActiveTabPermission:", error);
+      sendResponse({
+        hasPermission: false,
+        error: error.message || "Invalid URL format"
+      });
+    }
+
+    return true;
   } else if (request.action === "terminateAllRequests") {
     console.log(`Terminating ${activeRequestControllers.size} active requests`);
 

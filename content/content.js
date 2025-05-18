@@ -76,7 +76,7 @@ async function checkOllamaStatus() {
     return true;
   } else {
     const reason = status
-      ? DOMPurify.sanitize(status.reason || "Unknown error")
+      ? window.DOMPurify.sanitize(status.reason || "Unknown error")
       : "Unknown error";
     console.warn(`Ollama is not available: ${reason}`);
     toaster.showError(`Ollama is not available: ${reason}`);
@@ -189,7 +189,7 @@ async function enhancePage() {
     const ollamaStatus =
       await enhancerIntegration.ollamaClient.checkOllamaAvailability();
     if (!ollamaStatus.available) {
-      const safeReason = DOMPurify.sanitize(
+      const safeReason = window.DOMPurify.sanitize(
         ollamaStatus.reason || "Unknown error"
       );
       toaster.showError(`Ollama not available: ${safeReason}`);
@@ -203,7 +203,7 @@ async function enhancePage() {
   } catch (error) {
     console.error("Novel Dialogue Enhancer: Enhancement error", error);
     toaster.showError(
-      `Enhancement failed: ${DOMPurify.sanitize(error.message)}`
+      `Enhancement failed: ${window.DOMPurify.sanitize(error.message)}`
     );
   } finally {
     if (typeof observer !== "undefined" && observer) {
@@ -245,7 +245,9 @@ async function enhancePageWithLLM() {
       await processMultipleParagraphs(paragraphs);
     }
 
-    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(paragraphs.length || 1);
+    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(
+      paragraphs.length || 1
+    );
     console.log("Novel Dialogue Enhancer: LLM enhancement complete");
   } catch (error) {
     console.error(
@@ -253,7 +255,7 @@ async function enhancePageWithLLM() {
       error
     );
     toaster.showError(
-      "LLM enhancement failed: " + DOMPurify.sanitize(error.message)
+      "LLM enhancement failed: " + window.DOMPurify.sanitize(error.message)
     );
     throw error;
   } finally {
@@ -281,7 +283,7 @@ async function processSingleContentBlock() {
     return;
   }
 
-  contentElement.innerHTML = DOMPurify.sanitize(llmEnhancedText);
+  contentElement.innerHTML = window.DOMPurify.sanitize(llmEnhancedText);
   toaster.updateProgress(1, 1, true);
 }
 
@@ -351,7 +353,7 @@ async function processParagraphBatch(
     const enhancedParagraphs = llmEnhancedText.split("\n\n");
 
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
-      batch[j].innerHTML = DOMPurify.sanitize(enhancedParagraphs[j]);
+      batch[j].innerHTML = window.DOMPurify.sanitize(enhancedParagraphs[j]);
     }
 
     toaster.updateProgress(
@@ -414,8 +416,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "ping") {
-    sendResponse({ status: "ok" });
-    return false;
+    sendResponse({ status: "active" });
+    return true;
   } else if (request.action === "enhanceNow") {
     // Validate settings object before applying
     if (request.settings && typeof request.settings === "object") {
