@@ -44,54 +44,8 @@ class Toaster {
     this.progressIcon = document.createElement("div");
     this.progressIcon.id = this.iconId;
 
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("class", "gear");
-    svg.setAttribute("width", "100");
-    svg.setAttribute("height", "100");
-    svg.setAttribute("viewBox", "0 0 100 100");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("fill", "none");
-
-    const circle = document.createElementNS(svgNS, "circle");
-    circle.setAttribute("cx", "50");
-    circle.setAttribute("cy", "50");
-    circle.setAttribute("r", "10");
-    circle.setAttribute("stroke-width", "4");
-
-    const g = document.createElementNS(svgNS, "g");
-    g.setAttribute("stroke-width", "4");
-
-    // Create lines
-    const linePositions = [
-      ["50", "5", "50", "15"],
-      ["50", "85", "50", "95"],
-      ["5", "50", "15", "50"],
-      ["85", "50", "95", "50"],
-      ["20", "20", "28", "28"],
-      ["80", "20", "72", "28"],
-      ["20", "80", "28", "72"],
-      ["80", "80", "72", "72"]
-    ];
-
-    linePositions.forEach((pos) => {
-      const line = document.createElementNS(svgNS, "line");
-      line.setAttribute("x1", pos[0]);
-      line.setAttribute("y1", pos[1]);
-      line.setAttribute("x2", pos[2]);
-      line.setAttribute("y2", pos[3]);
-      g.appendChild(line);
-    });
-
-    svg.appendChild(circle);
-    svg.appendChild(g);
-    this.progressIcon.appendChild(svg);
-
-    this.progressIcon.style.cssText = `
-      animation: spin 2s linear infinite;
-      transform-origin: 50% 50%;
-      transform-box: fill-box;
-    `;
+    // Create spinning gear icon for initial loading state
+    this.setIcon("loading");
 
     this.progressText = document.createElement("div");
     this.progressText.id = this.textId;
@@ -149,27 +103,205 @@ class Toaster {
     this.isActive = true;
   }
 
+  setIcon(severity) {
+    if (!this.progressIcon) return;
+
+    this.progressIcon.innerHTML = "";
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+
+    // Default styles that will be overridden as needed
+    svg.setAttribute("width", "20");
+    svg.setAttribute("height", "20");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+
+    // Reset animation
+    this.progressIcon.style.animation = "none";
+
+    switch (severity) {
+      case "success": {
+        svg.setAttribute("stroke", "#4caf50");
+        svg.setAttribute("stroke-width", "3");
+
+        const successCircle = document.createElementNS(svgNS, "circle");
+        successCircle.setAttribute("cx", "12");
+        successCircle.setAttribute("cy", "12");
+        successCircle.setAttribute("r", "10");
+        successCircle.setAttribute("stroke", "#4caf50");
+
+        const checkmark = document.createElementNS(svgNS, "path");
+        checkmark.setAttribute("d", "M8 12l3 3 6-6");
+        checkmark.setAttribute("stroke", "#4caf50");
+
+        svg.appendChild(successCircle);
+        svg.appendChild(checkmark);
+        break;
+      }
+
+      case "error": {
+        svg.setAttribute("stroke", "#f44336");
+        svg.setAttribute("stroke-width", "3");
+
+        const errorCircle = document.createElementNS(svgNS, "circle");
+        errorCircle.setAttribute("cx", "12");
+        errorCircle.setAttribute("cy", "12");
+        errorCircle.setAttribute("r", "10");
+        errorCircle.setAttribute("stroke", "#f44336");
+
+        const line1 = document.createElementNS(svgNS, "line");
+        line1.setAttribute("x1", "15");
+        line1.setAttribute("y1", "9");
+        line1.setAttribute("x2", "9");
+        line1.setAttribute("y2", "15");
+        line1.setAttribute("stroke", "#f44336");
+
+        const line2 = document.createElementNS(svgNS, "line");
+        line2.setAttribute("x1", "9");
+        line2.setAttribute("y1", "9");
+        line2.setAttribute("x2", "15");
+        line2.setAttribute("y2", "15");
+        line2.setAttribute("stroke", "#f44336");
+
+        svg.appendChild(errorCircle);
+        svg.appendChild(line1);
+        svg.appendChild(line2);
+        break;
+      }
+
+      case "info": {
+        const infoCircle = document.createElementNS(svgNS, "circle");
+        infoCircle.setAttribute("cx", "12");
+        infoCircle.setAttribute("cy", "12");
+        infoCircle.setAttribute("r", "10");
+
+        const infoLine1 = document.createElementNS(svgNS, "line");
+        infoLine1.setAttribute("x1", "12");
+        infoLine1.setAttribute("y1", "16");
+        infoLine1.setAttribute("x2", "12");
+        infoLine1.setAttribute("y2", "12");
+
+        const infoLine2 = document.createElementNS(svgNS, "line");
+        infoLine2.setAttribute("x1", "12");
+        infoLine2.setAttribute("y1", "8");
+        infoLine2.setAttribute("x2", "12.01");
+        infoLine2.setAttribute("y2", "8");
+
+        svg.appendChild(infoCircle);
+        svg.appendChild(infoLine1);
+        svg.appendChild(infoLine2);
+        break;
+      }
+
+      case "warn": {
+        svg.setAttribute("stroke", "#ff9800");
+
+        const triangle = document.createElementNS(svgNS, "path");
+        triangle.setAttribute(
+          "d",
+          "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+        );
+        triangle.setAttribute("stroke", "#ff9800");
+
+        const exclamation = document.createElementNS(svgNS, "line");
+        exclamation.setAttribute("x1", "12");
+        exclamation.setAttribute("y1", "9");
+        exclamation.setAttribute("x2", "12");
+        exclamation.setAttribute("y2", "13");
+        exclamation.setAttribute("stroke", "#ff9800");
+
+        const dot = document.createElementNS(svgNS, "line");
+        dot.setAttribute("x1", "12");
+        dot.setAttribute("y1", "17");
+        dot.setAttribute("x2", "12.01");
+        dot.setAttribute("y2", "17");
+        dot.setAttribute("stroke", "#ff9800");
+
+        svg.appendChild(triangle);
+        svg.appendChild(exclamation);
+        svg.appendChild(dot);
+        break;
+      }
+
+      case "loading":
+      default: // Set up the spinning gear for loading
+      {
+        svg.setAttribute("class", "gear");
+        svg.setAttribute("width", "100");
+        svg.setAttribute("height", "100");
+        svg.setAttribute("viewBox", "0 0 100 100");
+
+        const circle = document.createElementNS(svgNS, "circle");
+        circle.setAttribute("cx", "50");
+        circle.setAttribute("cy", "50");
+        circle.setAttribute("r", "10");
+        circle.setAttribute("stroke-width", "4");
+
+        const g = document.createElementNS(svgNS, "g");
+        g.setAttribute("stroke-width", "4");
+
+        // Create lines
+        const linePositions = [
+          ["50", "5", "50", "15"],
+          ["50", "85", "50", "95"],
+          ["5", "50", "15", "50"],
+          ["85", "50", "95", "50"],
+          ["20", "20", "28", "28"],
+          ["80", "20", "72", "28"],
+          ["20", "80", "28", "72"],
+          ["80", "80", "72", "72"]
+        ];
+
+        linePositions.forEach((pos) => {
+          const line = document.createElementNS(svgNS, "line");
+          line.setAttribute("x1", pos[0]);
+          line.setAttribute("y1", pos[1]);
+          line.setAttribute("x2", pos[2]);
+          line.setAttribute("y2", pos[3]);
+          g.appendChild(line);
+        });
+
+        svg.appendChild(circle);
+        svg.appendChild(g);
+
+        // Add animation for loading state
+        this.progressIcon.style.cssText = `
+          animation: spin 2s linear infinite;
+          transform-origin: 50% 50%;
+          transform-box: fill-box;
+        `;
+        break;
+      }
+    }
+
+    this.progressIcon.appendChild(svg);
+  }
+
   updateProgress(current, total) {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
-  
+
     // Validate inputs
     current = parseInt(current);
     total = parseInt(total);
-    
+
     if (isNaN(current) || isNaN(total) || current < 0 || total <= 0) {
-      console.warn("Invalid progress values:", {current, total});
+      console.warn("Invalid progress values:", { current, total });
       current = 0;
       total = 1;
     }
-  
+
     const percent = Math.min(100, Math.round((current / total) * 100));
-  
+
     if (this.progressBar) {
       this.progressBar.style.width = `${percent}%`;
     }
-  
+
     if (this.progressText) {
       if (current >= total) {
         this.progressText.textContent = `AI Enhancement complete!`;
@@ -177,7 +309,7 @@ class Toaster {
         this.progressText.textContent = `Enhancing with AI: ${current}/${total} paragraphs (${percent}%)`;
       }
     }
-  
+
     if (current >= total) {
       this.finishProgress();
     }
@@ -189,6 +321,8 @@ class Toaster {
       this.progressBar.style.backgroundColor = "#4caf50";
     }
 
+    this.setIcon("success");
+
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
     }
@@ -198,185 +332,69 @@ class Toaster {
     }, 3000);
   }
 
-  showError(message) {
+  showMessage(message, severity = "info", duration = 3000) {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
-  
+
+    // Set up the progress bar based on severity
     if (this.progressBar) {
-      this.progressBar.style.width = "100%";
-      this.progressBar.style.backgroundColor = "#f44336";
-    }
-  
-    if (this.progressIcon) {
-      this.progressIcon.innerHTML = "";
-  
-      const svgNS = "http://www.w3.org/2000/svg";
-      const svg = document.createElementNS(svgNS, "svg");
-      svg.setAttribute("width", "20");
-      svg.setAttribute("height", "20");
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "#f44336");
-      svg.setAttribute("stroke-width", "3");
-      svg.setAttribute("stroke-linecap", "round");
-      svg.setAttribute("stroke-linejoin", "round");
-  
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", "12");
-      circle.setAttribute("cy", "12");
-      circle.setAttribute("r", "10");
-      circle.setAttribute("stroke", "#f44336");
-  
-      const line1 = document.createElementNS(svgNS, "line");
-      line1.setAttribute("x1", "15");
-      line1.setAttribute("y1", "9");
-      line1.setAttribute("x2", "9");
-      line1.setAttribute("y2", "15");
-      line1.setAttribute("stroke", "#f44336");
-  
-      const line2 = document.createElementNS(svgNS, "line");
-      line2.setAttribute("x1", "9");
-      line2.setAttribute("y1", "9");
-      line2.setAttribute("x2", "15");
-      line2.setAttribute("y2", "15");
-      line2.setAttribute("stroke", "#f44336");
-  
-      svg.appendChild(circle);
-      svg.appendChild(line1);
-      svg.appendChild(line2);
-  
-      this.progressIcon.appendChild(svg);
-      this.progressIcon.style.animation = "none";
-    }
-  
-    if (this.progressText) {
-      this.progressText.textContent = message || "Operation failed";
-    }
-  
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-    }
-    this.timeoutId = setTimeout(() => {
-      this.removeToaster();
-    }, 5000);
-  }
-  
-  showSuccess(message) {
-    if (!this.toaster || !this.isActive) {
-      this.createToaster();
+      switch (severity) {
+        case "success":
+          this.progressBar.style.width = "100%";
+          this.progressBar.style.backgroundColor = "#4caf50";
+          break;
+        case "error":
+          this.progressBar.style.width = "100%";
+          this.progressBar.style.backgroundColor = "#f44336";
+          break;
+        case "warn":
+          this.progressBar.style.width = "100%";
+          this.progressBar.style.backgroundColor = "#ff9800";
+          break;
+        case "info":
+        default:
+          this.progressBar.style.display = "none";
+          break;
+      }
     }
 
-    if (this.progressBar) {
-      this.progressBar.style.width = "100%";
-      this.progressBar.style.backgroundColor = "#4caf50";
-    }
+    // Set the appropriate icon
+    this.setIcon(severity);
 
-    if (this.progressIcon) {
-      this.progressIcon.innerHTML = "";
-
-      const svgNS = "http://www.w3.org/2000/svg";
-      const svg = document.createElementNS(svgNS, "svg");
-      svg.setAttribute("width", "20");
-      svg.setAttribute("height", "20");
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "#4caf50");
-      svg.setAttribute("stroke-width", "3");
-      svg.setAttribute("stroke-linecap", "round");
-      svg.setAttribute("stroke-linejoin", "round");
-
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", "12");
-      circle.setAttribute("cy", "12");
-      circle.setAttribute("r", "10");
-      circle.setAttribute("stroke", "#4caf50");
-
-      const path = document.createElementNS(svgNS, "path");
-      path.setAttribute("d", "M8 12l3 3 6-6");
-      path.setAttribute("stroke", "#4caf50");
-
-      svg.appendChild(circle);
-      svg.appendChild(path);
-
-      this.progressIcon.appendChild(svg);
-      this.progressIcon.style.animation = "none";
-    }
-
-    if (this.progressText) {
-      this.progressText.textContent = message || "Operation successful!";
-    }
-
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-    }
-    this.timeoutId = setTimeout(() => {
-      this.removeToaster();
-    }, 3000);
-  }
-
-  showMessage(message, duration = 3000) {
-    if (!this.toaster || !this.isActive) {
-      this.createToaster();
-    }
-  
-    if (this.progressIcon) {
-      this.progressIcon.innerHTML = '';
-      
-      const svgNS = "http://www.w3.org/2000/svg";
-      const svg = document.createElementNS(svgNS, "svg");
-      svg.setAttribute("width", "20");
-      svg.setAttribute("height", "20");
-      svg.setAttribute("viewBox", "0 0 24 24");
-      svg.setAttribute("fill", "none");
-      svg.setAttribute("stroke", "currentColor");
-      svg.setAttribute("stroke-width", "2");
-      svg.setAttribute("stroke-linecap", "round");
-      svg.setAttribute("stroke-linejoin", "round");
-      
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", "12");
-      circle.setAttribute("cy", "12");
-      circle.setAttribute("r", "10");
-      
-      const line1 = document.createElementNS(svgNS, "line");
-      line1.setAttribute("x1", "12");
-      line1.setAttribute("y1", "16");
-      line1.setAttribute("x2", "12");
-      line1.setAttribute("y2", "12");
-      
-      const line2 = document.createElementNS(svgNS, "line");
-      line2.setAttribute("x1", "12");
-      line2.setAttribute("y1", "8");
-      line2.setAttribute("x2", "12.01");
-      line2.setAttribute("y2", "8");
-      
-      svg.appendChild(circle);
-      svg.appendChild(line1);
-      svg.appendChild(line2);
-      
-      this.progressIcon.appendChild(svg);
-      this.progressIcon.style.animation = "none";
-    }
-  
+    // Set the message text
     if (this.progressText) {
       this.progressText.textContent = message ? String(message) : "";
     }
-  
-    if (this.progressBar) {
-      this.progressBar.style.display = "none";
-    }
-  
-    // Validate duration
-    duration = typeof duration === 'number' && duration > 0 ? duration : 3000;
+
+    // Validate and set duration
+    duration = typeof duration === "number" && duration > 0 ? duration : 3000;
     duration = Math.min(duration, 10000);
-    
+
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
     }
+
     this.timeoutId = setTimeout(() => {
       this.removeToaster();
     }, duration);
+  }
+
+  // Convenience methods that use the core showMessage function
+  showSuccess(message) {
+    this.showMessage(message || "Operation successful!", "success", 3000);
+  }
+
+  showError(message) {
+    this.showMessage(message || "Operation failed", "error", 5000);
+  }
+
+  showWarning(message) {
+    this.showMessage(message || "Warning", "warn", 4000);
+  }
+
+  showInfo(message) {
+    this.showMessage(message || "Information", "info", 3000);
   }
 
   removeToaster() {

@@ -10,6 +10,7 @@ let pendingEnhancement = false;
 let terminateRequested = false;
 let enhancerIntegration;
 let toaster;
+let isCurrentSiteWhitelisted = false;
 const maxRetries = 3;
 
 /**
@@ -20,27 +21,42 @@ function init() {
   toaster = new Toaster();
   toaster.createToaster();
 
-  chrome.storage.sync.get(
-    ["isExtensionPaused", "preserveNames", "fixPronouns"],
-    (data) => {
-      settings = {
-        isExtensionPaused:
-          data.isExtensionPaused !== undefined
-            ? Boolean(data.isExtensionPaused)
-            : true,
-        preserveNames:
-          data.preserveNames !== undefined ? Boolean(data.preserveNames) : true,
-        fixPronouns:
-          data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
-      };
+  // First check if current site is whitelisted
+  chrome.runtime.sendMessage(
+    { action: "checkSitePermission", url: window.location.href },
+    (response) => {
+      isCurrentSiteWhitelisted = response && response.hasPermission;
+      
+      if (!isCurrentSiteWhitelisted) {
+        console.log("Site not whitelisted, extension inactive");
+        return;
+      }
+      
+      // Only load settings if the site is whitelisted
+      chrome.storage.sync.get(
+        ["isExtensionPaused", "preserveNames", "fixPronouns"],
+        (data) => {
+          settings = {
+            isExtensionPaused:
+              data.isExtensionPaused !== undefined
+                ? Boolean(data.isExtensionPaused)
+                : true,
+            preserveNames:
+              data.preserveNames !== undefined ? Boolean(data.preserveNames) : true,
+            fixPronouns:
+              data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
+          };
 
-      setTimeout(async () => {
-        const isAvailable = await checkOllamaStatus();
-
-        if (!settings.isExtensionPaused && isAvailable) {
-          enhancePage();
+          setTimeout(async () => {
+            if (!settings.isExtensionPaused) {
+              const isAvailable = await checkOllamaStatus();
+              if (isAvailable) {
+                enhancePage();
+              }
+            }
+          }, 1000);
         }
-      }, 1000);
+      );
     }
   );
 }
@@ -416,9 +432,23 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "ping") {
-    sendResponse({ status: "active" });
+    sendResponse({ status: "active", whitelisted: isCurrentSiteWhitelisted });
     return true;
+  } else if (request.action === "checkCurrentSiteWhitelist") {
+    isCurrentSiteWhitelisted = request.isWhitelisted;
+    console.log(`Site whitelist status updated: ${isCurrentSiteWhitelisted}`);
+    sendResponse({ status: "updated" });
+    return false;
   } else if (request.action === "enhanceNow") {
+    // First check if site is whitelisted
+    if (!isCurrentSiteWhitelisted) {
+      sendResponse({
+        status: "failed",
+        error: "This site is not whitelisted. Please whitelist it first."
+      });
+      return false;
+    }
+    
     // Validate settings object before applying
     if (request.settings && typeof request.settings === "object") {
       // Use safe defaults if properties are missing
@@ -466,7 +496,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   } else if (request.action === "updatePageStatus") {
     console.log(`Page status updated: disabled=${Boolean(request.disabled)}`);
-
+    
+    // Update whitelist status
+    isCurrentSiteWhitelisted = !request.disabled;
+    
     if (request.disabled) {
       handleTerminationRequest();
     }
@@ -479,7 +512,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 const observer = new MutationObserver((mutations) => {
-  if (!settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
+  // Only process if site is whitelisted, extension not paused, and not already enhancing
+  if (isCurrentSiteWhitelisted && !settings.isExtensionPaused && !isEnhancing && !terminateRequested) {
     let newContentAdded = false;
 
     mutations.forEach((mutation) => {
@@ -508,8 +542,11 @@ const observer = new MutationObserver((mutations) => {
 init();
 
 setTimeout(() => {
-  const contentElement = findContentElement();
-  if (contentElement) {
-    observer.observe(contentElement, { childList: true, subtree: true });
+  // Only set up observer if the site is whitelisted
+  if (isCurrentSiteWhitelisted) {
+    const contentElement = findContentElement();
+    if (contentElement) {
+      observer.observe(contentElement, { childList: true, subtree: true });
+    }
   }
 }, 1000);

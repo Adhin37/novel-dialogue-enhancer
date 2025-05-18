@@ -1,7 +1,7 @@
 // ollamaClient.js
 /**
  * Enhanced Ollama client module for Novel Dialogue Enhancer
- * Optimized for better integration with dialogueUtils and genderUtils
+ * Optimized for better integration with genderUtils and novelUtils
  */
 class OllamaClient {
   constructor() {

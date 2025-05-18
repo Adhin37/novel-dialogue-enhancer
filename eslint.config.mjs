@@ -13,7 +13,6 @@ export default defineConfig([
         chrome: "readonly",
         darkModeManager: "readonly",
         module: "readonly",
-        DialogueUtils: "readonly",
         GenderUtils: "readonly",
         NovelUtils: "readonly",
         StatsUtils: "readonly",

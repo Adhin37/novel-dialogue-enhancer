@@ -357,21 +357,35 @@ function isSiteWhitelisted(url) {
   }
 }
 
-// Check and handle site permissions
+// Check and handle site permissions - optimized with caching
 async function checkSitePermission(url) {
-  // First, check if the site is whitelisted
-  const isWhitelisted = await isSiteWhitelisted(url);
-  if (isWhitelisted) {
-    return true; // Site is already whitelisted
+  if (!url || typeof url !== "string") {
+    return false;
   }
-
-  // Check if we have permissions for this host
-  const origin = new URL(url).origin + "/*";
-  const hasPermission = await chrome.permissions.contains({
-    origins: [origin]
-  });
-
-  return hasPermission;
+  
+  try {
+    // Use cache if available
+    const hostname = new URL(url).hostname;
+    const cachedResult = whitelistCache.get(hostname);
+    
+    if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_EXPIRY)) {
+      return cachedResult.isWhitelisted;
+    }
+    
+    // First, check if the site is whitelisted
+    const isWhitelisted = await isSiteWhitelisted(url);
+    
+    // Cache the result
+    whitelistCache.set(hostname, {
+      isWhitelisted,
+      timestamp: Date.now()
+    });
+    
+    return isWhitelisted;
+  } catch (error) {
+    console.error("Error in checkSitePermission:", error);
+    return false;
+  }
 }
 
 // Function to request permissions for a domain
@@ -412,18 +426,49 @@ chrome.runtime.onInstalled.addListener(() => {
   );
 });
 
+// Cache for whitelist checks to avoid repeated calls
+const whitelistCache = new Map();
+const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    chrome.tabs
-      .sendMessage(tabId, {
-        action: "checkCurrentSiteWhitelist",
-        isWhitelisted: isSiteWhitelisted(tab.url)
+    // If we have a recent cache entry, use it instead of checking again
+    const cacheKey = new URL(tab.url).hostname;
+    const cachedResult = whitelistCache.get(cacheKey);
+    
+    if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_EXPIRY)) {
+      sendWhitelistStatus(tabId, cachedResult.isWhitelisted);
+      return;
+    }
+    
+    // Otherwise check and update cache
+    isSiteWhitelisted(tab.url)
+      .then(isWhitelisted => {
+        // Cache the result
+        whitelistCache.set(cacheKey, {
+          isWhitelisted,
+          timestamp: Date.now()
+        });
+        
+        sendWhitelistStatus(tabId, isWhitelisted);
       })
-      .catch(() => {
-        // Suppress errors when content script isn't ready or available
+      .catch(error => {
+        console.error("Error checking whitelist status:", error);
       });
   }
 });
+
+// Helper function to send whitelist status to tab
+function sendWhitelistStatus(tabId, isWhitelisted) {
+  chrome.tabs
+    .sendMessage(tabId, {
+      action: "checkCurrentSiteWhitelist",
+      isWhitelisted: isWhitelisted
+    })
+    .catch(() => {
+      // Suppress errors when content script isn't ready or available
+    });
+}
 
 // Load character maps on startup
 chrome.runtime.onInstalled.addListener(() => {
@@ -530,6 +575,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (await requestPermission(hostname)) {
             whitelistedSites.push(hostname);
             chrome.storage.sync.set({ whitelistedSites }, () => {
+              // Update cache
+              whitelistCache.set(hostname, {
+                isWhitelisted: true,
+                timestamp: Date.now()
+              });
+              
               sendResponse({
                 success: true,
                 message: `${hostname} added to whitelist`
@@ -558,6 +609,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       let whitelistedSites = data.whitelistedSites || [];
       whitelistedSites = whitelistedSites.filter((site) => site !== hostname);
       chrome.storage.sync.set({ whitelistedSites }, () => {
+        // Update cache
+        whitelistCache.set(hostname, {
+          isWhitelisted: false,
+          timestamp: Date.now()
+        });
+        
         sendResponse({ success: true });
       });
     });

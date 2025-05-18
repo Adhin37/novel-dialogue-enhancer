@@ -2,11 +2,10 @@
 
 /**
  * Enhanced integration module for Novel Dialogue Enhancer
- * Integrates dialogueUtils, genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
+ * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
  */
 class EnhancerIntegration {
   constructor() {
-    this.dialogueUtils = new DialogueUtils();
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
     this.novelUtils = new NovelUtils(window.location.href, document.title);
@@ -33,7 +32,7 @@ class EnhancerIntegration {
 
       // Get dialogue patterns for statistics
       const dialoguePatterns =
-        this.dialogueUtils.extractDialoguePatterns(sanitizedText);
+        this.novelUtils.extractDialoguePatterns(sanitizedText);
       const dialogueCount = this.countDialogues(dialoguePatterns);
       this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
 

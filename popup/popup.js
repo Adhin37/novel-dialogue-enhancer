@@ -322,8 +322,6 @@ document.addEventListener("DOMContentLoaded", () => {
         currentTabHostname = url.hostname;
         currentSite.textContent = currentTabHostname;
 
-        updateStatus();
-
         // Check if the site is a chrome:// URL
         const isChromePage = currentTabUrl.startsWith("chrome");
         if (isChromePage) {
@@ -333,27 +331,52 @@ document.addEventListener("DOMContentLoaded", () => {
           enhanceNowBtn.disabled = true;
           enhanceNowBtn.classList.add("disabled");
           statusMessage.textContent = "Enhancement not available on this page";
-        } else {
-          // Check if the site is whitelisted using our loaded data
-          const isWhitelisted = isSiteWhitelisted(
-            currentTabHostname,
-            whitelistedSites
-          );
+          return;
+        }
+        
+        // First ping the content script to check if it's active and get whitelist status
+        chrome.tabs.sendMessage(tabs[0].id, { action: "ping" }, (response) => {
+          // If we can't reach the content script, use background page check
+          if (chrome.runtime.lastError) {
+            checkWhitelistWithBackground();
+            return;
+          }
+          
+          // If content script responded, use its whitelist status
+          const isWhitelisted = response && response.whitelisted;
           updateWhitelistButton(isWhitelisted);
           updateEnhanceButton(isWhitelisted);
-
-          // Check site permission status
-          chrome.runtime.sendMessage(
-            { action: "checkSitePermission", url: currentTabUrl },
-            (response) => {
-              if (!(response && response.hasPermission)) {
-                updateWhitelistButton(false);
-                updateEnhanceButton(false);
-              }
-            }
-          );
-        }
+          updateStatus();
+        });
       }
     });
+  }
+  
+  /**
+   * Fallback method to check whitelist status using background page
+   */
+  function checkWhitelistWithBackground() {
+    // Check if the site is whitelisted using our loaded data
+    const isWhitelisted = isSiteWhitelisted(
+      currentTabHostname,
+      whitelistedSites
+    );
+    updateWhitelistButton(isWhitelisted);
+    updateEnhanceButton(isWhitelisted);
+    
+    // Double-check with background page for permission status
+    chrome.runtime.sendMessage(
+      { action: "checkSitePermission", url: currentTabUrl },
+      (response) => {
+        if (response && response.hasPermission) {
+          updateWhitelistButton(true);
+          updateEnhanceButton(true);
+        } else {
+          updateWhitelistButton(false);
+          updateEnhanceButton(false);
+        }
+        updateStatus();
+      }
+    );
   }
 });

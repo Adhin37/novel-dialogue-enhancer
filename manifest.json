@@ -45,7 +45,6 @@
       "js": [
         "assets/js/lib/purify.min.js",
         "assets/js/utils/genderUtils.js",
-        "assets/js/utils/dialogueUtils.js",
         "assets/js/utils/novelUtils.js",
         "assets/js/utils/statsUtils.js",
         "assets/js/enhancerIntegration.js",
