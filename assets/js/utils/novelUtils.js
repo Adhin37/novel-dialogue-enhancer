@@ -3,6 +3,11 @@
  * Utility functions for novel processing
  */
 class NovelUtils {
+  /**
+   * Creates a new NovelUtils instance
+   * @param {string} url - URL of the novel page
+   * @param {string} title - Title of the novel page
+   */
   constructor(url, title) {
     this.url = url;
     this.title = title;
@@ -10,6 +15,9 @@ class NovelUtils {
     this.novelStyle = null;
     this.novelGenre = null;
     this.characterMap = {};
+    this.chapterInfo = null;
+    this.enhancedChapters = [];
+    this.isCurrentChapterEnhanced = false;
     console.log("Novel Dialogue Enhancer: Novel Utils initialized");
   }
     
@@ -111,12 +119,12 @@ class NovelUtils {
   detectChapterInfo(title, content) {
     const chapterInfo = {
       isChapter: false,
-      chapterNumber: null,
-      chapterTitle: null
+      chapterNumber: null
     };
 
     if (!title) return chapterInfo;
 
+    // First check for standard chapter patterns in title
     const chapterPatterns = [
       /chapter\s+(\d+)/i,
       /ch\.?\s*(\d+)/i,
@@ -129,24 +137,11 @@ class NovelUtils {
       if (match) {
         chapterInfo.isChapter = true;
         chapterInfo.chapterNumber = parseInt(match[1], 10);
-
-        const titleParts = title.split(/[-–—:|]/);
-        if (titleParts.length > 1) {
-          for (const part of titleParts) {
-            if (!pattern.test(part)) {
-              const potentialTitle = part.trim();
-              if (potentialTitle && potentialTitle.length > 2) {
-                chapterInfo.chapterTitle = potentialTitle;
-                break;
-              }
-            }
-          }
-        }
-
         break;
       }
     }
 
+    // Check for chapter heading in content if not found in title
     if (!chapterInfo.isChapter && content) {
       const headingMatch = content.match(
         /\b(chapter|ch\.)\s+(\d+)[:\s]+(.*?)(\n|$)/i
@@ -154,7 +149,42 @@ class NovelUtils {
       if (headingMatch) {
         chapterInfo.isChapter = true;
         chapterInfo.chapterNumber = parseInt(headingMatch[2], 10);
-        chapterInfo.chapterTitle = headingMatch[3].trim();
+      }
+    }
+    
+    // Try to extract chapter numbers from URL if still not found
+    if (!chapterInfo.isChapter || chapterInfo.chapterNumber === null) {
+      try {
+        const url = new URL(this.url);
+        const pathParts = url.pathname.split('/');
+        
+        // Look for patterns like /chapter-123/ or /123/ in the URL
+        for (const part of pathParts) {
+          // Check for chapter numbers in URL segments
+          const chapterNumMatch = part.match(/chapter[\\-_]?(\d+)/i) || 
+                               part.match(/ch[\\-_]?(\d+)/i) ||
+                               part.match(/^(\d+)$/);
+          
+          if (chapterNumMatch) {
+            chapterInfo.isChapter = true;
+            chapterInfo.chapterNumber = parseInt(chapterNumMatch[1], 10);
+            break;
+          }
+        }
+        
+        // Check for query parameters like ?chapter=123
+        if (!chapterInfo.isChapter && url.searchParams) {
+          const chapterParam = url.searchParams.get('chapter') || 
+                             url.searchParams.get('chap') || 
+                             url.searchParams.get('c');
+          
+          if (chapterParam && /^\d+$/.test(chapterParam)) {
+            chapterInfo.isChapter = true;
+            chapterInfo.chapterNumber = parseInt(chapterParam, 10);
+          }
+        }
+      } catch (err) {
+        console.warn("Error parsing URL for chapter info:", err);
       }
     }
 
@@ -624,7 +654,7 @@ class NovelUtils {
    * @param {object} existingCharacterMap - Existing character data
    * @return {object} - Updated character map
    */
-  extractCharacterNames(text, existingCharacterMap = {}) {
+  async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
     let characterMap = { ...existingCharacterMap };
     const startCharCount = Object.keys(characterMap).length;
@@ -632,9 +662,30 @@ class NovelUtils {
     if (!this.novelId) {
       this.updateNovelId(window.location.href, document.title);
     }
-
+    
+    // Get chapter information if not already set
+    if (!this.chapterInfo) {
+      this.chapterInfo = this.detectChapterInfo(document.title, document.body.textContent);
+    }
+    
+    // Check if we've already enhanced this chapter for this novel
     if (this.novelId) {
-      characterMap = this.loadExistingCharacterData(characterMap);
+      const novelData = await this.loadExistingNovelData();
+      characterMap = novelData.characterMap || characterMap;
+      this.enhancedChapters = novelData.enhancedChapters || [];
+      
+      // Check if this chapter has already been enhanced
+      if (this.chapterInfo && this.chapterInfo.chapterNumber) {
+        this.isCurrentChapterEnhanced = this.enhancedChapters.some(
+          chapter => chapter.chapterNumber === this.chapterInfo.chapterNumber
+        );
+        
+        if (this.isCurrentChapterEnhanced) {
+          console.log(`Chapter ${this.chapterInfo.chapterNumber} was previously enhanced, using existing character data`);
+          this.characterMap = characterMap;
+          return characterMap;
+        }
+      }
     }
 
     const namePatterns = [
@@ -936,7 +987,11 @@ class NovelUtils {
    * @param {object} characterMap - Current character map
    * @return {object} - Updated character map with existing data
    */
-  loadExistingCharacterData(characterMap) {
+  /**
+   * Load existing novel data from storage including character map and enhanced chapters
+   * @return {Promise<object>} - Novel data including character map and enhanced chapters
+   */
+  loadExistingNovelData() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
         { action: "getCharacterMap", novelId: this.novelId },
@@ -946,31 +1001,49 @@ class NovelUtils {
             !response ||
             response.status !== "ok"
           ) {
-            console.warn("Failed to fetch existing character map");
-            resolve(characterMap);
+            console.warn("Failed to fetch existing novel data");
+            resolve({ characterMap: {}, enhancedChapters: [] });
             return;
           }
 
-          const existingMap = response.characterMap || {};
-          const mergedMap = {
-            ...characterMap,
-            ...Object.fromEntries(
-              Object.entries(existingMap).filter(
-                ([name]) => !characterMap[name]
-              )
-            )
-          };
-
+          const characterMap = response.characterMap || {};
+          const enhancedChapters = response.enhancedChapters || [];
+          
           console.log(
-            `Retrieved ${Object.keys(existingMap).length} existing characters`
+            `Retrieved ${Object.keys(characterMap).length} existing characters and ${enhancedChapters.length} enhanced chapters`
           );
-          resolve(mergedMap);
+          
+          resolve({
+            characterMap: characterMap,
+            enhancedChapters: enhancedChapters
+          });
         }
       );
     }).catch((err) => {
-      console.warn("Error loading character data:", err);
-      return characterMap;
+      console.warn("Error loading novel data:", err);
+      return { characterMap: {}, enhancedChapters: [] };
     });
+  }
+  
+  /**
+   * Load existing character data from storage
+   * @param {object} characterMap - Current character map
+   * @return {Promise<object>} - Updated character map with existing data
+   */
+  async loadExistingCharacterData(characterMap) {
+    const novelData = await this.loadExistingNovelData();
+    const existingMap = novelData.characterMap || {};
+    
+    const mergedMap = {
+      ...characterMap,
+      ...Object.fromEntries(
+        Object.entries(existingMap).filter(
+          ([name]) => !characterMap[name]
+        )
+      )
+    };
+    
+    return mergedMap;
   }
 
   /**
@@ -1002,18 +1075,26 @@ class NovelUtils {
       }
     });
 
+    // If we have chapter info, include it in the update
+    const chapterInfo = this.chapterInfo || {};
+    
     console.log(
       `Syncing ${Object.keys(sanitizedCharMap).length} characters for novel: ${
         this.novelId
-      }`
+      }, chapter: ${chapterInfo.chapterNumber || 'unknown'}`
     );
+    
     chrome.runtime.sendMessage({
       action: "updateCharacterMap",
       characters: sanitizedCharMap,
-      novelId: this.novelId
+      novelId: this.novelId,
+      chapterInfo: chapterInfo
     });
   }
 
+  /**
+   * Sync novel style with background storage
+   */
   /**
    * Sync novel style with background storage
    */
@@ -1087,6 +1168,11 @@ class NovelUtils {
    * @param {string} text - The text to analyze
    * @return {object} - Extracted dialogue data
    */
+  /**
+   * Extract dialogue patterns from text
+   * @param {string} text - The text to analyze
+   * @return {object} - Extracted dialogue data
+   */
   extractDialoguePatterns(text) {
     const dialoguePatterns = {
       quotedDialogue: [],
@@ -1127,6 +1213,11 @@ class NovelUtils {
     return dialoguePatterns;
   }
 
+  /**
+   * Extract named characters from dialogue patterns
+   * @param {object} dialoguePatterns - Extracted dialogue patterns
+   * @return {Set} - Set of character names
+   */
   /**
    * Extract named characters from dialogue patterns
    * @param {object} dialoguePatterns - Extracted dialogue patterns

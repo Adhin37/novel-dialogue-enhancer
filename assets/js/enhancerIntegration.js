@@ -99,11 +99,14 @@ class EnhancerIntegration {
     console.log("Extracting character information...");
     const startCharCount = Object.keys(this.novelUtils.characterMap).length;
 
-    // Let novelUtils extract the character names
-    const characterMap = this.novelUtils.extractCharacterNames(text);
+    // Let novelUtils extract the character names (now async)
+    const characterMap = await this.novelUtils.extractCharacterNames(text);
 
-    // Apply gender detection to any characters with unknown gender
-    await this.applyGenderDetection(characterMap, text);
+    // If the current chapter was already enhanced, we might be using cached data
+    if (!this.novelUtils.isCurrentChapterEnhanced) {
+      // Apply gender detection to any characters with unknown gender
+      await this.applyGenderDetection(characterMap, text);
+    }
 
     // Track new characters found
     const newCharCount = Object.keys(characterMap).length - startCharCount;
@@ -112,7 +115,7 @@ class EnhancerIntegration {
     console.log(
       `Processed ${Object.keys(characterMap).length} characters for novel ${
         this.novelUtils.novelId
-      }`
+      }${this.novelUtils.chapterInfo?.chapterNumber ? ', chapter ' + this.novelUtils.chapterInfo.chapterNumber : ''}`
     );
     return characterMap;
   }
@@ -149,6 +152,16 @@ class EnhancerIntegration {
   }
 
   /**
+   * Set up character context for enhancement
+   * @return {Promise<Object>} - Character map with gender information
+   */
+  async setupCharacterContext() {
+    // Get text from the content element
+    const text = document.body.textContent;
+    return await this.extractCharacterInfo(text);
+  }
+  
+  /**
    * Enhance text using the LLM with character context
    * @param {string} text - Text to enhance
    * @param {string} characterSummary - Character information summary
@@ -157,15 +170,20 @@ class EnhancerIntegration {
   async enhanceTextWithLLM(text, characterSummary) {
     try {
       // Analyze novel style using novelUtils
-      const novelStyle = this.novelUtils.analyzeNovelStyle(text);
+      const novelStyle = await this.novelUtils.analyzeNovelStyle(text);
 
+      // Get chapter info if not already detected
+      if (!this.novelUtils.chapterInfo) {
+        this.novelUtils.chapterInfo = this.novelUtils.detectChapterInfo(document.title, text);
+      }
+      
       // Format novel style information for the LLM
       const novelInfo = {
         style: novelStyle.style,
         tone: novelStyle.tone,
         title: this.novelUtils.title,
         platform: this.novelUtils.detectPlatform(window.location.href),
-        chapterInfo: this.novelUtils.detectChapterInfo(document.title, text)
+        chapterInfo: this.novelUtils.chapterInfo
       };
 
       // Process with Ollama

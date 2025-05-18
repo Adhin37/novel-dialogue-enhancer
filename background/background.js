@@ -1,7 +1,32 @@
 // background.js
+/**
+ * Background script for Novel Dialogue Enhancer
+ */
+
 const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
+
+/**
+ * Novel character map data structure:
+ * {
+ *   [novelId]: {
+ *     characters: {
+ *       [characterName]: {
+ *         gender: string,
+ *         confidence: number,
+ *         appearances: number,
+ *         evidence: string[]
+ *       }
+ *     },
+ *     enhancedChapters: [
+ *       {
+ *         chapterNumber: number
+ *       }
+ *     ]
+ *   }
+ * }
+ */
 
 /**
  * Stores novel character maps in Chrome storage with size management
@@ -26,10 +51,15 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
       const novelEntries = Object.entries(novelCharacterMaps);
 
       // Sort by character count (ascending)
-      novelEntries.sort(
-        (a, b) =>
-          Object.keys(a[1] || {}).length - Object.keys(b[1] || {}).length
-      );
+      novelEntries.sort((a, b) => {
+        const aCharCount = a[1].characters
+          ? Object.keys(a[1].characters).length
+          : Object.keys(a[1]).length;
+        const bCharCount = b[1].characters
+          ? Object.keys(b[1].characters).length
+          : Object.keys(b[1]).length;
+        return aCharCount - bCharCount;
+      });
 
       const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
       for (let i = 0; i < toRemove; i++) {
@@ -52,6 +82,11 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
   }
 }
 
+/**
+ * Handles Ollama API request from content script
+ * @param {object} request - Request data containing action and parameters
+ * @param {function} sendResponse - Function to send response back to sender
+ */
 function handleOllamaRequest(request, sendResponse) {
   // Validate request data
   if (!request || !request.data) {
@@ -114,6 +149,12 @@ function handleOllamaRequest(request, sendResponse) {
   );
 }
 
+/**
+ * Prepares request data for Ollama API with appropriate settings
+ * @param {object} requestData - Raw request data
+ * @param {object} settings - Extension settings
+ * @return {object} - Prepared request data
+ */
 function prepareRequestData(requestData, settings) {
   return {
     ...requestData,
@@ -122,6 +163,12 @@ function prepareRequestData(requestData, settings) {
   };
 }
 
+/**
+ * Processes a non-streaming request to Ollama API
+ * @param {object} requestData - Prepared request data
+ * @param {number} timeout - Request timeout in seconds
+ * @param {function} sendResponse - Function to send response back to sender
+ */
 function processNonStreamingRequest(requestData, timeout, sendResponse) {
   // Validate Ollama URL
   const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
@@ -168,6 +215,11 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
     });
 }
 
+/**
+ * Processes response from Ollama API
+ * @param {string} rawText - Raw response text from Ollama
+ * @param {function} sendResponse - Function to send response back to sender
+ */
 function processOllamaResponse(rawText, sendResponse) {
   console.log(
     "Raw Ollama response (first 100 chars):",
@@ -217,6 +269,13 @@ function processOllamaResponse(rawText, sendResponse) {
   }
 }
 
+/**
+ * Handles errors from Ollama API requests
+ * @param {Error} error - Error object
+ * @param {AbortController} controller - Request controller
+ * @param {number} timeout - Request timeout
+ * @param {function} sendResponse - Function to send response back to sender
+ */
 function handleOllamaError(error, controller, timeout, sendResponse) {
   if (error.name === "AbortError") {
     const isUserTerminated = controller.signal.reason === "USER_TERMINATED";
@@ -236,6 +295,10 @@ function handleOllamaError(error, controller, timeout, sendResponse) {
   }
 }
 
+/**
+ * Checks if Ollama is available and returns its status
+ * @param {function} sendResponse - Function to send response back to sender
+ */
 function checkOllamaAvailability(sendResponse) {
   console.log(
     `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
@@ -312,7 +375,11 @@ function checkOllamaAvailability(sendResponse) {
     .finally(() => clearTimeout(timeoutId));
 }
 
-// Function to check if a site is whitelisted
+/**
+ * Checks if a site is whitelisted for enhancement
+ * @param {string} url - URL to check
+ * @return {Promise<boolean>} - Promise resolving to whitelist status
+ */
 function isSiteWhitelisted(url) {
   try {
     // Validate URL format
@@ -326,6 +393,12 @@ function isSiteWhitelisted(url) {
     if (!hostname) {
       console.warn("No hostname found in URL:", url);
       return Promise.resolve(false);
+    }
+
+    // Check cache first
+    const cachedResult = whitelistCache.get(hostname);
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
+      return Promise.resolve(cachedResult.isWhitelisted);
     }
 
     return new Promise((resolve, reject) => {
@@ -348,6 +421,13 @@ function isSiteWhitelisted(url) {
             hostname === whitelistedSite ||
             hostname.endsWith("." + whitelistedSite)
         );
+
+        // Update cache
+        whitelistCache.set(hostname, {
+          isWhitelisted,
+          timestamp: Date.now()
+        });
+
         resolve(isWhitelisted);
       });
     });
@@ -357,30 +437,34 @@ function isSiteWhitelisted(url) {
   }
 }
 
-// Check and handle site permissions - optimized with caching
+/**
+ * Checks if a site has permission for enhancement
+ * @param {string} url - URL to check
+ * @return {Promise<boolean>} - Promise resolving to permission status
+ */
 async function checkSitePermission(url) {
   if (!url || typeof url !== "string") {
     return false;
   }
-  
+
   try {
     // Use cache if available
     const hostname = new URL(url).hostname;
     const cachedResult = whitelistCache.get(hostname);
-    
-    if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_EXPIRY)) {
+
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
       return cachedResult.isWhitelisted;
     }
-    
+
     // First, check if the site is whitelisted
     const isWhitelisted = await isSiteWhitelisted(url);
-    
+
     // Cache the result
     whitelistCache.set(hostname, {
       isWhitelisted,
       timestamp: Date.now()
     });
-    
+
     return isWhitelisted;
   } catch (error) {
     console.error("Error in checkSitePermission:", error);
@@ -388,7 +472,11 @@ async function checkSitePermission(url) {
   }
 }
 
-// Function to request permissions for a domain
+/**
+ * Requests extension permissions for a domain
+ * @param {string} domain - Domain to request permissions for
+ * @return {Promise<boolean>} - Promise resolving to whether permission was granted
+ */
 async function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
 
@@ -435,30 +523,34 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     // If we have a recent cache entry, use it instead of checking again
     const cacheKey = new URL(tab.url).hostname;
     const cachedResult = whitelistCache.get(cacheKey);
-    
-    if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_EXPIRY)) {
+
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
       sendWhitelistStatus(tabId, cachedResult.isWhitelisted);
       return;
     }
-    
+
     // Otherwise check and update cache
     isSiteWhitelisted(tab.url)
-      .then(isWhitelisted => {
+      .then((isWhitelisted) => {
         // Cache the result
         whitelistCache.set(cacheKey, {
           isWhitelisted,
           timestamp: Date.now()
         });
-        
+
         sendWhitelistStatus(tabId, isWhitelisted);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error("Error checking whitelist status:", error);
       });
   }
 });
 
-// Helper function to send whitelist status to tab
+/**
+ * Sends whitelist status to a tab
+ * @param {number} tabId - ID of the tab to send status to
+ * @param {boolean} isWhitelisted - Whether the site is whitelisted
+ */
 function sendWhitelistStatus(tabId, isWhitelisted) {
   chrome.tabs
     .sendMessage(tabId, {
@@ -491,14 +583,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     // Create or update the character map for this novel
     if (!novelCharacterMaps[novelId]) {
-      novelCharacterMaps[novelId] = {};
+      novelCharacterMaps[novelId] = {
+        characters: {},
+        enhancedChapters: []
+      };
+    }
+
+    // Ensure the novel has the new structure with characters and enhancedChapters
+    if (
+      !novelCharacterMaps[novelId].characters &&
+      typeof novelCharacterMaps[novelId] === "object"
+    ) {
+      // Migrate old structure if needed
+      const characters = { ...novelCharacterMaps[novelId] };
+      novelCharacterMaps[novelId] = {
+        characters: characters,
+        enhancedChapters: []
+      };
+    }
+
+    // Update enhanced chapters list if provided
+    if (request.chapterInfo && request.chapterInfo.chapterNumber) {
+      const { chapterNumber } = request.chapterInfo;
+      const existingChapterIndex = novelCharacterMaps[
+        novelId
+      ].enhancedChapters.findIndex(
+        (chapter) => chapter.chapterNumber === chapterNumber
+      );
+
+      if (existingChapterIndex >= 0) {
+        // Update existing chapter entry
+        novelCharacterMaps[novelId].enhancedChapters[existingChapterIndex] = {
+          chapterNumber
+        };
+      } else {
+        // Add new chapter entry
+        novelCharacterMaps[novelId].enhancedChapters.push({
+          chapterNumber
+        });
+      }
     }
 
     // For each character in the new map
     Object.entries(request.characters).forEach(([charName, charData]) => {
       // If character already exists in our stored map
-      if (novelCharacterMaps[novelId][charName]) {
-        const existingChar = novelCharacterMaps[novelId][charName];
+      if (
+        novelCharacterMaps[novelId].characters &&
+        novelCharacterMaps[novelId].characters[charName]
+      ) {
+        const existingChar = novelCharacterMaps[novelId].characters[charName];
 
         // Merge appearances count
         const newAppearances =
@@ -529,7 +662,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         // Update the existing character with merged data
-        novelCharacterMaps[novelId][charName] = {
+        novelCharacterMaps[novelId].characters[charName] = {
           ...existingChar,
           gender: mergedGender,
           confidence: mergedConfidence,
@@ -537,7 +670,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           evidence: mergedEvidence
         };
       } else {
-        novelCharacterMaps[novelId][charName] = charData;
+        if (!novelCharacterMaps[novelId].characters) {
+          novelCharacterMaps[novelId].characters = {};
+        }
+        novelCharacterMaps[novelId].characters[charName] = charData;
       }
     });
 
@@ -554,10 +690,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
-    sendResponse({
+    // Check if we have the new data structure
+    const novelData = novelCharacterMaps[novelId] || {};
+    const response = {
       status: "ok",
-      characterMap: novelCharacterMaps[novelId] || {}
-    });
+      characterMap: {}
+    };
+
+    // If it's the new structure, return the characters part
+    if (novelData.characters) {
+      response.characterMap = novelData.characters;
+    } else {
+      // For backward compatibility
+      response.characterMap = novelData;
+    }
+
+    // Add enhancedChapters data to response
+    if (novelData.enhancedChapters) {
+      response.enhancedChapters = novelData.enhancedChapters;
+    }
+
+    sendResponse(response);
     return false;
   } else if (request.action === "checkSitePermission") {
     checkSitePermission(request.url).then((hasPermission) => {
@@ -580,7 +733,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 isWhitelisted: true,
                 timestamp: Date.now()
               });
-              
+
               sendResponse({
                 success: true,
                 message: `${hostname} added to whitelist`
@@ -614,7 +767,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           isWhitelisted: false,
           timestamp: Date.now()
         });
-        
+
         sendResponse({ success: true });
       });
     });
