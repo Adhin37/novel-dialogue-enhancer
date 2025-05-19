@@ -4,7 +4,7 @@
  */
 let contentElement = null;
 let settings = {
-  isExtensionPaused: true,
+  isExtensionPaused: false,
   preserveNames: true,
   fixPronouns: true
 };
@@ -24,26 +24,62 @@ function init() {
   toaster = new Toaster();
   toaster.createToaster();
 
-  // First check if current site is whitelisted
-  chrome.runtime.sendMessage(
-    { action: "checkSitePermission", url: window.location.href },
-    (response) => {
-      isCurrentSiteWhitelisted = response && response.hasPermission;
+  // First check if current site is whitelisted with timeout handling
+  const checkPermissionPromise = new Promise((resolve) => {
+    const permissionTimeout = setTimeout(() => {
+      console.warn("Whitelist check timed out");
+      resolve({ hasPermission: false, error: "Timeout" });
+    }, 5000); // 5 second timeout
 
-      if (!isCurrentSiteWhitelisted) {
-        console.log("Site not whitelisted, extension inactive");
-        return;
+    chrome.runtime.sendMessage(
+      { action: "checkSitePermission", url: window.location.href },
+      (response) => {
+        clearTimeout(permissionTimeout);
+        
+        if (chrome.runtime.lastError) {
+          console.warn("Error checking site permission:", chrome.runtime.lastError);
+          resolve({ hasPermission: false, error: chrome.runtime.lastError.message });
+          return;
+        }
+        
+        resolve(response || { hasPermission: false });
       }
+    );
+  });
 
-      // Only load settings if the site is whitelisted
-      chrome.storage.sync.get(
-        ["isExtensionPaused", "preserveNames", "fixPronouns"],
-        (data) => {
+  checkPermissionPromise.then((response) => {
+    isCurrentSiteWhitelisted = response && response.hasPermission;
+    
+    if (response.error) {
+      console.warn(`Site permission check failed: ${response.error}`);
+      toaster.showWarning("Extension permission check failed. Try refreshing the page.");
+    }
+
+    if (!isCurrentSiteWhitelisted) {
+      console.log("Site not whitelisted, extension inactive");
+      return;
+    }
+
+    console.log("Site is whitelisted, activating extension features");
+    
+    // Only load settings if the site is whitelisted
+    chrome.storage.sync.get(
+      ["isExtensionPaused", "preserveNames", "fixPronouns"],
+      (data) => {
+        if (chrome.runtime.lastError) {
+          console.warn("Error loading settings:", chrome.runtime.lastError);
+          // Use defaults if settings can't be loaded
+          settings = {
+            isExtensionPaused: false,
+            preserveNames: true,
+            fixPronouns: true
+          };
+        } else {
           settings = {
             isExtensionPaused:
               data.isExtensionPaused !== undefined
                 ? Boolean(data.isExtensionPaused)
-                : true,
+                : false,
             preserveNames:
               data.preserveNames !== undefined
                 ? Boolean(data.preserveNames)
@@ -51,33 +87,58 @@ function init() {
             fixPronouns:
               data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
           };
+        }
 
-          setTimeout(async () => {
-            if (!settings.isExtensionPaused) {
+        // Use a shorter delay and provide better feedback
+        setTimeout(async () => {
+          if (!settings.isExtensionPaused) {
+            console.log("Extension is enabled, checking Ollama availability");
+            try {
               const isAvailable = await checkOllamaStatus();
               if (isAvailable) {
+                console.log("Ollama is available, starting page enhancement");
                 enhancePage();
+              } else {
+                console.log("Ollama is not available, page enhancement skipped");
               }
+            } catch (error) {
+              console.error("Error checking Ollama status:", error);
+              toaster.showError(`Ollama check failed: ${error.message}`);
             }
-          }, 1000);
-        }
-      );
-    }
-  );
+          } else {
+            console.log("Extension is paused in settings");
+          }
+        }, 800); // Slightly shorter delay for better responsiveness
+      }
+    );
+  }).catch(error => {
+    console.error("Fatal error during initialization:", error);
+    toaster.showError("Extension initialization failed. Please try refreshing the page.");
+  });
 }
 
 /**
- * Checks the availability of Ollama
+ * Checks the availability of Ollama with timeout
  * @return {Promise<boolean>}
  */
 async function checkOllamaStatus() {
   console.log("Checking Ollama status...");
   let retries = 0;
   let status = null;
+  const TIMEOUT = 10000; // 10 seconds timeout per check
 
   while (retries < maxRetries) {
     try {
-      status = await enhancerIntegration.ollamaClient.checkOllamaAvailability();
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Ollama check timed out")), TIMEOUT);
+      });
+      
+      // Create the actual check promise
+      const checkPromise = enhancerIntegration.ollamaClient.checkOllamaAvailability();
+      
+      // Race the promises
+      status = await Promise.race([checkPromise, timeoutPromise]);
       break;
     } catch (err) {
       console.warn(
@@ -103,6 +164,7 @@ async function checkOllamaStatus() {
     console.warn(`Ollama is not available: ${reason}`);
     toaster.showError(`Ollama is not available: ${reason}`);
 
+    // If we reached the maximum retries or got a definitive "not available" response
     return false;
   }
 }
@@ -206,8 +268,17 @@ async function enhancePage() {
   }
 
   try {
-    const ollamaStatus =
-      await enhancerIntegration.ollamaClient.checkOllamaAvailability();
+    // Create a timeout for the Ollama check
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Ollama availability check timed out")), 10000);
+    });
+    
+    // The actual check
+    const checkPromise = enhancerIntegration.ollamaClient.checkOllamaAvailability();
+    
+    // Race the promises
+    const ollamaStatus = await Promise.race([checkPromise, timeoutPromise]);
+    
     if (!ollamaStatus.available) {
       const safeReason = window.DOMPurify.sanitize(
         ollamaStatus.reason || "Unknown error"

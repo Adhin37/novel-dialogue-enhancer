@@ -4,6 +4,7 @@
   "description": "Novel dialogue enhancer",
   "main": "content.js",
   "scripts": {
+    "test": "node tests/characterMap.test.js",
     "build:zip": "zip -r dist/novel-dialogue-enhancer.zip assets/* background/* content/* popup/* options/* manifest.json README.md"
   },
   "repository": {

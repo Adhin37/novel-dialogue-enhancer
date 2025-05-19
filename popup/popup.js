@@ -22,14 +22,14 @@ document.addEventListener("DOMContentLoaded", () => {
   chrome.storage.sync.get(
     {
       whitelistedSites: [],
-      isExtensionPaused: true,
+      isExtensionPaused: false,
       preserveNames: true,
       fixPronouns: true
     },
     (items) => {
       // Store loaded data first
       whitelistedSites = items.whitelistedSites || [];
-      isExtensionPaused = !items.isExtensionPaused;
+      isExtensionPaused = items.isExtensionPaused;
       preserveNamesToggle.checked = items.preserveNames;
       fixPronounsToggle.checked = items.fixPronouns;
 
@@ -61,8 +61,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle pause/resume button
   pauseButton.addEventListener("click", () => {
+    // Toggle the state
     isExtensionPaused = !isExtensionPaused;
-    chrome.storage.sync.set({ isExtensionPaused: !isExtensionPaused });
+    
+    // Save the new state to storage
+    chrome.storage.sync.set({ isExtensionPaused: isExtensionPaused }, () => {
+      console.log(`Extension paused state set to: ${isExtensionPaused}`);
+    });
 
     if (isExtensionPaused) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -200,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
           chrome.tabs.sendMessage(tabs[0].id, {
             action: "enhanceNow",
             settings: {
-              isExtensionPaused: !isExtensionPaused,
+              isExtensionPaused: isExtensionPaused, // Send the correct pause state
               preserveNames: preserveNamesToggle.checked,
               fixPronouns: fixPronounsToggle.checked
             }

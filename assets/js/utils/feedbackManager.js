@@ -81,7 +81,6 @@ class FeedbackManager {
   }
 }
 
-// Create a default instance for backward compatibility
 const feedbackManager = new FeedbackManager();
 document.addEventListener("DOMContentLoaded", () => feedbackManager);
 

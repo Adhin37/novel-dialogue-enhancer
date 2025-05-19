@@ -341,44 +341,64 @@ ${chunk}`;
    * @return {Promise<object>} - Availability status
    */
   async checkOllamaAvailability() {
-    const lastCheckTime = 30000;
+    const CACHE_TTL = 30000; // 30 seconds
+    const CHECK_TIMEOUT = 15000; // 15 seconds timeout
+    
+    // Return cached result if it's recent enough
     if (
       this.lastAvailabilityCheck &&
-      Date.now() - this.lastAvailabilityCheck < lastCheckTime &&
+      Date.now() - this.lastAvailabilityCheck < CACHE_TTL &&
       this.availabilityCache
     ) {
       return this.availabilityCache;
     }
 
+    // If a check is already in progress, don't start another one
     if (this.checkingAvailability) {
       console.log("Ollama availability check already in progress, waiting...");
-      // Wait for the existing check to complete
-      await new Promise((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (!this.checkingAvailability) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 100);
-      });
-      return (
-        this.availabilityCache || { available: false, reason: "Check failed" }
-      );
+      
+      try {
+        // Wait for the existing check to complete with a timeout
+        const result = await Promise.race([
+          // Wait for the check to complete
+          new Promise((resolve) => {
+            const checkInterval = setInterval(() => {
+              if (!this.checkingAvailability) {
+                clearInterval(checkInterval);
+                resolve(this.availabilityCache);
+              }
+            }, 100);
+          }),
+          // Timeout after 5 seconds of waiting
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error("Timed out waiting for availability check")), 5000)
+          )
+        ]);
+        
+        return result || { available: false, reason: "Check failed" };
+      } catch (error) {
+        console.warn("Waiting for Ollama check timed out:", error);
+        // Reset the flag if we timed out waiting
+        this.checkingAvailability = false;
+        return { available: false, reason: "Check timeout" };
+      }
     }
 
+    // Set checking flag and clear it in case of errors
     this.checkingAvailability = true;
     console.log("Checking Ollama availability...");
 
     try {
-      return new Promise((resolve) => {
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Ollama check timed out")), CHECK_TIMEOUT);
+      });
+      
+      // Create the actual check promise
+      const checkPromise = new Promise((resolve) => {
         chrome.runtime.sendMessage(
-          {
-            action: "checkOllamaAvailability"
-          },
+          { action: "checkOllamaAvailability" },
           (response) => {
-            this.checkingAvailability = false;
-            this.lastAvailabilityCheck = Date.now();
-
             if (chrome.runtime.lastError) {
               console.warn(
                 "Ollama check communication error:",
@@ -400,13 +420,19 @@ ${chunk}`;
           }
         );
       });
+      
+      // Race the promises
+      const result = await Promise.race([checkPromise, timeoutPromise]);
+      this.lastAvailabilityCheck = Date.now();
+      return result;
     } catch (err) {
-      this.checkingAvailability = false;
       console.warn("Ollama availability check failed:", err);
-
       const result = { available: false, reason: err.message };
       this.availabilityCache = result;
       return result;
+    } finally {
+      // Always reset the checking flag when we're done
+      this.checkingAvailability = false;
     }
   }
 

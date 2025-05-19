@@ -216,11 +216,6 @@ class NovelUtils {
   /**
    * Analyze novel style and genre from text
    * @param {string} text - Text to analyze
-   * @return {object} - Novel style information
-   */
-  /**
-   * Analyze novel style and genre from text
-   * @param {string} text - Text to analyze
    * @param {string} [novelId] - Optional novel identifier for fetching existing style info
    * @return {Promise<object>} - Novel style information
    */
@@ -238,19 +233,33 @@ class NovelUtils {
     if (novelId) {
       try {
         const response = await new Promise((resolve, reject) => {
-          chrome.runtime.sendMessage(
-            { action: "getNovelStyle", novelId: novelId },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                console.error(
-                  "Error getting novel style:",
-                  chrome.runtime.lastError
-                );
-                return reject(chrome.runtime.lastError);
+          // Add a timeout to handle message port closure
+          const timeoutId = setTimeout(() => {
+            reject(new Error("Message port closed before response was received"));
+          }, 5000);
+          
+          try {
+            chrome.runtime.sendMessage(
+              { action: "getNovelStyle", novelId: novelId },
+              (response) => {
+                clearTimeout(timeoutId);
+                
+                // Check for runtime error
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "Error getting novel style:",
+                    chrome.runtime.lastError
+                  );
+                  return reject(chrome.runtime.lastError);
+                }
+                
+                resolve(response);
               }
-              resolve(response);
-            }
-          );
+            );
+          } catch (err) {
+            clearTimeout(timeoutId);
+            reject(err);
+          }
         });
 
         if (response && response.style) {
@@ -261,6 +270,19 @@ class NovelUtils {
         }
       } catch (err) {
         console.warn("Failed to fetch existing novel style:", err);
+        // Return a default style instead of failing
+        const defaultStyle = {
+          style: "standard narrative",
+          tone: "neutral",
+          confidence: 0,
+          analyzed: true
+        };
+        
+        if (novelId === this.novelId) {
+          this.novelStyle = defaultStyle;
+        }
+        
+        return defaultStyle;
       }
     }
 
@@ -983,18 +1005,13 @@ class NovelUtils {
   }
 
   /**
-   * Load existing character data from storage
-   * @param {object} characterMap - Current character map
-   * @return {object} - Updated character map with existing data
-   */
-  /**
    * Load existing novel data from storage including character map and enhanced chapters
    * @return {Promise<object>} - Novel data including character map and enhanced chapters
    */
   loadExistingNovelData() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
-        { action: "getCharacterMap", novelId: this.novelId },
+        { action: "getNovelData", novelId: this.novelId },
         (response) => {
           if (
             chrome.runtime.lastError ||
@@ -1061,40 +1078,60 @@ class NovelUtils {
       return;
     }
 
-    const sanitizedCharMap = {};
-    Object.entries(characterMap).forEach(([name, data]) => {
-      if (name && typeof name === "string" && name.length <= 50) {
-        sanitizedCharMap[name] = {
-          gender: data.gender || "unknown",
-          confidence: parseFloat(data.confidence) || 0,
-          appearances: parseInt(data.appearances) || 1,
-          evidence: Array.isArray(data.evidence)
-            ? data.evidence.filter((e) => typeof e === "string").slice(0, 10)
-            : []
-        };
+    // Convert to the optimized format
+    const optimizedChars = {};
+    
+    Object.entries(characterMap).forEach(([name, data], index) => {
+      // Skip invalid entries
+      if (!name || typeof name !== "string" || name.length > 50) return;
+      
+      // Create optimized character entry
+      optimizedChars[index] = {
+        n: name,
+        g: this.compressGender(data.gender),
+        c: parseFloat(data.confidence) || 0,
+        a: parseInt(data.appearances) || 1
+      };
+      
+      // Add evidence if available (limited to 5)
+      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+        optimizedChars[index].e = data.evidence
+          .filter(e => typeof e === "string")
+          .slice(0, 5);
       }
     });
 
     // If we have chapter info, include it in the update
-    const chapterInfo = this.chapterInfo || {};
+    const chapterNumber = this.chapterInfo?.chapterNumber;
     
     console.log(
-      `Syncing ${Object.keys(sanitizedCharMap).length} characters for novel: ${
+      `Syncing ${Object.keys(optimizedChars).length} characters for novel: ${
         this.novelId
-      }, chapter: ${chapterInfo.chapterNumber || 'unknown'}`
+      }, chapter: ${chapterNumber || 'unknown'}`
     );
     
     chrome.runtime.sendMessage({
-      action: "updateCharacterMap",
-      characters: sanitizedCharMap,
+      action: "updateNovelData",
+      chars: optimizedChars,
       novelId: this.novelId,
-      chapterInfo: chapterInfo
+      chapterNumber: chapterNumber
     });
   }
-
+  
   /**
-   * Sync novel style with background storage
+   * Compress gender string to single character code
+   * @param {string} gender - The gender string to compress
+   * @return {string} - Single character gender code
    */
+  compressGender(gender) {
+    if (!gender || typeof gender !== 'string') return 'u';
+    
+    const genderLower = gender.toLowerCase();
+    if (genderLower === 'male') return 'm';
+    if (genderLower === 'female') return 'f';
+    return 'u'; // unknown or other
+  }
+
   /**
    * Sync novel style with background storage
    */
@@ -1108,6 +1145,19 @@ class NovelUtils {
       novelId: this.novelId,
       style: this.novelStyle
     });
+  }
+  
+  /**
+   * Expands compressed gender code to full form
+   * @param {string} code - Compressed gender code ("m", "f", "u")
+   * @return {string} - Full gender string ("male", "female", "unknown")
+   */
+  expandGender(code) {
+    if (!code || typeof code !== 'string') return 'unknown';
+    
+    if (code === 'm') return 'male';
+    if (code === 'f') return 'female';
+    return 'unknown';
   }
 
   /**
@@ -1168,11 +1218,6 @@ class NovelUtils {
    * @param {string} text - The text to analyze
    * @return {object} - Extracted dialogue data
    */
-  /**
-   * Extract dialogue patterns from text
-   * @param {string} text - The text to analyze
-   * @return {object} - Extracted dialogue data
-   */
   extractDialoguePatterns(text) {
     const dialoguePatterns = {
       quotedDialogue: [],
@@ -1213,11 +1258,6 @@ class NovelUtils {
     return dialoguePatterns;
   }
 
-  /**
-   * Extract named characters from dialogue patterns
-   * @param {object} dialoguePatterns - Extracted dialogue patterns
-   * @return {Set} - Set of character names
-   */
   /**
    * Extract named characters from dialogue patterns
    * @param {object} dialoguePatterns - Extracted dialogue patterns

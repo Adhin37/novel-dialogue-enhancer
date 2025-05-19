@@ -1,80 +1,153 @@
-// background.js
-/**
- * Background script for Novel Dialogue Enhancer
- */
-
 const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 
-/**
- * Novel character map data structure:
- * {
- *   [novelId]: {
- *     characters: {
- *       [characterName]: {
- *         gender: string,
- *         confidence: number,
- *         appearances: number,
- *         evidence: string[]
- *       }
- *     },
- *     enhancedChapters: [
- *       {
- *         chapterNumber: number
- *       }
- *     ]
- *   }
- * }
- */
+function compressGender(gender) {
+  if (!gender || typeof gender !== 'string') return 'u';
+  
+  const genderLower = gender.toLowerCase();
+  if (genderLower === 'male') return 'm';
+  if (genderLower === 'female') return 'f';
+  return 'u';
+}
 
-/**
- * Stores novel character maps in Chrome storage with size management
- * @param {object} novelCharacterMaps - The character maps to store
- */
+function expandGender(code) {
+  if (!code || typeof code !== 'string') return 'unknown';
+  
+  if (code === 'm') return 'male';
+  if (code === 'f') return 'female';
+  return 'unknown';
+}
+
+function getNextCharacterId(charMap) {
+  if (!charMap || typeof charMap !== 'object') return 0;
+  
+  const existingIds = Object.keys(charMap).map(id => parseInt(id)).filter(id => !isNaN(id));
+  
+  if (existingIds.length === 0) return 0;
+  
+  return Math.max(...existingIds) + 1;
+}
+
+function migrateToNewFormat(oldMap) {
+  if (!oldMap || typeof oldMap !== 'object') return { chars: {}, chaps: [], lastAccess: Date.now() };
+  
+  if (oldMap.chars) return oldMap;
+  
+  const newMap = {
+    chars: {},
+    chaps: [],
+    lastAccess: Date.now()
+  };
+  
+  if (oldMap.characters && typeof oldMap.characters === 'object') {
+    Object.entries(oldMap.characters).forEach(([name, data], index) => {
+      newMap.chars[index] = {
+        n: name,
+        g: compressGender(data.gender),
+        c: parseFloat(data.confidence) || 0,
+        a: parseInt(data.appearances) || 1
+      };
+      
+      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+        newMap.chars[index].e = data.evidence.slice(0, 5);
+      }
+    });
+    
+    if (Array.isArray(oldMap.enhancedChapters)) {
+      newMap.chaps = oldMap.enhancedChapters
+        .map(chapter => chapter.chapterNumber)
+        .filter(num => typeof num === 'number');
+    }
+    
+    if (oldMap.style) {
+      newMap.style = oldMap.style;
+    }
+  } 
+  else {
+    Object.entries(oldMap).forEach(([name, data], index) => {
+      newMap.chars[index] = {
+        n: name,
+        g: compressGender(data.gender),
+        c: parseFloat(data.confidence) || 0,
+        a: parseInt(data.appearances) || 1
+      };
+      
+      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+        newMap.chars[index].e = data.evidence.slice(0, 5);
+      }
+    });
+  }
+  
+  return newMap;
+}
+
+function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
+  if (!maps || typeof maps !== 'object') return {};
+  
+  const now = Date.now();
+  const purgedMaps = { ...maps };
+  let purgedCount = 0;
+  
+  Object.entries(purgedMaps).forEach(([novelId, data]) => {
+    if (!data.lastAccess || (now - data.lastAccess) < maxAge) return;
+    
+    delete purgedMaps[novelId];
+    purgedCount++;
+  });
+  
+  if (purgedCount > 0) {
+    console.log(`Purged ${purgedCount} novels that haven't been accessed in ${maxAge/(24*60*60*1000)} days`);
+  }
+  
+  return purgedMaps;
+}
+
 function storeNovelCharacterMaps(novelCharacterMaps) {
   try {
-    const serialized = JSON.stringify(novelCharacterMaps);
+    const purgedMaps = purgeOldNovels(novelCharacterMaps);
+    
+    Object.entries(purgedMaps).forEach(([novelId, data]) => {
+      purgedMaps[novelId] = migrateToNewFormat(data);
+    });
+    
+    const serialized = JSON.stringify(purgedMaps);
     const sizeInBytes = new Blob([serialized]).size;
 
     if (sizeInBytes > 100000) {
-      console.warn(
-        "Character maps getting too large, pruning older/smaller entries"
-      );
+      console.warn("Character maps getting too large, pruning older/smaller entries");
 
-      if (!novelCharacterMaps || typeof novelCharacterMaps !== "object") {
+      if (!purgedMaps || typeof purgedMaps !== "object") {
         console.error("Invalid novelCharacterMaps object");
         return;
       }
 
-      // Get novels with least characters and remove them
-      const novelEntries = Object.entries(novelCharacterMaps);
+      const novelEntries = Object.entries(purgedMaps);
 
-      // Sort by character count (ascending)
       novelEntries.sort((a, b) => {
-        const aCharCount = a[1].characters
-          ? Object.keys(a[1].characters).length
-          : Object.keys(a[1]).length;
-        const bCharCount = b[1].characters
-          ? Object.keys(b[1].characters).length
-          : Object.keys(b[1]).length;
+        const aLastAccess = a[1].lastAccess || 0;
+        const bLastAccess = b[1].lastAccess || 0;
+        
+        if (aLastAccess !== bLastAccess) {
+          return aLastAccess - bLastAccess;
+        }
+        
+        const aCharCount = a[1].chars ? Object.keys(a[1].chars).length : 0;
+        const bCharCount = b[1].chars ? Object.keys(b[1].chars).length : 0;
         return aCharCount - bCharCount;
       });
 
       const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
       for (let i = 0; i < toRemove; i++) {
         if (novelEntries[i]) {
-          delete novelCharacterMaps[novelEntries[i][0]];
+          delete purgedMaps[novelEntries[i][0]];
         }
       }
     }
 
-    chrome.storage.local.set({ novelCharacterMaps }, () => {
+    chrome.storage.local.set({ novelCharacterMaps: purgedMaps }, () => {
       if (chrome.runtime.lastError) {
-        console.error(
-          "Error storing character maps:",
-          chrome.runtime.lastError
-        );
+        console.error("Error storing character maps:", chrome.runtime.lastError);
       }
     });
   } catch (error) {
@@ -82,13 +155,7 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
   }
 }
 
-/**
- * Handles Ollama API request from content script
- * @param {object} request - Request data containing action and parameters
- * @param {function} sendResponse - Function to send response back to sender
- */
 function handleOllamaRequest(request, sendResponse) {
-  // Validate request data
   if (!request || !request.data) {
     sendResponse({ error: "Invalid request data" });
     return;
@@ -103,8 +170,7 @@ function handleOllamaRequest(request, sendResponse) {
     (data) => {
       if (chrome.runtime.lastError) {
         sendResponse({
-          error:
-            "Error retrieving settings: " + chrome.runtime.lastError.message
+          error: "Error retrieving settings: " + chrome.runtime.lastError.message
         });
         return;
       }
@@ -112,7 +178,6 @@ function handleOllamaRequest(request, sendResponse) {
       try {
         const requestData = prepareRequestData(request.data, data);
 
-        // Validate important fields
         if (!requestData.model || typeof requestData.model !== "string") {
           throw new Error("Invalid model specification");
         }
@@ -121,7 +186,6 @@ function handleOllamaRequest(request, sendResponse) {
           throw new Error("Invalid prompt");
         }
 
-        // Limit prompt size
         if (requestData.prompt.length > 32000) {
           requestData.prompt = requestData.prompt.substring(0, 32000);
         }
@@ -149,12 +213,6 @@ function handleOllamaRequest(request, sendResponse) {
   );
 }
 
-/**
- * Prepares request data for Ollama API with appropriate settings
- * @param {object} requestData - Raw request data
- * @param {object} settings - Extension settings
- * @return {object} - Prepared request data
- */
 function prepareRequestData(requestData, settings) {
   return {
     ...requestData,
@@ -163,19 +221,10 @@ function prepareRequestData(requestData, settings) {
   };
 }
 
-/**
- * Processes a non-streaming request to Ollama API
- * @param {object} requestData - Prepared request data
- * @param {number} timeout - Request timeout in seconds
- * @param {function} sendResponse - Function to send response back to sender
- */
 function processNonStreamingRequest(requestData, timeout, sendResponse) {
-  // Validate Ollama URL
   const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
 
-  // Ensure timeout is a reasonable number
-  timeout =
-    typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
+  timeout = typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
 
   const controller = new AbortController();
   const requestId = Date.now().toString();
@@ -183,7 +232,6 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
 
   const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
 
-  // Sanitize request data before sending
   const safeRequestData = {
     model: String(requestData.model || ""),
     prompt: String(requestData.prompt || ""),
@@ -206,25 +254,15 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
       return response.text();
     })
     .then((rawText) => processOllamaResponse(rawText, sendResponse))
-    .catch((error) =>
-      handleOllamaError(error, controller, timeout, sendResponse)
-    )
+    .catch((error) => handleOllamaError(error, controller, timeout, sendResponse))
     .finally(() => {
       clearTimeout(timeoutId);
       activeRequestControllers.delete(requestId);
     });
 }
 
-/**
- * Processes response from Ollama API
- * @param {string} rawText - Raw response text from Ollama
- * @param {function} sendResponse - Function to send response back to sender
- */
 function processOllamaResponse(rawText, sendResponse) {
-  console.log(
-    "Raw Ollama response (first 100 chars):",
-    rawText.substring(0, 100)
-  );
+  console.log("Raw Ollama response (first 100 chars):", rawText.substring(0, 100));
 
   try {
     let enhancedText = "";
@@ -247,35 +285,19 @@ function processOllamaResponse(rawText, sendResponse) {
     }
 
     if (!enhancedText) {
-      console.warn(
-        "No text found in Ollama response:",
-        rawText.substring(0, 200)
-      );
+      console.warn("No text found in Ollama response:", rawText.substring(0, 200));
       throw new Error("No text found in Ollama response");
     }
 
-    console.log(
-      "Ollama request successful, response length:",
-      enhancedText.length
-    );
+    console.log("Ollama request successful, response length:", enhancedText.length);
     sendResponse({ enhancedText });
   } catch (parseError) {
     console.error("JSON parsing error:", parseError);
-    console.error(
-      "Raw response that caused parsing error:",
-      rawText.substring(0, 500)
-    );
+    console.error("Raw response that caused parsing error:", rawText.substring(0, 500));
     sendResponse({ error: `JSON parsing error: ${parseError.message}` });
   }
 }
 
-/**
- * Handles errors from Ollama API requests
- * @param {Error} error - Error object
- * @param {AbortController} controller - Request controller
- * @param {number} timeout - Request timeout
- * @param {function} sendResponse - Function to send response back to sender
- */
 function handleOllamaError(error, controller, timeout, sendResponse) {
   if (error.name === "AbortError") {
     const isUserTerminated = controller.signal.reason === "USER_TERMINATED";
@@ -295,18 +317,11 @@ function handleOllamaError(error, controller, timeout, sendResponse) {
   }
 }
 
-/**
- * Checks if Ollama is available and returns its status
- * @param {function} sendResponse - Function to send response back to sender
- */
 function checkOllamaAvailability(sendResponse) {
-  console.log(
-    `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
-  );
+  console.log(`Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`);
 
-  // Create AbortController with reasonable timeout
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
   fetch(DEFAULT_OLLAMA_URL + "/api/version", {
     method: "GET",
@@ -318,12 +333,8 @@ function checkOllamaAvailability(sendResponse) {
         return response.json().then((data) => {
           console.log(`Ollama version check successful: ${data.version}`);
 
-          // Create new controller for models request
           const modelsController = new AbortController();
-          const modelsTimeoutId = setTimeout(
-            () => modelsController.abort(),
-            5000
-          );
+          const modelsTimeoutId = setTimeout(() => modelsController.abort(), 5000);
 
           fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
             method: "GET",
@@ -332,18 +343,13 @@ function checkOllamaAvailability(sendResponse) {
           })
             .then((modelsResponse) => modelsResponse.json())
             .then((modelsData) => {
-              // Validate model data
               const availableModels = Array.isArray(modelsData.models)
                 ? modelsData.models
                     .filter((m) => m && m.name)
                     .map((m) => m.name)
                 : [];
 
-              console.log(
-                `Ollama is available, version: ${
-                  data.version
-                }, models: ${availableModels.join(", ")}`
-              );
+              console.log(`Ollama is available, version: ${data.version}, models: ${availableModels.join(", ")}`);
               sendResponse({
                 available: true,
                 version: data.version,
@@ -351,17 +357,13 @@ function checkOllamaAvailability(sendResponse) {
               });
             })
             .catch((modelError) => {
-              console.log(
-                `Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`
-              );
+              console.log(`Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`);
               sendResponse({ available: true, version: data.version });
             })
             .finally(() => clearTimeout(modelsTimeoutId));
         });
       } else {
-        console.warn(
-          `Ollama availability check failed with status: ${response.status}`
-        );
+        console.warn(`Ollama availability check failed with status: ${response.status}`);
         sendResponse({
           available: false,
           reason: `HTTP error: ${response.status}`
@@ -375,14 +377,8 @@ function checkOllamaAvailability(sendResponse) {
     .finally(() => clearTimeout(timeoutId));
 }
 
-/**
- * Checks if a site is whitelisted for enhancement
- * @param {string} url - URL to check
- * @return {Promise<boolean>} - Promise resolving to whitelist status
- */
 function isSiteWhitelisted(url) {
   try {
-    // Validate URL format
     if (!url || typeof url !== "string" || !url.startsWith("http")) {
       console.warn("Invalid URL format:", url);
       return Promise.resolve(false);
@@ -395,34 +391,28 @@ function isSiteWhitelisted(url) {
       return Promise.resolve(false);
     }
 
-    // Check cache first
     const cachedResult = whitelistCache.get(hostname);
     if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
       return Promise.resolve(cachedResult.isWhitelisted);
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       chrome.storage.sync.get("whitelistedSites", (data) => {
         if (chrome.runtime.lastError) {
-          console.error(
-            "Error retrieving whitelisted sites:",
-            chrome.runtime.lastError
-          );
-          return reject(false);
+          console.error("Error retrieving whitelisted sites:", chrome.runtime.lastError);
+          whitelistCache.set(hostname, {
+            isWhitelisted: false,
+            timestamp: Date.now()
+          });
+          return resolve(false);
         }
 
-        const whitelistedSites = Array.isArray(data.whitelistedSites)
-          ? data.whitelistedSites
-          : [];
+        const whitelistedSites = Array.isArray(data.whitelistedSites) ? data.whitelistedSites : [];
 
-        // Check if hostname or any of its parent domains are in the whitelist
         const isWhitelisted = whitelistedSites.some(
-          (whitelistedSite) =>
-            hostname === whitelistedSite ||
-            hostname.endsWith("." + whitelistedSite)
+          (whitelistedSite) => hostname === whitelistedSite || hostname.endsWith("." + whitelistedSite)
         );
 
-        // Update cache
         whitelistCache.set(hostname, {
           isWhitelisted,
           timestamp: Date.now()
@@ -437,18 +427,12 @@ function isSiteWhitelisted(url) {
   }
 }
 
-/**
- * Checks if a site has permission for enhancement
- * @param {string} url - URL to check
- * @return {Promise<boolean>} - Promise resolving to permission status
- */
 async function checkSitePermission(url) {
   if (!url || typeof url !== "string") {
     return false;
   }
 
   try {
-    // Use cache if available
     const hostname = new URL(url).hostname;
     const cachedResult = whitelistCache.get(hostname);
 
@@ -456,10 +440,8 @@ async function checkSitePermission(url) {
       return cachedResult.isWhitelisted;
     }
 
-    // First, check if the site is whitelisted
     const isWhitelisted = await isSiteWhitelisted(url);
 
-    // Cache the result
     whitelistCache.set(hostname, {
       isWhitelisted,
       timestamp: Date.now()
@@ -472,11 +454,6 @@ async function checkSitePermission(url) {
   }
 }
 
-/**
- * Requests extension permissions for a domain
- * @param {string} domain - Domain to request permissions for
- * @return {Promise<boolean>} - Promise resolving to whether permission was granted
- */
 async function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
 
@@ -499,7 +476,7 @@ async function requestPermission(domain) {
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(
     {
-      isExtensionPaused: true,
+      isExtensionPaused: false,
       preserveNames: true,
       fixPronouns: true,
       modelName: "qwen3:8b",
@@ -510,17 +487,18 @@ chrome.runtime.onInstalled.addListener(() => {
       topP: 0.9,
       whitelistedSites: []
     },
-    (data) => chrome.storage.sync.set(data)
+    (data) => {
+      chrome.storage.sync.set(data);
+      console.log("Extension initialized with default settings:", data);
+    }
   );
 });
 
-// Cache for whitelist checks to avoid repeated calls
 const whitelistCache = new Map();
-const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const CACHE_EXPIRY = 5 * 60 * 1000;
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
-    // If we have a recent cache entry, use it instead of checking again
     const cacheKey = new URL(tab.url).hostname;
     const cachedResult = whitelistCache.get(cacheKey);
 
@@ -529,10 +507,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       return;
     }
 
-    // Otherwise check and update cache
     isSiteWhitelisted(tab.url)
       .then((isWhitelisted) => {
-        // Cache the result
         whitelistCache.set(cacheKey, {
           isWhitelisted,
           timestamp: Date.now()
@@ -546,143 +522,182 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-/**
- * Sends whitelist status to a tab
- * @param {number} tabId - ID of the tab to send status to
- * @param {boolean} isWhitelisted - Whether the site is whitelisted
- */
 function sendWhitelistStatus(tabId, isWhitelisted) {
   chrome.tabs
     .sendMessage(tabId, {
       action: "checkCurrentSiteWhitelist",
       isWhitelisted: isWhitelisted
     })
-    .catch(() => {
-      // Suppress errors when content script isn't ready or available
-    });
+    .catch(() => {});
 }
 
-// Load character maps on startup
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get("novelCharacterMaps", (data) => {
     if (data.novelCharacterMaps) {
-      novelCharacterMaps = data.novelCharacterMaps;
+      const convertedMaps = {};
+      
+      Object.entries(data.novelCharacterMaps).forEach(([novelId, novelData]) => {
+        if (!novelData.chars && !novelData.characters) {
+          convertedMaps[novelId] = {
+            chars: {},
+            chaps: [],
+            lastAccess: Date.now()
+          };
+          
+          Object.entries(novelData).forEach(([name, data], index) => {
+            if (name && typeof name === 'string') {
+              convertedMaps[novelId].chars[index] = {
+                n: name,
+                g: compressGender(data.gender),
+                c: parseFloat(data.confidence) || 0,
+                a: parseInt(data.appearances) || 1
+              };
+              
+              if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+                convertedMaps[novelId].chars[index].e = data.evidence.slice(0, 5);
+              }
+            }
+          });
+        } 
+        else if (novelData.characters && !novelData.chars) {
+          convertedMaps[novelId] = {
+            chars: {},
+            chaps: [],
+            lastAccess: Date.now()
+          };
+          
+          Object.entries(novelData.characters).forEach(([name, data], index) => {
+            convertedMaps[novelId].chars[index] = {
+              n: name,
+              g: compressGender(data.gender),
+              c: parseFloat(data.confidence) || 0,
+              a: parseInt(data.appearances) || 1
+            };
+            
+            if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+              convertedMaps[novelId].chars[index].e = data.evidence.slice(0, 5);
+            }
+          });
+          
+          if (Array.isArray(novelData.enhancedChapters)) {
+            convertedMaps[novelId].chaps = novelData.enhancedChapters
+              .map(chapter => chapter.chapterNumber)
+              .filter(num => typeof num === 'number');
+          }
+          
+          if (novelData.style) {
+            convertedMaps[novelId].style = novelData.style;
+          }
+        }
+        else if (novelData.chars) {
+          convertedMaps[novelId] = novelData;
+          
+          if (!convertedMaps[novelId].lastAccess) {
+            convertedMaps[novelId].lastAccess = Date.now();
+          }
+        }
+      });
+      
+      novelCharacterMaps = convertedMaps;
+      
+      chrome.storage.local.set({ novelCharacterMaps: convertedMaps });
+      console.log("Character data converted to optimized format");
     }
   });
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "updateCharacterMap") {
+  if (request.action === "updateNovelData") {
     const novelId = request.novelId;
 
     if (!novelId) {
-      console.warn("No novel ID provided for character map update");
+      console.warn("No novel ID provided for novel data update");
       sendResponse({ status: "error", message: "No novel ID provided" });
       return false;
     }
 
-    // Create or update the character map for this novel
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
-        characters: {},
-        enhancedChapters: []
+        chars: {},
+        chaps: [],
+        lastAccess: Date.now()
       };
     }
+    
+    novelCharacterMaps[novelId].lastAccess = Date.now();
 
-    // Ensure the novel has the new structure with characters and enhancedChapters
-    if (
-      !novelCharacterMaps[novelId].characters &&
-      typeof novelCharacterMaps[novelId] === "object"
-    ) {
-      // Migrate old structure if needed
-      const characters = { ...novelCharacterMaps[novelId] };
-      novelCharacterMaps[novelId] = {
-        characters: characters,
-        enhancedChapters: []
-      };
-    }
-
-    // Update enhanced chapters list if provided
-    if (request.chapterInfo && request.chapterInfo.chapterNumber) {
-      const { chapterNumber } = request.chapterInfo;
-      const existingChapterIndex = novelCharacterMaps[
-        novelId
-      ].enhancedChapters.findIndex(
-        (chapter) => chapter.chapterNumber === chapterNumber
-      );
-
-      if (existingChapterIndex >= 0) {
-        // Update existing chapter entry
-        novelCharacterMaps[novelId].enhancedChapters[existingChapterIndex] = {
-          chapterNumber
-        };
-      } else {
-        // Add new chapter entry
-        novelCharacterMaps[novelId].enhancedChapters.push({
-          chapterNumber
-        });
+    if (request.chapterNumber) {
+      if (!novelCharacterMaps[novelId].chaps.includes(request.chapterNumber)) {
+        novelCharacterMaps[novelId].chaps.push(request.chapterNumber);
       }
     }
 
-    // For each character in the new map
-    Object.entries(request.characters).forEach(([charName, charData]) => {
-      // If character already exists in our stored map
-      if (
-        novelCharacterMaps[novelId].characters &&
-        novelCharacterMaps[novelId].characters[charName]
-      ) {
-        const existingChar = novelCharacterMaps[novelId].characters[charName];
-
-        // Merge appearances count
-        const newAppearances =
-          (existingChar.appearances || 0) + (charData.appearances || 1);
-
-        // Keep the higher confidence gender assessment
-        let mergedGender = existingChar.gender;
-        let mergedConfidence = existingChar.confidence || 0;
-        let mergedEvidence = existingChar.evidence || [];
-
-        // If new data has better confidence, use it instead
-        if (charData.confidence > mergedConfidence) {
-          mergedGender = charData.gender;
-          mergedConfidence = charData.confidence;
-          mergedEvidence = charData.evidence || [];
+    if (request.chars && typeof request.chars === 'object') {
+      Object.entries(request.chars).forEach(([charId, charData]) => {
+        let existingCharId = null;
+        
+        for (const [id, character] of Object.entries(novelCharacterMaps[novelId].chars)) {
+          if (character.n === charData.n) {
+            existingCharId = id;
+            break;
+          }
         }
-        // If new data has same confidence but more evidence, include new evidence
-        else if (
-          charData.confidence === mergedConfidence &&
-          charData.evidence
-        ) {
-          // Add new evidence that doesn't already exist
-          charData.evidence.forEach((item) => {
-            if (!mergedEvidence.includes(item)) {
-              mergedEvidence.push(item);
-            }
-          });
-        }
+        
+        if (existingCharId !== null) {
+          const existingChar = novelCharacterMaps[novelId].chars[existingCharId];
+          
+          const newAppearances = (existingChar.a || 0) + (charData.a || 1);
 
-        // Update the existing character with merged data
-        novelCharacterMaps[novelId].characters[charName] = {
-          ...existingChar,
-          gender: mergedGender,
-          confidence: mergedConfidence,
-          appearances: newAppearances,
-          evidence: mergedEvidence
-        };
-      } else {
-        if (!novelCharacterMaps[novelId].characters) {
-          novelCharacterMaps[novelId].characters = {};
-        }
-        novelCharacterMaps[novelId].characters[charName] = charData;
-      }
-    });
+          let mergedGender = existingChar.g;
+          let mergedConfidence = existingChar.c || 0;
+          let mergedEvidence = existingChar.e || [];
 
-    // Store in sync storage (with size limit handling)
+          const newConfidence = parseFloat(charData.c) || 0;
+          if (newConfidence > mergedConfidence) {
+            mergedGender = charData.g;
+            mergedConfidence = newConfidence;
+            mergedEvidence = Array.isArray(charData.e) ? charData.e : [];
+          }
+          else if (newConfidence === mergedConfidence && Array.isArray(charData.e)) {
+            charData.e.forEach((item) => {
+              if (!mergedEvidence.includes(item) && mergedEvidence.length < 5) {
+                mergedEvidence.push(item);
+              }
+            });
+          }
+
+          novelCharacterMaps[novelId].chars[existingCharId] = {
+            n: charData.n,
+            g: mergedGender,
+            c: mergedConfidence,
+            a: newAppearances
+          };
+          
+          if (mergedEvidence.length > 0) {
+            novelCharacterMaps[novelId].chars[existingCharId].e = mergedEvidence.slice(0, 5);
+          }
+        } else {
+          const nextId = getNextCharacterId(novelCharacterMaps[novelId].chars);
+          
+          novelCharacterMaps[novelId].chars[nextId] = {
+            n: charData.n,
+            g: charData.g,
+            c: parseFloat(charData.c) || 0,
+            a: parseInt(charData.a) || 1
+          };
+          
+          if (Array.isArray(charData.e) && charData.e.length > 0) {
+            novelCharacterMaps[novelId].chars[nextId].e = charData.e.slice(0, 5);
+          }
+        }
+      });
+    }
+
     storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
     return false;
-  } else if (request.action === "getCharacterMap") {
+  } else if (request.action === "getNovelData") {
     const novelId = request.novelId;
 
     if (!novelId) {
@@ -690,24 +705,35 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
-    // Check if we have the new data structure
-    const novelData = novelCharacterMaps[novelId] || {};
+    if (!novelCharacterMaps[novelId]) {
+      sendResponse({ 
+        status: "ok", 
+        characterMap: {},
+        enhancedChapters: []
+      });
+      return false;
+    }
+    
+    novelCharacterMaps[novelId].lastAccess = Date.now();
+    
     const response = {
       status: "ok",
-      characterMap: {}
+      characterMap: {},
+      enhancedChapters: []
     };
 
-    // If it's the new structure, return the characters part
-    if (novelData.characters) {
-      response.characterMap = novelData.characters;
-    } else {
-      // For backward compatibility
-      response.characterMap = novelData;
-    }
+    Object.entries(novelCharacterMaps[novelId].chars).forEach(([charId, charData]) => {
+      const characterName = charData.n;
+      response.characterMap[characterName] = {
+        gender: expandGender(charData.g),
+        confidence: charData.c,
+        appearances: charData.a,
+        evidence: charData.e || []
+      };
+    });
 
-    // Add enhancedChapters data to response
-    if (novelData.enhancedChapters) {
-      response.enhancedChapters = novelData.enhancedChapters;
+    if (Array.isArray(novelCharacterMaps[novelId].chaps)) {
+      response.enhancedChapters = novelCharacterMaps[novelId].chaps.map(num => ({ chapterNumber: num }));
     }
 
     sendResponse(response);
@@ -728,7 +754,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (await requestPermission(hostname)) {
             whitelistedSites.push(hostname);
             chrome.storage.sync.set({ whitelistedSites }, () => {
-              // Update cache
               whitelistCache.set(hostname, {
                 isWhitelisted: true,
                 timestamp: Date.now()
@@ -762,7 +787,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       let whitelistedSites = data.whitelistedSites || [];
       whitelistedSites = whitelistedSites.filter((site) => site !== hostname);
       chrome.storage.sync.set({ whitelistedSites }, () => {
-        // Update cache
         whitelistCache.set(hostname, {
           isWhitelisted: false,
           timestamp: Date.now()
@@ -835,6 +859,55 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.action === "checkOllamaAvailability") {
     checkOllamaAvailability(sendResponse);
     return true;
+  } else if (request.action === "getNovelStyle") {
+    const novelId = request.novelId;
+    
+    if (!novelId) {
+      sendResponse({ status: "error", message: "No novel ID provided" });
+      return false;
+    }
+    
+    const novelData = novelCharacterMaps[novelId] || {};
+    
+    const migratedData = migrateToNewFormat(novelData);
+    
+    migratedData.lastAccess = Date.now();
+    novelCharacterMaps[novelId] = migratedData;
+    
+    if (migratedData.style) {
+      sendResponse({ status: "ok", style: migratedData.style });
+    } else {
+      sendResponse({ status: "ok", style: null });
+    }
+    
+    return false;
+  } else if (request.action === "updateNovelStyle") {
+    const novelId = request.novelId;
+    const style = request.style;
+    
+    if (!novelId || !style) {
+      sendResponse({ status: "error", message: "Missing novel ID or style data" });
+      return false;
+    }
+    
+    if (!novelCharacterMaps[novelId]) {
+      novelCharacterMaps[novelId] = {
+        chars: {},
+        chaps: [],
+        style: style,
+        lastAccess: Date.now()
+      };
+    } else {
+      const migratedData = migrateToNewFormat(novelCharacterMaps[novelId]);
+      migratedData.style = style;
+      migratedData.lastAccess = Date.now();
+      novelCharacterMaps[novelId] = migratedData;
+    }
+    
+    storeNovelCharacterMaps(novelCharacterMaps);
+    
+    sendResponse({ status: "ok" });
+    return false;
   }
 
   return false;
