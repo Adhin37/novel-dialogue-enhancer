@@ -96,6 +96,17 @@ class Toaster {
         from { opacity: 0; transform: translate(-50%, -20px); }
         to { opacity: 1; transform: translate(-50%, 0); }
       }
+      #${this.iconId} svg.gear {
+        transform-origin: center center;
+        animation: spin 2s linear infinite;
+      }
+      /* Make sure SVG elements are visible in both light and dark modes */
+      #${this.iconId} svg {
+        color-scheme: light dark;
+      }
+      #root {
+        --gear-color: #ffffffe7;
+      }
     `;
     document.head.appendChild(style);
 
@@ -115,13 +126,10 @@ class Toaster {
     svg.setAttribute("height", "20");
     svg.setAttribute("viewBox", "0 0 24 24");
     svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke", "#ffffff");
     svg.setAttribute("stroke-width", "2");
     svg.setAttribute("stroke-linecap", "round");
     svg.setAttribute("stroke-linejoin", "round");
-
-    // Reset animation
-    this.progressIcon.style.animation = "none";
 
     switch (severity) {
       case "success": {
@@ -133,10 +141,12 @@ class Toaster {
         successCircle.setAttribute("cy", "12");
         successCircle.setAttribute("r", "10");
         successCircle.setAttribute("stroke", "#4caf50");
+        successCircle.setAttribute("fill", "none");
 
         const checkmark = document.createElementNS(svgNS, "path");
         checkmark.setAttribute("d", "M8 12l3 3 6-6");
         checkmark.setAttribute("stroke", "#4caf50");
+        checkmark.setAttribute("fill", "none");
 
         svg.appendChild(successCircle);
         svg.appendChild(checkmark);
@@ -152,6 +162,7 @@ class Toaster {
         errorCircle.setAttribute("cy", "12");
         errorCircle.setAttribute("r", "10");
         errorCircle.setAttribute("stroke", "#f44336");
+        errorCircle.setAttribute("fill", "none");
 
         const line1 = document.createElementNS(svgNS, "line");
         line1.setAttribute("x1", "15");
@@ -174,22 +185,30 @@ class Toaster {
       }
 
       case "info": {
+        const iconColor = "#3498db";
+        svg.setAttribute("stroke", iconColor);
+        svg.setAttribute("stroke-width", "2");
+
         const infoCircle = document.createElementNS(svgNS, "circle");
         infoCircle.setAttribute("cx", "12");
         infoCircle.setAttribute("cy", "12");
         infoCircle.setAttribute("r", "10");
+        infoCircle.setAttribute("stroke", iconColor);
+        infoCircle.setAttribute("fill", "none");
 
         const infoLine1 = document.createElementNS(svgNS, "line");
         infoLine1.setAttribute("x1", "12");
         infoLine1.setAttribute("y1", "16");
         infoLine1.setAttribute("x2", "12");
         infoLine1.setAttribute("y2", "12");
+        infoLine1.setAttribute("stroke", iconColor);
 
         const infoLine2 = document.createElementNS(svgNS, "line");
         infoLine2.setAttribute("x1", "12");
         infoLine2.setAttribute("y1", "8");
         infoLine2.setAttribute("x2", "12.01");
         infoLine2.setAttribute("y2", "8");
+        infoLine2.setAttribute("stroke", iconColor);
 
         svg.appendChild(infoCircle);
         svg.appendChild(infoLine1);
@@ -198,28 +217,31 @@ class Toaster {
       }
 
       case "warn": {
-        svg.setAttribute("stroke", "#ff9800");
+        const iconColor = "#ff9800";
+        svg.setAttribute("stroke", iconColor);
+        svg.setAttribute("stroke-width", "2");
 
         const triangle = document.createElementNS(svgNS, "path");
         triangle.setAttribute(
           "d",
           "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
         );
-        triangle.setAttribute("stroke", "#ff9800");
+        triangle.setAttribute("stroke", iconColor);
+        triangle.setAttribute("fill", "none");
 
         const exclamation = document.createElementNS(svgNS, "line");
         exclamation.setAttribute("x1", "12");
         exclamation.setAttribute("y1", "9");
         exclamation.setAttribute("x2", "12");
         exclamation.setAttribute("y2", "13");
-        exclamation.setAttribute("stroke", "#ff9800");
+        exclamation.setAttribute("stroke", iconColor);
 
         const dot = document.createElementNS(svgNS, "line");
         dot.setAttribute("x1", "12");
         dot.setAttribute("y1", "17");
         dot.setAttribute("x2", "12.01");
         dot.setAttribute("y2", "17");
-        dot.setAttribute("stroke", "#ff9800");
+        dot.setAttribute("stroke", iconColor);
 
         svg.appendChild(triangle);
         svg.appendChild(exclamation);
@@ -228,52 +250,48 @@ class Toaster {
       }
 
       case "loading":
-      default: // Set up the spinning gear for loading
-      {
+      default: {
+        // Use a properly centered SVG for the gear
         svg.setAttribute("class", "gear");
-        svg.setAttribute("width", "100");
-        svg.setAttribute("height", "100");
-        svg.setAttribute("viewBox", "0 0 100 100");
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+        svg.setAttribute("viewBox", "0 0 24 24");
 
+        // Create a centered gear with proper rotation point
+        const gear = document.createElementNS(svgNS, "g");
+        const gearColor = "var(--gear-color)";
+
+        // Center circle
         const circle = document.createElementNS(svgNS, "circle");
-        circle.setAttribute("cx", "50");
-        circle.setAttribute("cy", "50");
-        circle.setAttribute("r", "10");
-        circle.setAttribute("stroke-width", "4");
+        circle.setAttribute("cx", "12");
+        circle.setAttribute("cy", "12");
+        circle.setAttribute("r", "2");
+        circle.setAttribute("stroke-width", "2");
+        circle.setAttribute("fill", gearColor);
+        circle.setAttribute("stroke", gearColor);
 
-        const g = document.createElementNS(svgNS, "g");
-        g.setAttribute("stroke-width", "4");
+        // Create spokes/teeth for the gear at equal angles
+        for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * 2 * Math.PI;
+          const innerX = 12 + 4 * Math.cos(angle);
+          const innerY = 12 + 4 * Math.sin(angle);
+          const outerX = 12 + 9 * Math.cos(angle);
+          const outerY = 12 + 9 * Math.sin(angle);
 
-        // Create lines
-        const linePositions = [
-          ["50", "5", "50", "15"],
-          ["50", "85", "50", "95"],
-          ["5", "50", "15", "50"],
-          ["85", "50", "95", "50"],
-          ["20", "20", "28", "28"],
-          ["80", "20", "72", "28"],
-          ["20", "80", "28", "72"],
-          ["80", "80", "72", "72"]
-        ];
-
-        linePositions.forEach((pos) => {
           const line = document.createElementNS(svgNS, "line");
-          line.setAttribute("x1", pos[0]);
-          line.setAttribute("y1", pos[1]);
-          line.setAttribute("x2", pos[2]);
-          line.setAttribute("y2", pos[3]);
-          g.appendChild(line);
-        });
+          line.setAttribute("x1", innerX);
+          line.setAttribute("y1", innerY);
+          line.setAttribute("x2", outerX);
+          line.setAttribute("y2", outerY);
+          line.setAttribute("stroke", gearColor);
+          line.setAttribute("stroke-width", "2");
+          line.setAttribute("stroke-linecap", "round");
 
-        svg.appendChild(circle);
-        svg.appendChild(g);
+          gear.appendChild(line);
+        }
 
-        // Add animation for loading state
-        this.progressIcon.style.cssText = `
-          animation: spin 2s linear infinite;
-          transform-origin: 50% 50%;
-          transform-box: fill-box;
-        `;
+        gear.appendChild(circle);
+        svg.appendChild(gear);
         break;
       }
     }

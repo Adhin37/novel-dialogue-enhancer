@@ -1,24 +1,24 @@
 .save-feedback {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: var(--success-color);
-    color: white;
-    padding: 1rem 1.5rem;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px var(--shadow-color);
-    z-index: 100;
-    animation: slideIn 0.3s, fadeOut 0.3s 2s forwards;
-  }
-  
-  .save-feedback.success {
-    background-color: var(--success-color);
-  }
-  
-  .save-feedback.warning {
-    background-color: var(--warning-color);
-  }
-  
-  .save-feedback.error {
-    background-color: var(--error-color);
-  }
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: var(--success-color);
+  color: white;
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  z-index: 100;
+  animation: slideIn 0.3s, fadeOut 0.3s 2s forwards;
+}
+
+.save-feedback.success {
+  background-color: var(--success-color);
+}
+
+.save-feedback.warning {
+  background-color: var(--warning-color);
+}
+
+.save-feedback.error {
+  background-color: var(--error-color);
+}

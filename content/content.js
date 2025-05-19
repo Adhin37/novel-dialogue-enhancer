@@ -471,7 +471,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     isCurrentSiteWhitelisted = request.isWhitelisted;
     console.log(`Site whitelist status updated: ${isCurrentSiteWhitelisted}`);
     sendResponse({ status: "updated" });
-    return false;
+    return true;
   } else if (request.action === "enhanceNow") {
     // First check if site is whitelisted
     if (!isCurrentSiteWhitelisted) {

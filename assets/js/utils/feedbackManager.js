@@ -44,7 +44,6 @@ class FeedbackManager {
       }
     }, duration);
 
-    // Return the element in case the caller wants to manipulate it further
     return feedback;
   }
 

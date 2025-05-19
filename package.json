@@ -4,7 +4,7 @@
   "description": "Novel dialogue enhancer",
   "main": "content.js",
   "scripts": {
-    "test": "npm run test"
+    "build:zip": "zip -r dist/novel-dialogue-enhancer.zip assets/* background/* content/* popup/* options/* manifest.json README.md"
   },
   "repository": {
     "type": "git",
