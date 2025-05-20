@@ -24,6 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const addSiteConfirmBtn = document.getElementById("add-site-confirm");
   const cancelAddSiteBtn = document.getElementById("cancel-add-site");
   const closeModalBtn = document.querySelector(".close-modal");
+  const novelsTab = document.querySelector('.tab-btn[data-tab="novels"]');
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
@@ -73,7 +74,10 @@ document.addEventListener("DOMContentLoaded", () => {
     domain = domain.split("/")[0];
 
     if (domain.startsWith("chrome")) {
-      window.feedbackManager.show("Chrome internal pages cannot be added to whitelist", "warning");
+      window.feedbackManager.show(
+        "Chrome internal pages cannot be added to whitelist",
+        "warning"
+      );
 
       siteModal.style.display = "none";
       siteUrlInput.value = "";
@@ -95,7 +99,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
           loadWhitelist();
         } else {
-          window.feedbackManager.show(response.message || "Error adding site", "warning");
+          window.feedbackManager.show(
+            response.message || "Error adding site",
+            "warning"
+          );
 
           siteModal.style.display = "none";
           siteUrlInput.value = "";
@@ -238,7 +245,10 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (response && response.success) {
-          window.feedbackManager.show(`Removed ${site} from whitelist`, "success");
+          window.feedbackManager.show(
+            `Removed ${site} from whitelist`,
+            "success"
+          );
 
           loadWhitelist();
         }
@@ -275,7 +285,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (url.protocol.startsWith("chrome")) {
             focusModal("Chrome pages can't be added to the whitelist");
-            window.feedbackManager.show("Chrome pages can't be added. Enter a site manually.", "warning");
+            window.feedbackManager.show(
+              "Chrome pages can't be added. Enter a site manually.",
+              "warning"
+            );
             return;
           }
 
@@ -325,10 +338,225 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Loads and displays novel character maps
+   */
+  function loadNovelCharacterMaps() {
+    chrome.storage.local.get("novelCharacterMaps", (data) => {
+      const novelMaps = data.novelCharacterMaps || {};
+      renderNovelMaps(novelMaps);
+    });
+  }
+
+  /**
+   * Renders novel maps in the UI
+   * @param {Object} novelMaps - The novel character maps data
+   */
+  function renderNovelMaps(novelMaps) {
+    const novelsContainer = document.getElementById("novels-container");
+    novelsContainer.innerHTML = "";
+
+    const novelIds = Object.keys(novelMaps);
+
+    if (novelIds.length === 0) {
+      novelsContainer.innerHTML =
+        '<div class="empty-list">No novels detected yet</div>';
+      return;
+    }
+
+    // Sort novels by last access time (most recent first)
+    novelIds.sort((a, b) => {
+      const timeA = novelMaps[a].lastAccess || 0;
+      const timeB = novelMaps[b].lastAccess || 0;
+      return timeB - timeA;
+    });
+
+    novelIds.forEach((novelId) => {
+      const novelData = novelMaps[novelId];
+
+      // Skip if no characters or invalid data
+      if (!novelData.chars || Object.keys(novelData.chars).length === 0) {
+        return;
+      }
+
+      const displayName = formatNovelId(novelId);
+      const charCount = Object.keys(novelData.chars).length;
+      const lastAccess = novelData.lastAccess
+        ? new Date(novelData.lastAccess).toLocaleDateString()
+        : "Unknown";
+
+      const novelElement = document.createElement("div");
+      novelElement.className = "novel-container";
+
+      const novelItem = document.createElement("div");
+      novelItem.className = "novel-item";
+      novelItem.dataset.novelId = novelId;
+
+      novelItem.innerHTML = `
+      <div class="novel-title">${displayName}</div>
+      <div class="novel-metadata">
+        <span class="novel-last-access">Last read: ${lastAccess}</span>
+        <span class="character-count">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 12C14.21 12 16 10.21 16 8C16 5.79 14.21 4 12 4C9.79 4 8 5.79 8 8C8 10.21 9.79 12 12 12ZM12 14C9.33 14 4 15.34 4 18V20H20V18C20 15.34 14.67 14 12 14Z" fill="currentColor"/>
+          </svg>
+          ${charCount}
+        </span>
+      </div>
+    `;
+
+      novelElement.appendChild(novelItem);
+
+      // Create details container (hidden by default)
+      const detailsContainer = document.createElement("div");
+      detailsContainer.className = "novel-details";
+      detailsContainer.style.display = "none";
+      novelElement.appendChild(detailsContainer);
+
+      novelsContainer.appendChild(novelElement);
+
+      // Add click event to toggle details
+      novelItem.addEventListener("click", () => {
+        if (detailsContainer.style.display === "none") {
+          // Close any other open details first
+          document.querySelectorAll(".novel-details").forEach((el) => {
+            if (el !== detailsContainer) {
+              el.style.display = "none";
+            }
+          });
+
+          renderNovelDetails(detailsContainer, novelData);
+          detailsContainer.style.display = "block";
+        } else {
+          detailsContainer.style.display = "none";
+        }
+      });
+    });
+  }
+
+  /**
+   * Renders novel character details
+   * @param {HTMLElement} container - The container element
+   * @param {Object} novelData - Novel data with characters
+   */
+  function renderNovelDetails(container, novelData) {
+    if (!container || !novelData || !novelData.chars) return;
+
+    const characters = Object.values(novelData.chars);
+
+    // Sort characters by appearance count (highest first)
+    characters.sort((a, b) => (b.appearances || 0) - (a.appearances || 0));
+
+    let html = '<div class="character-list">';
+
+    characters.forEach((char) => {
+      const name = char.name || "Unknown";
+      const appearances = char.appearances || 0;
+      const confidence = parseFloat(char.confidence) || 0;
+
+      let gender = "unknown";
+      if (char.gender === "m") gender = "male";
+      if (char.gender === "f") gender = "female";
+
+      let confidenceClass = "confidence-low";
+      if (confidence >= 0.7) confidenceClass = "confidence-high";
+      else if (confidence >= 0.4) confidenceClass = "confidence-medium";
+
+      html += `
+      <div class="character-card">
+        <div class="gender-badge gender-${gender}">${gender}</div>
+        <div class="character-name">${escapeHtml(name)}</div>
+        <div class="character-info">
+          <div><span class="confidence-indicator ${confidenceClass}"></span> Confidence: ${Math.round(
+        confidence * 100
+      )}%</div>
+          <div class="character-appearances">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5C17 19.5 21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17ZM12 9C10.34 9 9 10.34 9 12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12C15 10.34 13.66 9 12 9Z" fill="currentColor"/>
+            </svg>
+            ${appearances} appearances
+          </div>
+        </div>
+      </div>
+    `;
+    });
+
+    html += "</div>";
+    container.innerHTML = html;
+  }
+
+  /**
+   * Format novel ID to a more readable title
+   * @param {string} novelId - The novel identifier
+   * @return {string} - Formatted title
+   */
+  function formatNovelId(novelId) {
+    if (!novelId) return "Unknown Novel";
+
+    // Remove underscores and capitalize words
+    let title = novelId
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    // Extract domain if present
+    const domainMatch = title.match(/^([A-Za-z0-9.]+)\s/);
+    if (domainMatch) {
+      const domain = domainMatch[1];
+      title = title.replace(
+        domain,
+        `<span style="color:var(--primary-color);">${domain}</span> |`
+      );
+    }
+
+    return title;
+  }
+
+  /**
+   * Escape HTML to prevent XSS
+   * @param {string} unsafe - Potentially unsafe string
+   * @return {string} - Safe HTML string
+   */
+  function escapeHtml(unsafe) {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  /**
+   * Sets up search functionality for novels
+   */
+  function setupNovelSearch() {
+    const searchInput = document.getElementById("novels-search");
+    if (!searchInput) return;
+
+    searchInput.addEventListener("input", () => {
+      const searchTerm = searchInput.value.toLowerCase();
+      const novelItems = document.querySelectorAll(".novel-item");
+
+      novelItems.forEach((item) => {
+        const novelContainer = item.closest(".novel-container");
+        const title = item
+          .querySelector(".novel-title")
+          .textContent.toLowerCase();
+
+        if (title.includes(searchTerm)) {
+          novelContainer.style.display = "block";
+        } else {
+          novelContainer.style.display = "none";
+        }
+      });
+    });
+  }
+
+  /**
    * Initialize all functionality
    */
   function init() {
     initTabs();
+    loadNovelCharacterMaps();
+    setupNovelSearch();
 
     syncThemeSwitchWithState();
 
@@ -367,10 +595,19 @@ document.addEventListener("DOMContentLoaded", () => {
         chrome.storage.sync.set({ whitelistedSites: [] }, () => {
           loadWhitelist();
 
-          window.feedbackManager.show("All sites removed from whitelist", "success");
+          window.feedbackManager.show(
+            "All sites removed from whitelist",
+            "success"
+          );
         });
       }
     });
+
+    if (novelsTab) {
+      novelsTab.addEventListener('click', () => {
+        loadNovelCharacterMaps();
+      });
+    }
 
     resetButton.addEventListener("click", resetSettings);
 
@@ -412,7 +649,10 @@ document.addEventListener("DOMContentLoaded", () => {
           topP: topP
         },
         () => {
-          window.feedbackManager.show("Settings Saved Successfully!", "success");
+          window.feedbackManager.show(
+            "Settings Saved Successfully!",
+            "success"
+          );
         }
       );
     });

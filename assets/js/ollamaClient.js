@@ -14,10 +14,10 @@ class OllamaClient {
     this.DEFAULT_MODEL = "qwen3:8b";
     this.BATCH_DELAY = 800;
     this.API_ENDPOINT = "http://localhost:11434/api";
-    this.cache = new Map(); // Simple cache for repeated prompts
-    this.checkingAvailability = false;
-    this.lastAvailabilityCheck = null;
-    this.availabilityCache = null;
+    this.responseCache = new Map(); // Simple cache for repeated prompts
+    this.isCheckingAvailability = false;
+    this.lastAvailabilityCheckTime = null;
+    this.cachedAvailabilityStatus = null;
 
     console.log(
       "Novel Dialogue Enhancer: Ollama Client initialized with enhanced capabilities"
@@ -41,7 +41,10 @@ class OllamaClient {
         },
         (data) => {
           if (chrome.runtime.lastError) {
-            console.error("Error getting LLM settings:", chrome.runtime.lastError);
+            console.error(
+              "Error getting LLM settings:",
+              chrome.runtime.lastError
+            );
             return reject(chrome.runtime.lastError);
           }
           resolve(data);
@@ -54,9 +57,14 @@ class OllamaClient {
    * Enhanced text processing with LLM that integrates character information
    * @param {string} text - Text to enhance
    * @param {string} characterContext - Character information for context
+   * @param {object} novelInfo - Novel style information
    * @return {Promise<string>} - Enhanced text
    */
-  async enhanceWithLLM(text, characterContext = "", novelInfo = { style: "standard narrative", tone: "neutral" }) {
+  async enhanceWithLLM(
+    text,
+    characterContext = "",
+    novelInfo = { style: "standard narrative", tone: "neutral" }
+  ) {
     console.time("enhanceWithLLM");
     try {
       // Make sure Ollama is available first
@@ -64,13 +72,20 @@ class OllamaClient {
       if (!ollamaStatus.available) {
         throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
       }
-  
+
       const settings = await this.getLLMSettings();
-      console.log(`Using Ollama model: ${settings.modelName} with temperature: ${settings.temperature}`);
-  
-      const chunks = this.splitIntoChunks(text, settings.maxChunkSize);
-      const enhancedChunks = await this.processChunks(chunks, characterContext, novelInfo, settings);
-  
+      console.log(
+        `Using Ollama model: ${settings.modelName} with temperature: ${settings.temperature}`
+      );
+
+      const textChunks = this.splitIntoChunks(text, settings.maxChunkSize);
+      const enhancedChunks = await this.processChunks(
+        textChunks,
+        characterContext,
+        novelInfo,
+        settings
+      );
+
       const enhancedText = enhancedChunks.join("\n\n");
       console.timeEnd("enhanceWithLLM");
       return this.cleanLLMResponse(enhancedText);
@@ -80,43 +95,77 @@ class OllamaClient {
       throw err;
     }
   }
-  
+
+  /**
+   * Process all text chunks sequentially
+   * @param {Array<string>} chunks - Text chunks to process
+   * @param {string} characterContext - Character information
+   * @param {object} novelInfo - Novel style information
+   * @param {object} settings - LLM settings
+   * @return {Promise<Array<string>>} - Array of enhanced text chunks
+   */
   async processChunks(chunks, characterContext, novelInfo, settings) {
     const enhancedChunks = [];
-    
+
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log(`Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`);
-  
+      console.log(
+        `Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`
+      );
+
       // Build context that includes surrounding text and character information
       const contextInfo = this.buildChunkContext(chunks, i);
-      const prompt = this.createEnhancedPrompt(chunk, characterContext, contextInfo, novelInfo);
-      
+      const prompt = this.createEnhancedPrompt(
+        chunk,
+        characterContext,
+        contextInfo,
+        novelInfo
+      );
+
       // Create cache key based on chunk content and prompt
       const cacheKey = this.hashString(chunk + contextInfo);
-  
-      const enhancedChunk = await this.getEnhancedChunk(cacheKey, settings.modelName, prompt, settings, chunk);
+
+      const enhancedChunk = await this.getEnhancedChunk(
+        cacheKey,
+        settings.modelName,
+        prompt,
+        settings,
+        chunk
+      );
       enhancedChunks.push(enhancedChunk);
-  
+
       if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, this.BATCH_DELAY));
+        await new Promise((resolve) => setTimeout(resolve, this.BATCH_DELAY));
       }
     }
-    
+
     return enhancedChunks;
   }
-  
+
+  /**
+   * Get enhanced version of a single chunk, using cache when possible
+   * @param {string} cacheKey - Unique key for caching
+   * @param {string} modelName - LLM model to use
+   * @param {string} prompt - Prompt for the LLM
+   * @param {object} settings - LLM settings
+   * @param {string} originalChunk - Original text chunk as fallback
+   * @return {Promise<string>} - Enhanced text chunk
+   */
   async getEnhancedChunk(cacheKey, modelName, prompt, settings, originalChunk) {
     // Check if we have this result cached
-    if (this.cache.has(cacheKey)) {
+    if (this.responseCache.has(cacheKey)) {
       console.log("Using cached result for chunk");
-      return this.cache.get(cacheKey);
+      return this.responseCache.get(cacheKey);
     }
-    
+
     try {
-      const enhancedChunk = await this.processChunkWithLLM(modelName, prompt, settings);
+      const enhancedChunk = await this.processChunkWithLLM(
+        modelName,
+        prompt,
+        settings
+      );
       // Cache the result
-      this.cache.set(cacheKey, enhancedChunk);
+      this.responseCache.set(cacheKey, enhancedChunk);
       console.log("Successfully enhanced chunk");
       return enhancedChunk;
     } catch (chunkError) {
@@ -126,7 +175,7 @@ class OllamaClient {
   }
 
   /**
-   * Build a context object that includes surrounding text chunks and character information
+   * Build a context object that includes surrounding text chunks for coherence
    * @param {Array<string>} chunks - All text chunks
    * @param {number} currentIndex - Current chunk index
    * @return {string} - Combined context information
@@ -158,9 +207,11 @@ class OllamaClient {
   }
 
   /**
-   * Create a comprehensive prompt for text enhancement that includes all necessary instructions
+   * Create a comprehensive prompt for text enhancement with proper instructions
    * @param {string} chunk - Text chunk to enhance
-   * @param {string} contextInfo - Context information including characters
+   * @param {string} characterContext - Character information
+   * @param {string} contextInfo - Context from surrounding chunks
+   * @param {object} novelInfo - Novel style information
    * @return {string} - Complete prompt for LLM
    */
   createEnhancedPrompt(chunk, characterContext, contextInfo, novelInfo) {
@@ -201,54 +252,70 @@ ${chunk}`;
     if (text.length <= maxChunkSize) {
       return [text];
     }
-  
+
     const chunks = [];
     const paragraphs = text.split(/\n\n|\r\n\r\n/);
     let currentChunk = "";
-  
+
     for (const paragraph of paragraphs) {
       // Handle normal paragraphs
       if (paragraph.length <= maxChunkSize) {
-        if (currentChunk.length + paragraph.length + 2 > maxChunkSize && currentChunk.length > 0) {
+        if (
+          currentChunk.length + paragraph.length + 2 > maxChunkSize &&
+          currentChunk.length > 0
+        ) {
           chunks.push(currentChunk.trim());
           currentChunk = paragraph;
         } else {
           currentChunk += (currentChunk ? "\n\n" : "") + paragraph;
         }
-      } 
+      }
       // Handle extremely long paragraphs by splitting on sentence boundaries
       else {
         if (currentChunk.length > 0) {
           chunks.push(currentChunk.trim());
           currentChunk = "";
         }
-        
+
         this.splitLongParagraph(paragraph, maxChunkSize, chunks);
       }
     }
-  
+
     // Add any remaining text as the final chunk
     if (currentChunk) {
       chunks.push(currentChunk.trim());
     }
-  
-    console.log(`Split text into ${chunks.length} chunks (avg size: ${Math.round(text.length / chunks.length)})`);
+
+    console.log(
+      `Split text into ${chunks.length} chunks (avg size: ${Math.round(
+        text.length / chunks.length
+      )})`
+    );
     return chunks;
   }
-  
+
+  /**
+   * Split a very long paragraph into sentence-based chunks
+   * @param {string} paragraph - Long paragraph to split
+   * @param {number} maxChunkSize - Maximum chunk size
+   * @param {Array<string>} chunks - Array to populate with chunks
+   */
   splitLongParagraph(paragraph, maxChunkSize, chunks) {
     const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
     let currentChunk = "";
-    
+
     for (const sentence of sentences) {
-      if (currentChunk.length + sentence.length > maxChunkSize && currentChunk.length > 0) {
+      if (
+        currentChunk.length + sentence.length > maxChunkSize &&
+        currentChunk.length > 0
+      ) {
         chunks.push(currentChunk.trim());
         currentChunk = sentence;
       } else {
         currentChunk += (currentChunk ? " " : "") + sentence;
       }
     }
-    
+
     if (currentChunk) {
       chunks.push(currentChunk.trim());
     }
@@ -335,65 +402,73 @@ ${chunk}`;
 
     return cleanedText.trim();
   }
-  
+
   /**
-   * Check Ollama API availability
+   * Check Ollama API availability with caching
    * @return {Promise<object>} - Availability status
    */
   async checkOllamaAvailability() {
     const CACHE_TTL = 30000; // 30 seconds
     const CHECK_TIMEOUT = 15000; // 15 seconds timeout
-    
+
     // Return cached result if it's recent enough
-    if (
-      this.lastAvailabilityCheck &&
-      Date.now() - this.lastAvailabilityCheck < CACHE_TTL &&
-      this.availabilityCache
-    ) {
-      return this.availabilityCache;
+    const isCacheValid =
+      this.lastAvailabilityCheckTime &&
+      Date.now() - this.lastAvailabilityCheckTime < CACHE_TTL &&
+      this.cachedAvailabilityStatus;
+
+    if (isCacheValid) {
+      return this.cachedAvailabilityStatus;
     }
 
     // If a check is already in progress, don't start another one
-    if (this.checkingAvailability) {
+    if (this.isCheckingAvailability) {
       console.log("Ollama availability check already in progress, waiting...");
-      
+
       try {
         // Wait for the existing check to complete with a timeout
         const result = await Promise.race([
           // Wait for the check to complete
           new Promise((resolve) => {
             const checkInterval = setInterval(() => {
-              if (!this.checkingAvailability) {
+              if (!this.isCheckingAvailability) {
                 clearInterval(checkInterval);
-                resolve(this.availabilityCache);
+                resolve(this.cachedAvailabilityStatus);
               }
             }, 100);
           }),
           // Timeout after 5 seconds of waiting
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Timed out waiting for availability check")), 5000)
+          new Promise((_, reject) =>
+            setTimeout(
+              () =>
+                reject(new Error("Timed out waiting for availability check")),
+              5000
+            )
           )
         ]);
-        
+
         return result || { available: false, reason: "Check failed" };
       } catch (error) {
         console.warn("Waiting for Ollama check timed out:", error);
         // Reset the flag if we timed out waiting
-        this.checkingAvailability = false;
+        this.isCheckingAvailability = false;
         return { available: false, reason: "Check timeout" };
       }
     }
 
     // Set checking flag and clear it in case of errors
-    this.checkingAvailability = true;
+    this.isCheckingAvailability = true;
     console.log("Checking Ollama availability...");
 
     try {
       // Create a timeout promise
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Ollama check timed out")), CHECK_TIMEOUT);
+        setTimeout(
+          () => reject(new Error("Ollama check timed out")),
+          CHECK_TIMEOUT
+        );
       });
-      
+
       // Create the actual check promise
       const checkPromise = new Promise((resolve) => {
         chrome.runtime.sendMessage(
@@ -410,29 +485,29 @@ ${chunk}`;
                 reason: chrome.runtime.lastError.message
               };
 
-              this.availabilityCache = result;
+              this.cachedAvailabilityStatus = result;
               resolve(result);
               return;
             }
 
-            this.availabilityCache = response;
+            this.cachedAvailabilityStatus = response;
             resolve(response);
           }
         );
       });
-      
+
       // Race the promises
       const result = await Promise.race([checkPromise, timeoutPromise]);
-      this.lastAvailabilityCheck = Date.now();
+      this.lastAvailabilityCheckTime = Date.now();
       return result;
     } catch (err) {
       console.warn("Ollama availability check failed:", err);
       const result = { available: false, reason: err.message };
-      this.availabilityCache = result;
+      this.cachedAvailabilityStatus = result;
       return result;
     } finally {
       // Always reset the checking flag when we're done
-      this.checkingAvailability = false;
+      this.isCheckingAvailability = false;
     }
   }
 
@@ -452,10 +527,10 @@ ${chunk}`;
   }
 
   /**
-   * Clear the cache
+   * Clear the response cache
    */
   clearCache() {
-    this.cache.clear();
+    this.responseCache.clear();
     console.log("Cleared OllamaClient cache");
   }
 }

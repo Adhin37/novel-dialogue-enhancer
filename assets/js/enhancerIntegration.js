@@ -38,7 +38,7 @@ class EnhancerIntegration {
 
       // Create character summary for LLM context
       const characterSummary = this.novelUtils.createCharacterSummary(
-        this.mapCharactersToArray(characterMap)
+        this.convertCharacterMapToArray(characterMap)
       );
 
       // Check LLM availability
@@ -78,11 +78,11 @@ class EnhancerIntegration {
   }
 
   /**
-   * Map character map to array for LLM context
-   * @param {object} characterMap - The character map to map
+   * Convert character map to array for LLM context
+   * @param {object} characterMap - The character map to convert
    * @return {Array} - Array of character objects
    */
-  mapCharactersToArray(characterMap) {
+  convertCharacterMapToArray(characterMap) {
     return Object.entries(characterMap).map(([name, data]) => ({
       name,
       gender: data.gender,
@@ -105,7 +105,7 @@ class EnhancerIntegration {
     // If the current chapter was already enhanced, we might be using cached data
     if (!this.novelUtils.isCurrentChapterEnhanced) {
       // Apply gender detection to any characters with unknown gender
-      await this.applyGenderDetection(characterMap, text);
+      await this.determineCharacterGenders(characterMap, text);
     }
 
     // Track new characters found
@@ -115,7 +115,11 @@ class EnhancerIntegration {
     console.log(
       `Processed ${Object.keys(characterMap).length} characters for novel ${
         this.novelUtils.novelId
-      }${this.novelUtils.chapterInfo?.chapterNumber ? ', chapter ' + this.novelUtils.chapterInfo.chapterNumber : ''}`
+      }${
+        this.novelUtils.chapterInfo?.chapterNumber
+          ? ", chapter " + this.novelUtils.chapterInfo.chapterNumber
+          : ""
+      }`
     );
     return characterMap;
   }
@@ -126,13 +130,12 @@ class EnhancerIntegration {
    * @param {string} text - The text to analyze
    * @return {Promise<object>} - Updated character map with gender information
    */
-  async applyGenderDetection(characterMap, text) {
+  async determineCharacterGenders(characterMap, text) {
     for (const [name, data] of Object.entries(characterMap)) {
-      if (
-        data.gender === "unknown" ||
-        !data.confidence ||
-        data.confidence < 0.7
-      ) {
+      const needsGenderDetermination =
+        data.gender === "unknown" || !data.confidence || data.confidence < 0.7;
+
+      if (needsGenderDetermination) {
         const genderInfo = this.genderUtils.guessGender(
           name,
           text,
@@ -160,7 +163,7 @@ class EnhancerIntegration {
     const text = document.body.textContent;
     return await this.extractCharacterInfo(text);
   }
-  
+
   /**
    * Enhance text using the LLM with character context
    * @param {string} text - Text to enhance
@@ -174,9 +177,12 @@ class EnhancerIntegration {
 
       // Get chapter info if not already detected
       if (!this.novelUtils.chapterInfo) {
-        this.novelUtils.chapterInfo = this.novelUtils.detectChapterInfo(document.title, text);
+        this.novelUtils.chapterInfo = this.novelUtils.detectChapterInfo(
+          document.title,
+          text
+        );
       }
-      
+
       // Format novel style information for the LLM
       const novelInfo = {
         style: novelStyle.style,

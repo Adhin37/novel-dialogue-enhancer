@@ -40,6 +40,7 @@
         <div class="tabs">
           <button class="tab-btn active" data-tab="general">General</button>
           <button class="tab-btn" data-tab="advanced">Advanced</button>
+          <button class="tab-btn" data-tab="novels">My Novels</button>
           <button class="tab-btn" data-tab="sites">Whitelisted Sites</button>
           <button class="tab-btn" data-tab="about">About</button>
         </div>
@@ -191,6 +192,30 @@
             </div>
           </div>
 
+          <!-- Novels Tab -->
+          <div class="tab-pane" id="novels-tab">
+            <div class="card">
+              <h3>Detected Novels</h3>
+              <div class="hint">
+                Below are novels that the extension has processed. You can view
+                characters detected in each novel.
+              </div>
+
+              <div class="novels-search-container">
+                <input
+                  type="text"
+                  id="novels-search"
+                  placeholder="Search novels..."
+                  class="search-input"
+                />
+              </div>
+
+              <div id="novels-container" class="novels-container">
+                <div class="empty-list">No novels detected yet</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Whitelist Tab -->
           <div class="tab-pane" id="sites-tab">
             <div class="card">
@@ -237,9 +262,20 @@
                     <a href="https://ollama.com" target="_blank">Ollama</a> on
                     your computer
                   </li>
-                  <li>Pull AI model that you want to run with Ollama (example : <a href="https://ollama.com/library/qwen3" target="_blank">ollama pull qwen3:8b</a>)</li>
-                  <li>Run command <code>ollama serve</code> to make your local AI model available to this extension</li>
-                  <li>Add your favorite novel sites to the whitelist (click extension icon or this page)</li>
+                  <li>
+                    Pull AI model that you want to run with Ollama (example :
+                    <a href="https://ollama.com/library/qwen3" target="_blank"
+                      >ollama pull qwen3:8b</a
+                    >)
+                  </li>
+                  <li>
+                    Run command <code>ollama serve</code> to make your local AI
+                    model available to this extension
+                  </li>
+                  <li>
+                    Add your favorite novel sites to the whitelist (click
+                    extension icon or this page)
+                  </li>
                   <li>Configure your preferences on this page</li>
                 </ol>
                 <h4>Supported Websites:</h4>
@@ -273,11 +309,20 @@
           <div class="modal-body">
             <div class="form-group">
               <label for="site-url">Website URL</label>
-              <input id="site-url" type="text" placeholder="https://www.example.com" />
+              <input
+                id="site-url"
+                type="text"
+                placeholder="https://www.example.com"
+              />
               <div class="hint">
-                Don't include the protocol (http:// or https://) and any paths or query parameters at the end.
+                Don't include the protocol (http:// or https://) and any paths
+                or query parameters at the end.
               </div>
-              <div id="modal-error" class="hint error-hint" style="display: none;"></div>
+              <div
+                id="modal-error"
+                class="hint error-hint"
+                style="display: none"
+              ></div>
             </div>
           </div>
           <div class="modal-footer">
