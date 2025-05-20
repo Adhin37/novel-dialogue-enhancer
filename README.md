@@ -60,119 +60,81 @@ This document describes the optimized character map implementation for the Novel
 
 ### Overview
 
-The extension tracks character data and enhanced chapters for novels across various websites. The original implementation had several inefficiencies that have been addressed with this optimization:
+The extension tracks character data and enhanced chapters for novels across various websites. The implementation is optimized for:
 
-1. Data structure was verbose and inefficient
-2. No mechanism for purging old/unused novels
-3. Redundant data storage
-4. No size management for evidence data
+1. Efficient data structure
+2. Purging old/unused novels
+3. Minimal data storage
+4. Size management for evidence data
 
-### New Data Schema
+### Data Schema
 
-#### Original Schema
-
-```javascript
-{
-  [novelId]: {
-    characters: {
-      [characterName]: {
-        gender: string,          // "male", "female", "unknown"
-        confidence: number,      // 0-1
-        appearances: number,     // count
-        evidence: string[]       // array of text evidence 
-      }
-    },
-    enhancedChapters: [
-      {
-        chapterNumber: number
-      }
-    ],
-    style: { /* novel style info */ }
-  }
-}
-```
-
-#### Optimized Schema
+The character data is stored in an optimized format:
 
 ```javascript
 {
   [novelId]: {
-    chars: {                     // shortened from "characters"
-      [characterId]: {           // numerical ID instead of full name
-        n: string,               // character name
-        g: string,               // "m", "f", "u" instead of "male", "female", "unknown"
-        c: number,               // confidence (0-1)
-        a: number,               // appearances count
-        e: string[]              // shortened evidence (optional, limited to 5 entries)
+    chars: {                      // Character data
+      [characterId]: {            // Numeric ID instead of full name
+        name: string,             // Character name
+        gender: string,           // "m", "f", "u" for "male", "female", "unknown"
+        confidence: number,       // Confidence score (0-1)
+        appearances: number,      // Number of appearances
+        evidences: string[]       // Supporting evidence (limited to 5 entries)
       }
     },
-    chaps: [                     // shortened from "enhancedChapters"
-      number                     // just store chapter numbers directly
+    chaps: [                      // Enhanced chapters
+      number                      // Chapter numbers
     ],
-    style: {                     // keep style object as is, since it's small
+    style: {                      // Style info
       style: string,
       tone: string,
       confidence: number,
       analyzed: boolean
     },
-    lastAccess: number           // timestamp for data purging
+    lastAccess: number            // Timestamp for data purging
   }
 }
 ```
 
 ### Key Optimizations
 
-#### 1. Shorter Property Names
+#### 1. Numeric Character IDs
 
-- Abbreviated property names reduce JSON size
-- Uses shorter field names like 'n' for 'name', 'g' for 'gender'
-
-#### 2. Numeric Character IDs
-
-- Instead of using character names as keys (which can be long), uses numeric IDs
+- Uses numeric IDs as keys rather than character names
 - Reduces duplication of character names in the data structure
 
-#### 3. Compressed Gender Representation
+#### 2. Compressed Gender Representation
 
-- "male" -> "m"
-- "female" -> "f"
-- "unknown" -> "u"
+- Uses "m" for "male"
+- Uses "f" for "female"
+- Uses "u" for "unknown"
 
-#### 4. Simplified Chapter Storage
+#### 3. Simplified Chapter Storage
 
 - Stores just chapter numbers instead of objects
-- Reduces the size significantly for novels with many chapters
+- Significantly reduces size for novels with many chapters
 
-#### 5. Limited Evidence Storage
+#### 4. Limited Evidence Storage
 
 - Caps evidence array at 5 entries per character
 - Prevents excessive storage growth from redundant evidence
 
-#### 6. Data Purging
+#### 5. Data Purging
 
-- Added timestamp-based data purging mechanism
+- Timestamp-based data purging mechanism
 - Automatically removes novel data not accessed in 30+ days
 - Implements size-based pruning when storage exceeds thresholds
-
-### Migration Strategy
-
-The implementation includes automatic migration from the old format to the new format:
-
-1. When data is retrieved from storage, it is automatically converted to the new format
-2. When saving data, the system ensures it is in the new format
-3. Users experience no disruption during the transition
 
 ### Clean Implementation
 
 The system uses a streamlined approach:
 
-1. One-time conversion of existing data to the optimized format
-2. Pure optimized implementation without backward compatibility overhead
+1. Simple and clear property names
+2. Consistent format across the extension
 3. Simplified codebase that's easier to maintain and extend
 
 ### Performance Gains
-
-Testing with representative data shows:
 
 - ~30-40% reduction in storage size for typical use
 - Improved performance for large datasets
@@ -185,14 +147,12 @@ The optimization is implemented in:
 1. `background.js` - For storage and retrieval
 2. `novelUtils.js` - For handling character data in content scripts
 
-No changes are required in how other components interact with the character map. The optimization is transparent to the rest of the system.
-
 ### Testing
 
 A test suite is available in `/tests/characterMap.test.js` to verify:
 
 1. Gender compression/expansion
-2. Migration from old to new format
+2. Data format consistency
 3. Data purging functionality
 4. Storage size comparison
 

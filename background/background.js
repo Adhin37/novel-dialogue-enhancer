@@ -43,14 +43,14 @@ function migrateToNewFormat(oldMap) {
   if (oldMap.characters && typeof oldMap.characters === 'object') {
     Object.entries(oldMap.characters).forEach(([name, data], index) => {
       newMap.chars[index] = {
-        n: name,
-        g: compressGender(data.gender),
-        c: parseFloat(data.confidence) || 0,
-        a: parseInt(data.appearances) || 1
+        name: name,
+        gender: compressGender(data.gender),
+        confidence: parseFloat(data.confidence) || 0,
+        appearances: parseInt(data.appearances) || 1
       };
       
       if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-        newMap.chars[index].e = data.evidence.slice(0, 5);
+        newMap.chars[index].evidences = data.evidence.slice(0, 5);
       }
     });
     
@@ -67,14 +67,14 @@ function migrateToNewFormat(oldMap) {
   else {
     Object.entries(oldMap).forEach(([name, data], index) => {
       newMap.chars[index] = {
-        n: name,
-        g: compressGender(data.gender),
-        c: parseFloat(data.confidence) || 0,
-        a: parseInt(data.appearances) || 1
+        name: name,
+        gender: compressGender(data.gender),
+        confidence: parseFloat(data.confidence) || 0,
+        appearances: parseInt(data.appearances) || 1
       };
       
       if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-        newMap.chars[index].e = data.evidence.slice(0, 5);
+        newMap.chars[index].evidences = data.evidence.slice(0, 5);
       }
     });
   }
@@ -547,14 +547,14 @@ chrome.runtime.onInstalled.addListener(() => {
           Object.entries(novelData).forEach(([name, data], index) => {
             if (name && typeof name === 'string') {
               convertedMaps[novelId].chars[index] = {
-                n: name,
-                g: compressGender(data.gender),
-                c: parseFloat(data.confidence) || 0,
-                a: parseInt(data.appearances) || 1
+                name: name,
+                gender: compressGender(data.gender),
+                confidence: parseFloat(data.confidence) || 0,
+                appearances: parseInt(data.appearances) || 1
               };
               
               if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-                convertedMaps[novelId].chars[index].e = data.evidence.slice(0, 5);
+                convertedMaps[novelId].chars[index].evidences = data.evidence.slice(0, 5);
               }
             }
           });
@@ -568,14 +568,14 @@ chrome.runtime.onInstalled.addListener(() => {
           
           Object.entries(novelData.characters).forEach(([name, data], index) => {
             convertedMaps[novelId].chars[index] = {
-              n: name,
-              g: compressGender(data.gender),
-              c: parseFloat(data.confidence) || 0,
-              a: parseInt(data.appearances) || 1
+              name: name,
+              gender: compressGender(data.gender),
+              confidence: parseFloat(data.confidence) || 0,
+              appearances: parseInt(data.appearances) || 1
             };
             
             if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-              convertedMaps[novelId].chars[index].e = data.evidence.slice(0, 5);
+              convertedMaps[novelId].chars[index].evidences = data.evidence.slice(0, 5);
             }
           });
           
@@ -637,7 +637,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         let existingCharId = null;
         
         for (const [id, character] of Object.entries(novelCharacterMaps[novelId].chars)) {
-          if (character.n === charData.n) {
+          if (character.name === charData.name) {
             existingCharId = id;
             break;
           }
@@ -646,48 +646,48 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (existingCharId !== null) {
           const existingChar = novelCharacterMaps[novelId].chars[existingCharId];
           
-          const newAppearances = (existingChar.a || 0) + (charData.a || 1);
+          const newAppearances = (existingChar.appearances || 0) + (charData.appearances || 1);
 
-          let mergedGender = existingChar.g;
-          let mergedConfidence = existingChar.c || 0;
-          let mergedEvidence = existingChar.e || [];
+          let mergedGender = existingChar.gender;
+          let mergedConfidence = existingChar.confidence || 0;
+          let mergedEvidences = existingChar.evidences || [];
 
-          const newConfidence = parseFloat(charData.c) || 0;
+          const newConfidence = parseFloat(charData.confidence) || 0;
           if (newConfidence > mergedConfidence) {
-            mergedGender = charData.g;
+            mergedGender = charData.gender;
             mergedConfidence = newConfidence;
-            mergedEvidence = Array.isArray(charData.e) ? charData.e : [];
+            mergedEvidences = Array.isArray(charData.evidences) ? charData.evidences : [];
           }
-          else if (newConfidence === mergedConfidence && Array.isArray(charData.e)) {
-            charData.e.forEach((item) => {
-              if (!mergedEvidence.includes(item) && mergedEvidence.length < 5) {
-                mergedEvidence.push(item);
+          else if (newConfidence === mergedConfidence && Array.isArray(charData.evidences)) {
+            charData.evidences.forEach((item) => {
+              if (!mergedEvidences.includes(item) && mergedEvidences.length < 5) {
+                mergedEvidences.push(item);
               }
             });
           }
 
           novelCharacterMaps[novelId].chars[existingCharId] = {
-            n: charData.n,
-            g: mergedGender,
-            c: mergedConfidence,
-            a: newAppearances
+            name: charData.name,
+            gender: mergedGender,
+            confidence: mergedConfidence,
+            appearances: newAppearances
           };
           
-          if (mergedEvidence.length > 0) {
-            novelCharacterMaps[novelId].chars[existingCharId].e = mergedEvidence.slice(0, 5);
+          if (mergedEvidences.length > 0) {
+            novelCharacterMaps[novelId].chars[existingCharId].evidences = mergedEvidences.slice(0, 5);
           }
         } else {
           const nextId = getNextCharacterId(novelCharacterMaps[novelId].chars);
           
           novelCharacterMaps[novelId].chars[nextId] = {
-            n: charData.n,
-            g: charData.g,
-            c: parseFloat(charData.c) || 0,
-            a: parseInt(charData.a) || 1
+            name: charData.name,
+            gender: charData.gender,
+            confidence: parseFloat(charData.confidence) || 0,
+            appearances: parseInt(charData.appearances) || 1
           };
           
-          if (Array.isArray(charData.e) && charData.e.length > 0) {
-            novelCharacterMaps[novelId].chars[nextId].e = charData.e.slice(0, 5);
+          if (Array.isArray(charData.evidences) && charData.evidences.length > 0) {
+            novelCharacterMaps[novelId].chars[nextId].evidences = charData.evidences.slice(0, 5);
           }
         }
       });
@@ -723,12 +723,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     };
 
     Object.entries(novelCharacterMaps[novelId].chars).forEach(([charId, charData]) => {
-      const characterName = charData.n;
+      const characterName = charData.name;
       response.characterMap[characterName] = {
-        gender: expandGender(charData.g),
-        confidence: charData.c,
-        appearances: charData.a,
-        evidence: charData.e || []
+        gender: expandGender(charData.gender),
+        confidence: charData.confidence,
+        appearances: charData.appearances,
+        evidence: charData.evidences || []
       };
     });
 

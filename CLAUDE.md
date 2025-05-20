@@ -46,6 +46,29 @@ The extension uses a whitelist system to determine where it can run:
 - Uses models like Qwen 3 for text enhancement
 - Communication flows through the background script to avoid CORS issues
 
+### Character Data Storage
+
+The extension uses an optimized format for storing character data:
+
+```javascript
+{
+  [novelId]: {
+    chars: {                      // Character data
+      [characterId]: {            // Numeric ID instead of full name
+        name: string,             // Character name
+        gender: string,           // "m", "f", "u" for "male", "female", "unknown"
+        confidence: number,       // Confidence score (0-1)
+        appearances: number,      // Number of appearances
+        evidences: string[]       // Supporting evidence (limited to 5 entries)
+      }
+    },
+    chaps: [number],              // Enhanced chapter numbers
+    style: {...},                 // Novel style information
+    lastAccess: number            // Timestamp for data purging
+  }
+}
+```
+
 ## Common Development Tasks
 
 ### Testing the Extension

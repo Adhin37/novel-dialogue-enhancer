@@ -20,7 +20,7 @@ class NovelUtils {
     this.isCurrentChapterEnhanced = false;
     console.log("Novel Dialogue Enhancer: Novel Utils initialized");
   }
-    
+
   /**
    * Update the novel identifier based on URL and title
    * @param {string} url - URL of the novel
@@ -151,33 +151,35 @@ class NovelUtils {
         chapterInfo.chapterNumber = parseInt(headingMatch[2], 10);
       }
     }
-    
+
     // Try to extract chapter numbers from URL if still not found
     if (!chapterInfo.isChapter || chapterInfo.chapterNumber === null) {
       try {
         const url = new URL(this.url);
-        const pathParts = url.pathname.split('/');
-        
+        const pathParts = url.pathname.split("/");
+
         // Look for patterns like /chapter-123/ or /123/ in the URL
         for (const part of pathParts) {
           // Check for chapter numbers in URL segments
-          const chapterNumMatch = part.match(/chapter[\\-_]?(\d+)/i) || 
-                               part.match(/ch[\\-_]?(\d+)/i) ||
-                               part.match(/^(\d+)$/);
-          
+          const chapterNumMatch =
+            part.match(/chapter[\\-_]?(\d+)/i) ||
+            part.match(/ch[\\-_]?(\d+)/i) ||
+            part.match(/^(\d+)$/);
+
           if (chapterNumMatch) {
             chapterInfo.isChapter = true;
             chapterInfo.chapterNumber = parseInt(chapterNumMatch[1], 10);
             break;
           }
         }
-        
+
         // Check for query parameters like ?chapter=123
         if (!chapterInfo.isChapter && url.searchParams) {
-          const chapterParam = url.searchParams.get('chapter') || 
-                             url.searchParams.get('chap') || 
-                             url.searchParams.get('c');
-          
+          const chapterParam =
+            url.searchParams.get("chapter") ||
+            url.searchParams.get("chap") ||
+            url.searchParams.get("c");
+
           if (chapterParam && /^\d+$/.test(chapterParam)) {
             chapterInfo.isChapter = true;
             chapterInfo.chapterNumber = parseInt(chapterParam, 10);
@@ -235,15 +237,17 @@ class NovelUtils {
         const response = await new Promise((resolve, reject) => {
           // Add a timeout to handle message port closure
           const timeoutId = setTimeout(() => {
-            reject(new Error("Message port closed before response was received"));
+            reject(
+              new Error("Message port closed before response was received")
+            );
           }, 5000);
-          
+
           try {
             chrome.runtime.sendMessage(
               { action: "getNovelStyle", novelId: novelId },
               (response) => {
                 clearTimeout(timeoutId);
-                
+
                 // Check for runtime error
                 if (chrome.runtime.lastError) {
                   console.error(
@@ -252,7 +256,7 @@ class NovelUtils {
                   );
                   return reject(chrome.runtime.lastError);
                 }
-                
+
                 resolve(response);
               }
             );
@@ -277,11 +281,11 @@ class NovelUtils {
           confidence: 0,
           analyzed: true
         };
-        
+
         if (novelId === this.novelId) {
           this.novelStyle = defaultStyle;
         }
-        
+
         return defaultStyle;
       }
     }
@@ -684,26 +688,31 @@ class NovelUtils {
     if (!this.novelId) {
       this.updateNovelId(window.location.href, document.title);
     }
-    
+
     // Get chapter information if not already set
     if (!this.chapterInfo) {
-      this.chapterInfo = this.detectChapterInfo(document.title, document.body.textContent);
+      this.chapterInfo = this.detectChapterInfo(
+        document.title,
+        document.body.textContent
+      );
     }
-    
+
     // Check if we've already enhanced this chapter for this novel
     if (this.novelId) {
       const novelData = await this.loadExistingNovelData();
       characterMap = novelData.characterMap || characterMap;
       this.enhancedChapters = novelData.enhancedChapters || [];
-      
+
       // Check if this chapter has already been enhanced
       if (this.chapterInfo && this.chapterInfo.chapterNumber) {
         this.isCurrentChapterEnhanced = this.enhancedChapters.some(
-          chapter => chapter.chapterNumber === this.chapterInfo.chapterNumber
+          (chapter) => chapter.chapterNumber === this.chapterInfo.chapterNumber
         );
-        
+
         if (this.isCurrentChapterEnhanced) {
-          console.log(`Chapter ${this.chapterInfo.chapterNumber} was previously enhanced, using existing character data`);
+          console.log(
+            `Chapter ${this.chapterInfo.chapterNumber} was previously enhanced, using existing character data`
+          );
           this.characterMap = characterMap;
           return characterMap;
         }
@@ -1025,11 +1034,15 @@ class NovelUtils {
 
           const characterMap = response.characterMap || {};
           const enhancedChapters = response.enhancedChapters || [];
-          
+
           console.log(
-            `Retrieved ${Object.keys(characterMap).length} existing characters and ${enhancedChapters.length} enhanced chapters`
+            `Retrieved ${
+              Object.keys(characterMap).length
+            } existing characters and ${
+              enhancedChapters.length
+            } enhanced chapters`
           );
-          
+
           resolve({
             characterMap: characterMap,
             enhancedChapters: enhancedChapters
@@ -1041,7 +1054,7 @@ class NovelUtils {
       return { characterMap: {}, enhancedChapters: [] };
     });
   }
-  
+
   /**
    * Load existing character data from storage
    * @param {object} characterMap - Current character map
@@ -1050,16 +1063,14 @@ class NovelUtils {
   async loadExistingCharacterData(characterMap) {
     const novelData = await this.loadExistingNovelData();
     const existingMap = novelData.characterMap || {};
-    
+
     const mergedMap = {
       ...characterMap,
       ...Object.fromEntries(
-        Object.entries(existingMap).filter(
-          ([name]) => !characterMap[name]
-        )
+        Object.entries(existingMap).filter(([name]) => !characterMap[name])
       )
     };
-    
+
     return mergedMap;
   }
 
@@ -1080,36 +1091,36 @@ class NovelUtils {
 
     // Convert to the optimized format
     const optimizedChars = {};
-    
+
     Object.entries(characterMap).forEach(([name, data], index) => {
       // Skip invalid entries
       if (!name || typeof name !== "string" || name.length > 50) return;
-      
+
       // Create optimized character entry
       optimizedChars[index] = {
-        n: name,
-        g: this.compressGender(data.gender),
-        c: parseFloat(data.confidence) || 0,
-        a: parseInt(data.appearances) || 1
+        name: name,
+        gender: this.compressGender(data.gender),
+        confidence: parseFloat(data.confidence) || 0,
+        appearances: parseInt(data.appearances) || 1
       };
-      
+
       // Add evidence if available (limited to 5)
       if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-        optimizedChars[index].e = data.evidence
-          .filter(e => typeof e === "string")
+        optimizedChars[index].evidences = data.evidence
+          .filter((e) => typeof e === "string")
           .slice(0, 5);
       }
     });
 
     // If we have chapter info, include it in the update
     const chapterNumber = this.chapterInfo?.chapterNumber;
-    
+
     console.log(
       `Syncing ${Object.keys(optimizedChars).length} characters for novel: ${
         this.novelId
-      }, chapter: ${chapterNumber || 'unknown'}`
+      }, chapter: ${chapterNumber || "unknown"}`
     );
-    
+
     chrome.runtime.sendMessage({
       action: "updateNovelData",
       chars: optimizedChars,
@@ -1117,19 +1128,19 @@ class NovelUtils {
       chapterNumber: chapterNumber
     });
   }
-  
+
   /**
    * Compress gender string to single character code
    * @param {string} gender - The gender string to compress
    * @return {string} - Single character gender code
    */
   compressGender(gender) {
-    if (!gender || typeof gender !== 'string') return 'u';
-    
+    if (!gender || typeof gender !== "string") return "u";
+
     const genderLower = gender.toLowerCase();
-    if (genderLower === 'male') return 'm';
-    if (genderLower === 'female') return 'f';
-    return 'u'; // unknown or other
+    if (genderLower === "male") return "m";
+    if (genderLower === "female") return "f";
+    return "u"; // unknown or other
   }
 
   /**
@@ -1146,18 +1157,18 @@ class NovelUtils {
       style: this.novelStyle
     });
   }
-  
+
   /**
    * Expands compressed gender code to full form
    * @param {string} code - Compressed gender code ("m", "f", "u")
    * @return {string} - Full gender string ("male", "female", "unknown")
    */
   expandGender(code) {
-    if (!code || typeof code !== 'string') return 'unknown';
-    
-    if (code === 'm') return 'male';
-    if (code === 'f') return 'female';
-    return 'unknown';
+    if (!code || typeof code !== "string") return "unknown";
+
+    if (code === "m") return "male";
+    if (code === "f") return "female";
+    return "unknown";
   }
 
   /**
