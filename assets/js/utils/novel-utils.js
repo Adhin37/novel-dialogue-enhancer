@@ -680,11 +680,42 @@ class NovelUtils {
    * @param {object} existingCharacterMap - Existing character data
    * @return {Promise<object>} - Updated character map
    */
+  /**
+   * Extract character names from text
+   * @param {string} text - Text to analyze
+   * @param {object} existingCharacterMap - Existing character data
+   * @return {Promise<object>} - Updated character map
+   */
   async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
     let characterMap = { ...existingCharacterMap };
     const startCharCount = Object.keys(characterMap).length;
 
+    // Initialize novel ID and chapter info
+    this.#initializeNovelContext();
+
+    // Check if chapter was already enhanced and get existing data
+    const alreadyEnhanced = await this.#checkChapterEnhancementStatus(
+      characterMap
+    );
+    if (alreadyEnhanced) {
+      return this.characterMap;
+    }
+
+    // Process text to extract character names
+    characterMap = this.#extractNamesFromText(text, characterMap);
+
+    // Clean up and finalize character map
+    characterMap = this.#finalizeCharacterMap(characterMap, startCharCount);
+
+    return characterMap;
+  }
+
+  /**
+   * Initialize novel ID and chapter info if not already set
+   * @private
+   */
+  #initializeNovelContext() {
     if (!this.novelId) {
       this.updateNovelId(window.location.href, document.title);
     }
@@ -696,40 +727,98 @@ class NovelUtils {
         document.body.textContent
       );
     }
+  }
 
-    // Check if we've already enhanced this chapter for this novel
-    if (this.novelId) {
-      const novelData = await this.loadExistingNovelData();
-      characterMap = novelData.characterMap || characterMap;
-      this.enhancedChapters = novelData.enhancedChapters || [];
+  /**
+   * Check if the current chapter has already been enhanced
+   * @param {object} characterMap - Current character map to update
+   * @return {Promise<boolean>} - Whether the chapter was already enhanced
+   * @private
+   */
+  async #checkChapterEnhancementStatus(characterMap) {
+    if (!this.novelId) {
+      return false;
+    }
 
-      // Check if this chapter has already been enhanced
-      if (this.chapterInfo && this.chapterInfo.chapterNumber) {
-        // Make sure chapter number is treated as a number for comparison
-        const currentChapter = parseInt(this.chapterInfo.chapterNumber, 10);
+    const novelData = await this.#loadExistingNovelData();
 
-        // First use the direct comparison method
-        this.isCurrentChapterEnhanced = this.enhancedChapters.some(
-          (chapter) => parseInt(chapter.chapterNumber, 10) === currentChapter
+    Object.assign(characterMap, novelData.characterMap || {});
+    this.enhancedChapters = novelData.enhancedChapters || [];
+
+    // Check if this chapter has already been enhanced
+    if (this.chapterInfo && this.chapterInfo.chapterNumber) {
+      const currentChapter = parseInt(this.chapterInfo.chapterNumber, 10);
+
+      this.isCurrentChapterEnhanced = this.enhancedChapters.some(
+        (chapter) => parseInt(chapter.chapterNumber, 10) === currentChapter
+      );
+
+      if (!this.isCurrentChapterEnhanced) {
+        this.isCurrentChapterEnhanced =
+          await this.#verifyChapterEnhancementStatus(currentChapter);
+      }
+
+      if (this.isCurrentChapterEnhanced) {
+        console.log(
+          `Chapter ${currentChapter} was previously enhanced, using existing character data`
         );
+        this.characterMap = characterMap;
+        return true;
+      }
+    }
 
-        // If not found, double-check with the server directly
-        if (!this.isCurrentChapterEnhanced) {
-          this.isCurrentChapterEnhanced =
-            await this.verifyChapterEnhancementStatus(currentChapter);
-        }
+    return false;
+  }
 
-        if (this.isCurrentChapterEnhanced) {
-          console.log(
-            `Chapter ${currentChapter} was previously enhanced, using existing character data`
-          );
-          this.characterMap = characterMap;
-          return characterMap;
+  /**
+   * Extract names from text using various patterns
+   * @param {string} text - Text to analyze
+   * @param {object} characterMap - Current character map to update
+   * @return {object} - Updated character map
+   * @private
+   */
+  #extractNamesFromText(text, characterMap) {
+    const namePatterns = this.#getNamePatterns();
+    const maxTextLength = 100000;
+    const processedText = text.substring(0, maxTextLength);
+    const maxMatches = 1000;
+    let totalMatches = 0;
+
+    for (const pattern of namePatterns) {
+      let match;
+      let patternMatches = 0;
+
+      while (
+        (match = pattern.exec(processedText)) !== null &&
+        totalMatches < maxMatches &&
+        patternMatches < 200
+      ) {
+        patternMatches++;
+        totalMatches++;
+
+        const name = this.#extractNameFromMatch(match, pattern, namePatterns);
+
+        if (!name || name.length > 30) continue;
+
+        const sanitizedName = this.#sanitizeText(name);
+        const extractedName = this.extractCharacterName(sanitizedName);
+
+        if (extractedName) {
+          this.#addOrUpdateCharacter(characterMap, extractedName);
         }
       }
     }
 
-    const namePatterns = [
+    return characterMap;
+  }
+
+  /**
+   * Get the regex patterns used for name extraction
+   * @return {Array<RegExp>} - Array of regex patterns
+   * @private
+   */
+  #getNamePatterns() {
+    return [
       // Character said pattern
       /([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})\s+(?:said|replied|asked|shouted|exclaimed|whispered|muttered|spoke|declared|answered)/g,
 
@@ -748,53 +837,56 @@ class NovelUtils {
       // "Xiao" prefix common in Chinese novels
       /(Xiao\s[A-Z][a-z]+)/g
     ];
+  }
 
-    const maxTextLength = 100000;
-    const processedText = text.substring(0, maxTextLength);
-    const maxMatches = 1000;
-    let totalMatches = 0;
-
-    for (const pattern of namePatterns) {
-      let match;
-      let patternMatches = 0;
-
-      while (
-        (match = pattern.exec(processedText)) !== null &&
-        totalMatches < maxMatches &&
-        patternMatches < 200
-      ) {
-        patternMatches++;
-        totalMatches++;
-
-        let name;
-        if (pattern === namePatterns[1]) {
-          name = match[2];
-        } else if (pattern === namePatterns[4]) {
-          name = match[2] ? `${match[1]} ${match[2]}` : match[1];
-        } else {
-          name = match[1];
-        }
-
-        if (!name || name.length > 30) continue;
-
-        const sanitizedName = this.sanitizeText(name);
-        const extractedName = this.extractCharacterName(sanitizedName);
-
-        if (extractedName) {
-          if (!characterMap[extractedName]) {
-            characterMap[extractedName] = {
-              gender: "unknown",
-              appearances: 1
-            };
-          } else {
-            characterMap[extractedName].appearances =
-              (characterMap[extractedName].appearances || 0) + 1;
-          }
-        }
-      }
+  /**
+   * Extract the name from a regex match based on the pattern
+   * @param {Array} match - The regex match result
+   * @param {RegExp} pattern - The pattern that produced the match
+   * @param {Array<RegExp>} patterns - Array of all patterns for index comparison
+   * @return {string|null} - Extracted name or null
+   * @private
+   */
+  #extractNameFromMatch(match, pattern, patterns) {
+    if (pattern === patterns[1]) {
+      // "Text" attribution pattern
+      return match[2];
+    } else if (pattern === patterns[4]) {
+      // Title + name pattern
+      return match[2] ? `${match[1]} ${match[2]}` : match[1];
+    } else {
+      // All other patterns
+      return match[1];
     }
+  }
 
-    characterMap = this.cleanupCharacterMap(characterMap);
+  /**
+   * Add or update a character in the character map
+   * @param {object} characterMap - Character map to update
+   * @param {string} characterName - Character name to add/update
+   * @private
+   */
+  #addOrUpdateCharacter(characterMap, characterName) {
+    if (!characterMap[characterName]) {
+      characterMap[characterName] = {
+        gender: "unknown",
+        appearances: 1
+      };
+    } else {
+      characterMap[characterName].appearances =
+        (characterMap[characterName].appearances || 0) + 1;
+    }
+  }
+
+  /**
+   * Finalize the character map by cleaning up and syncing
+   * @param {object} characterMap - Character map to finalize
+   * @param {number} startCharCount - Initial character count for logging
+   * @return {object} - Finalized character map
+   * @private
+   */
+  #finalizeCharacterMap(characterMap, startCharCount) {
+    characterMap = this.#cleanupCharacterMap(characterMap);
 
     const newCharCount = Object.keys(characterMap).length - startCharCount;
     console.log(
@@ -979,7 +1071,7 @@ class NovelUtils {
    * @param {object} characterMap - Character map to clean up
    * @return {object} - Cleaned character map
    */
-  cleanupCharacterMap(characterMap) {
+  #cleanupCharacterMap(characterMap) {
     const invalidKeys = [];
 
     for (const name in characterMap) {
@@ -1028,7 +1120,7 @@ class NovelUtils {
    * @param {number} chapterNumber - The chapter number to verify
    * @return {Promise<boolean>} - Whether the chapter is enhanced
    */
-  verifyChapterEnhancementStatus(chapterNumber) {
+  async #verifyChapterEnhancementStatus(chapterNumber) {
     return new Promise((resolve) => {
       if (!this.novelId || !chapterNumber) {
         resolve(false);
@@ -1062,7 +1154,7 @@ class NovelUtils {
    * Load existing novel data from storage including character map and enhanced chapters
    * @return {Promise<object>} - Novel data including character map and enhanced chapters
    */
-  loadExistingNovelData() {
+  async #loadExistingNovelData() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage(
         { action: "getNovelData", novelId: this.novelId },
@@ -1106,7 +1198,7 @@ class NovelUtils {
    * @return {Promise<object>} - Updated character map with existing data
    */
   async loadExistingCharacterData(characterMap) {
-    const novelData = await this.loadExistingNovelData();
+    const novelData = await this.#loadExistingNovelData();
     const existingMap = novelData.characterMap || {};
 
     const mergedMap = {
@@ -1191,7 +1283,7 @@ class NovelUtils {
   /**
    * Sync novel style with background storage
    */
-  syncNovelStyle() {
+  #syncNovelStyle() {
     if (!this.novelId || !this.novelStyle) {
       return;
     }
@@ -1208,7 +1300,7 @@ class NovelUtils {
    * @param {string} code - Compressed gender code ("m", "f", "u")
    * @return {string} - Full gender string ("male", "female", "unknown")
    */
-  expandGender(code) {
+  #expandGender(code) {
     if (!code || typeof code !== "string") return "unknown";
 
     if (code === "m") return "male";
@@ -1261,7 +1353,7 @@ class NovelUtils {
    * @param {string} text - Text to sanitize
    * @return {string} - Sanitized text
    */
-  sanitizeText(text) {
+  #sanitizeText(text) {
     if (!text || typeof text !== "string") return "";
 
     const container = document.createElement("div");
@@ -1319,7 +1411,7 @@ class NovelUtils {
    * @param {object} dialoguePatterns - Extracted dialogue patterns
    * @return {Set} - Set of character names
    */
-  extractCharactersFromDialogue(dialoguePatterns) {
+  #extractCharactersFromDialogue(dialoguePatterns) {
     const characters = new Set();
 
     dialoguePatterns.quotedDialogue.forEach((item) => {
