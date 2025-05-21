@@ -21,7 +21,12 @@ export default defineConfig([
         Toaster: "readonly",
         TextProcessor: "readonly",
         PromptGenerator: "readonly",
-        DOMPurify: "readonly"
+        DOMPurify: "readonly",
+        CulturalAnalyzer: "readonly",
+        NameAnalyzer: "readonly",
+        PronounAnalyzer: "readonly",
+        RelationshipAnalyzer: "readonly",
+        AppearanceAnalyzer: "readonly"
       }
     },
     rules: {
