@@ -29,7 +29,8 @@ export default defineConfig([
       "arrow-body-style": ["warn", "as-needed"],
       "no-unused-vars": ["warn", { vars: "all", args: "after-used" }],
       "no-var": "error",
-      "prefer-const": "warn"
+      "prefer-const": "warn",
+      "no-param-reassign": ["error", { props: true }]
     }
   }
 ]);
