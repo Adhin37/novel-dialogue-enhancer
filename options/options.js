@@ -491,23 +491,17 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function formatNovelId(novelId) {
     if (!novelId) return "Unknown Novel";
-
-    // Remove underscores and capitalize words
-    let title = novelId
-      .replace(/_/g, " ")
-      .replace(/\b\w/g, (l) => l.toUpperCase());
-
-    // Extract domain if present
-    const domainMatch = title.match(/^([A-Za-z0-9.]+)\s/);
-    if (domainMatch) {
-      const domain = domainMatch[1];
-      title = title.replace(
-        domain,
-        `<span style="color:var(--primary-color);">${domain}</span> |`
-      );
-    }
-
-    return title;
+  
+    const [domainPart, novelPart] = novelId.split("__");
+  
+    const domain = domainPart.replace(/_/g, ".");
+  
+    const novelName = novelPart
+      .split("_")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  
+    return `<span style="color:var(--primary-color);">${domain}</span> | ${novelName}`;
   }
 
   /**

@@ -196,8 +196,11 @@ class EnhancerIntegration {
 
       // Split text into manageable chunks
       const settings = await this.ollamaClient.getLLMSettings();
-      const textChunks = this.textProcessor.splitIntoChunks(text, settings.maxChunkSize);
-      
+      const textChunks = this.textProcessor.splitIntoChunks(
+        text,
+        settings.maxChunkSize
+      );
+
       // Process each chunk
       const enhancedChunks = await this.processChunks(
         textChunks,
@@ -236,7 +239,7 @@ class EnhancerIntegration {
 
       // Build context that includes surrounding text
       const contextInfo = this.textProcessor.buildChunkContext(chunks, i);
-      
+
       // Create the prompt using our prompt generator
       const prompt = this.promptGenerator.createEnhancementPrompt(
         chunk,
@@ -261,7 +264,7 @@ class EnhancerIntegration {
             cacheKey: cacheKey
           }
         );
-        
+
         enhancedChunks.push(enhancedChunk);
       } catch (chunkError) {
         console.warn("Failed to enhance chunk, using original:", chunkError);

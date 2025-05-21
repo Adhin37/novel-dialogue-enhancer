@@ -3,44 +3,47 @@ const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 
 function compressGender(gender) {
-  if (!gender || typeof gender !== 'string') return 'u';
-  
+  if (!gender || typeof gender !== "string") return "u";
+
   const genderLower = gender.toLowerCase();
-  if (genderLower === 'male') return 'm';
-  if (genderLower === 'female') return 'f';
-  return 'u';
+  if (genderLower === "male") return "m";
+  if (genderLower === "female") return "f";
+  return "u";
 }
 
 function expandGender(code) {
-  if (!code || typeof code !== 'string') return 'unknown';
-  
-  if (code === 'm') return 'male';
-  if (code === 'f') return 'female';
-  return 'unknown';
+  if (!code || typeof code !== "string") return "unknown";
+
+  if (code === "m") return "male";
+  if (code === "f") return "female";
+  return "unknown";
 }
 
 function getNextCharacterId(charMap) {
-  if (!charMap || typeof charMap !== 'object') return 0;
-  
-  const existingIds = Object.keys(charMap).map(id => parseInt(id)).filter(id => !isNaN(id));
-  
+  if (!charMap || typeof charMap !== "object") return 0;
+
+  const existingIds = Object.keys(charMap)
+    .map((id) => parseInt(id))
+    .filter((id) => !isNaN(id));
+
   if (existingIds.length === 0) return 0;
-  
+
   return Math.max(...existingIds) + 1;
 }
 
 function migrateToNewFormat(oldMap) {
-  if (!oldMap || typeof oldMap !== 'object') return { chars: {}, chaps: [], lastAccess: Date.now() };
-  
+  if (!oldMap || typeof oldMap !== "object")
+    return { chars: {}, chaps: [], lastAccess: Date.now() };
+
   if (oldMap.chars) return oldMap;
-  
+
   const newMap = {
     chars: {},
     chaps: [],
     lastAccess: Date.now()
   };
-  
-  if (oldMap.characters && typeof oldMap.characters === 'object') {
+
+  if (oldMap.characters && typeof oldMap.characters === "object") {
     Object.entries(oldMap.characters).forEach(([name, data], index) => {
       newMap.chars[index] = {
         name: name,
@@ -48,23 +51,22 @@ function migrateToNewFormat(oldMap) {
         confidence: parseFloat(data.confidence) || 0,
         appearances: parseInt(data.appearances) || 1
       };
-      
+
       if (Array.isArray(data.evidence) && data.evidence.length > 0) {
         newMap.chars[index].evidences = data.evidence.slice(0, 5);
       }
     });
-    
+
     if (Array.isArray(oldMap.enhancedChapters)) {
       newMap.chaps = oldMap.enhancedChapters
-        .map(chapter => chapter.chapterNumber)
-        .filter(num => typeof num === 'number');
+        .map((chapter) => chapter.chapterNumber)
+        .filter((num) => typeof num === "number");
     }
-    
+
     if (oldMap.style) {
       newMap.style = oldMap.style;
     }
-  } 
-  else {
+  } else {
     Object.entries(oldMap).forEach(([name, data], index) => {
       newMap.chars[index] = {
         name: name,
@@ -72,50 +74,56 @@ function migrateToNewFormat(oldMap) {
         confidence: parseFloat(data.confidence) || 0,
         appearances: parseInt(data.appearances) || 1
       };
-      
+
       if (Array.isArray(data.evidence) && data.evidence.length > 0) {
         newMap.chars[index].evidences = data.evidence.slice(0, 5);
       }
     });
   }
-  
+
   return newMap;
 }
 
 function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
-  if (!maps || typeof maps !== 'object') return {};
-  
+  if (!maps || typeof maps !== "object") return {};
+
   const now = Date.now();
   const purgedMaps = { ...maps };
   let purgedCount = 0;
-  
+
   Object.entries(purgedMaps).forEach(([novelId, data]) => {
-    if (!data.lastAccess || (now - data.lastAccess) < maxAge) return;
-    
+    if (!data.lastAccess || now - data.lastAccess < maxAge) return;
+
     delete purgedMaps[novelId];
     purgedCount++;
   });
-  
+
   if (purgedCount > 0) {
-    console.log(`Purged ${purgedCount} novels that haven't been accessed in ${maxAge/(24*60*60*1000)} days`);
+    console.log(
+      `Purged ${purgedCount} novels that haven't been accessed in ${
+        maxAge / (24 * 60 * 60 * 1000)
+      } days`
+    );
   }
-  
+
   return purgedMaps;
 }
 
 function storeNovelCharacterMaps(novelCharacterMaps) {
   try {
     const purgedMaps = purgeOldNovels(novelCharacterMaps);
-    
+
     Object.entries(purgedMaps).forEach(([novelId, data]) => {
       purgedMaps[novelId] = migrateToNewFormat(data);
     });
-    
+
     const serialized = JSON.stringify(purgedMaps);
     const sizeInBytes = new Blob([serialized]).size;
 
     if (sizeInBytes > 100000) {
-      console.warn("Character maps getting too large, pruning older/smaller entries");
+      console.warn(
+        "Character maps getting too large, pruning older/smaller entries"
+      );
 
       if (!purgedMaps || typeof purgedMaps !== "object") {
         console.error("Invalid novelCharacterMaps object");
@@ -127,11 +135,11 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
       novelEntries.sort((a, b) => {
         const aLastAccess = a[1].lastAccess || 0;
         const bLastAccess = b[1].lastAccess || 0;
-        
+
         if (aLastAccess !== bLastAccess) {
           return aLastAccess - bLastAccess;
         }
-        
+
         const aCharCount = a[1].chars ? Object.keys(a[1].chars).length : 0;
         const bCharCount = b[1].chars ? Object.keys(b[1].chars).length : 0;
         return aCharCount - bCharCount;
@@ -147,7 +155,10 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
 
     chrome.storage.local.set({ novelCharacterMaps: purgedMaps }, () => {
       if (chrome.runtime.lastError) {
-        console.error("Error storing character maps:", chrome.runtime.lastError);
+        console.error(
+          "Error storing character maps:",
+          chrome.runtime.lastError
+        );
       }
     });
   } catch (error) {
@@ -170,7 +181,8 @@ function handleOllamaRequest(request, sendResponse) {
     (data) => {
       if (chrome.runtime.lastError) {
         sendResponse({
-          error: "Error retrieving settings: " + chrome.runtime.lastError.message
+          error:
+            "Error retrieving settings: " + chrome.runtime.lastError.message
         });
         return;
       }
@@ -224,7 +236,8 @@ function prepareRequestData(requestData, settings) {
 function processNonStreamingRequest(requestData, timeout, sendResponse) {
   const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
 
-  timeout = typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
+  timeout =
+    typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
 
   const controller = new AbortController();
   const requestId = Date.now().toString();
@@ -254,7 +267,9 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
       return response.text();
     })
     .then((rawText) => processOllamaResponse(rawText, sendResponse))
-    .catch((error) => handleOllamaError(error, controller, timeout, sendResponse))
+    .catch((error) =>
+      handleOllamaError(error, controller, timeout, sendResponse)
+    )
     .finally(() => {
       clearTimeout(timeoutId);
       activeRequestControllers.delete(requestId);
@@ -262,7 +277,10 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
 }
 
 function processOllamaResponse(rawText, sendResponse) {
-  console.log("Raw Ollama response (first 100 chars):", rawText.substring(0, 100));
+  console.log(
+    "Raw Ollama response (first 100 chars):",
+    rawText.substring(0, 100)
+  );
 
   try {
     let enhancedText = "";
@@ -285,15 +303,24 @@ function processOllamaResponse(rawText, sendResponse) {
     }
 
     if (!enhancedText) {
-      console.warn("No text found in Ollama response:", rawText.substring(0, 200));
+      console.warn(
+        "No text found in Ollama response:",
+        rawText.substring(0, 200)
+      );
       throw new Error("No text found in Ollama response");
     }
 
-    console.log("Ollama request successful, response length:", enhancedText.length);
+    console.log(
+      "Ollama request successful, response length:",
+      enhancedText.length
+    );
     sendResponse({ enhancedText });
   } catch (parseError) {
     console.error("JSON parsing error:", parseError);
-    console.error("Raw response that caused parsing error:", rawText.substring(0, 500));
+    console.error(
+      "Raw response that caused parsing error:",
+      rawText.substring(0, 500)
+    );
     sendResponse({ error: `JSON parsing error: ${parseError.message}` });
   }
 }
@@ -318,7 +345,9 @@ function handleOllamaError(error, controller, timeout, sendResponse) {
 }
 
 function checkOllamaAvailability(sendResponse) {
-  console.log(`Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`);
+  console.log(
+    `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
+  );
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -334,7 +363,10 @@ function checkOllamaAvailability(sendResponse) {
           console.log(`Ollama version check successful: ${data.version}`);
 
           const modelsController = new AbortController();
-          const modelsTimeoutId = setTimeout(() => modelsController.abort(), 5000);
+          const modelsTimeoutId = setTimeout(
+            () => modelsController.abort(),
+            5000
+          );
 
           fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
             method: "GET",
@@ -349,7 +381,11 @@ function checkOllamaAvailability(sendResponse) {
                     .map((m) => m.name)
                 : [];
 
-              console.log(`Ollama is available, version: ${data.version}, models: ${availableModels.join(", ")}`);
+              console.log(
+                `Ollama is available, version: ${
+                  data.version
+                }, models: ${availableModels.join(", ")}`
+              );
               sendResponse({
                 available: true,
                 version: data.version,
@@ -357,13 +393,17 @@ function checkOllamaAvailability(sendResponse) {
               });
             })
             .catch((modelError) => {
-              console.log(`Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`);
+              console.log(
+                `Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`
+              );
               sendResponse({ available: true, version: data.version });
             })
             .finally(() => clearTimeout(modelsTimeoutId));
         });
       } else {
-        console.warn(`Ollama availability check failed with status: ${response.status}`);
+        console.warn(
+          `Ollama availability check failed with status: ${response.status}`
+        );
         sendResponse({
           available: false,
           reason: `HTTP error: ${response.status}`
@@ -399,7 +439,10 @@ function isSiteWhitelisted(url) {
     return new Promise((resolve) => {
       chrome.storage.sync.get("whitelistedSites", (data) => {
         if (chrome.runtime.lastError) {
-          console.error("Error retrieving whitelisted sites:", chrome.runtime.lastError);
+          console.error(
+            "Error retrieving whitelisted sites:",
+            chrome.runtime.lastError
+          );
           whitelistCache.set(hostname, {
             isWhitelisted: false,
             timestamp: Date.now()
@@ -407,10 +450,14 @@ function isSiteWhitelisted(url) {
           return resolve(false);
         }
 
-        const whitelistedSites = Array.isArray(data.whitelistedSites) ? data.whitelistedSites : [];
+        const whitelistedSites = Array.isArray(data.whitelistedSites)
+          ? data.whitelistedSites
+          : [];
 
         const isWhitelisted = whitelistedSites.some(
-          (whitelistedSite) => hostname === whitelistedSite || hostname.endsWith("." + whitelistedSite)
+          (whitelistedSite) =>
+            hostname === whitelistedSite ||
+            hostname.endsWith("." + whitelistedSite)
         );
 
         whitelistCache.set(hostname, {
@@ -535,71 +582,75 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get("novelCharacterMaps", (data) => {
     if (data.novelCharacterMaps) {
       const convertedMaps = {};
-      
-      Object.entries(data.novelCharacterMaps).forEach(([novelId, novelData]) => {
-        if (!novelData.chars && !novelData.characters) {
-          convertedMaps[novelId] = {
-            chars: {},
-            chaps: [],
-            lastAccess: Date.now()
-          };
-          
-          Object.entries(novelData).forEach(([name, data], index) => {
-            if (name && typeof name === 'string') {
-              convertedMaps[novelId].chars[index] = {
-                name: name,
-                gender: compressGender(data.gender),
-                confidence: parseFloat(data.confidence) || 0,
-                appearances: parseInt(data.appearances) || 1
-              };
-              
-              if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-                convertedMaps[novelId].chars[index].evidences = data.evidence.slice(0, 5);
-              }
-            }
-          });
-        } 
-        else if (novelData.characters && !novelData.chars) {
-          convertedMaps[novelId] = {
-            chars: {},
-            chaps: [],
-            lastAccess: Date.now()
-          };
-          
-          Object.entries(novelData.characters).forEach(([name, data], index) => {
-            convertedMaps[novelId].chars[index] = {
-              name: name,
-              gender: compressGender(data.gender),
-              confidence: parseFloat(data.confidence) || 0,
-              appearances: parseInt(data.appearances) || 1
+
+      Object.entries(data.novelCharacterMaps).forEach(
+        ([novelId, novelData]) => {
+          if (!novelData.chars && !novelData.characters) {
+            convertedMaps[novelId] = {
+              chars: {},
+              chaps: [],
+              lastAccess: Date.now()
             };
-            
-            if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-              convertedMaps[novelId].chars[index].evidences = data.evidence.slice(0, 5);
+
+            Object.entries(novelData).forEach(([name, data], index) => {
+              if (name && typeof name === "string") {
+                convertedMaps[novelId].chars[index] = {
+                  name: name,
+                  gender: compressGender(data.gender),
+                  confidence: parseFloat(data.confidence) || 0,
+                  appearances: parseInt(data.appearances) || 1
+                };
+
+                if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+                  convertedMaps[novelId].chars[index].evidences =
+                    data.evidence.slice(0, 5);
+                }
+              }
+            });
+          } else if (novelData.characters && !novelData.chars) {
+            convertedMaps[novelId] = {
+              chars: {},
+              chaps: [],
+              lastAccess: Date.now()
+            };
+
+            Object.entries(novelData.characters).forEach(
+              ([name, data], index) => {
+                convertedMaps[novelId].chars[index] = {
+                  name: name,
+                  gender: compressGender(data.gender),
+                  confidence: parseFloat(data.confidence) || 0,
+                  appearances: parseInt(data.appearances) || 1
+                };
+
+                if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+                  convertedMaps[novelId].chars[index].evidences =
+                    data.evidence.slice(0, 5);
+                }
+              }
+            );
+
+            if (Array.isArray(novelData.enhancedChapters)) {
+              convertedMaps[novelId].chaps = novelData.enhancedChapters
+                .map((chapter) => chapter.chapterNumber)
+                .filter((num) => typeof num === "number");
             }
-          });
-          
-          if (Array.isArray(novelData.enhancedChapters)) {
-            convertedMaps[novelId].chaps = novelData.enhancedChapters
-              .map(chapter => chapter.chapterNumber)
-              .filter(num => typeof num === 'number');
-          }
-          
-          if (novelData.style) {
-            convertedMaps[novelId].style = novelData.style;
-          }
-        }
-        else if (novelData.chars) {
-          convertedMaps[novelId] = novelData;
-          
-          if (!convertedMaps[novelId].lastAccess) {
-            convertedMaps[novelId].lastAccess = Date.now();
+
+            if (novelData.style) {
+              convertedMaps[novelId].style = novelData.style;
+            }
+          } else if (novelData.chars) {
+            convertedMaps[novelId] = novelData;
+
+            if (!convertedMaps[novelId].lastAccess) {
+              convertedMaps[novelId].lastAccess = Date.now();
+            }
           }
         }
-      });
-      
+      );
+
       novelCharacterMaps = convertedMaps;
-      
+
       chrome.storage.local.set({ novelCharacterMaps: convertedMaps });
       console.log("Character data converted to optimized format");
     }
@@ -623,30 +674,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         lastAccess: Date.now()
       };
     }
-    
+
     novelCharacterMaps[novelId].lastAccess = Date.now();
 
     if (request.chapterNumber) {
+      if (!novelCharacterMaps[novelId].chaps) {
+        novelCharacterMaps[novelId].chaps = [];
+      }
+
       if (!novelCharacterMaps[novelId].chaps.includes(request.chapterNumber)) {
         novelCharacterMaps[novelId].chaps.push(request.chapterNumber);
       }
     }
 
-    if (request.chars && typeof request.chars === 'object') {
+    if (request.chars && typeof request.chars === "object") {
       Object.entries(request.chars).forEach(([charId, charData]) => {
         let existingCharId = null;
-        
-        for (const [id, character] of Object.entries(novelCharacterMaps[novelId].chars)) {
+
+        for (const [id, character] of Object.entries(
+          novelCharacterMaps[novelId].chars
+        )) {
           if (character.name === charData.name) {
             existingCharId = id;
             break;
           }
         }
-        
+
         if (existingCharId !== null) {
-          const existingChar = novelCharacterMaps[novelId].chars[existingCharId];
-          
-          const newAppearances = (existingChar.appearances || 0) + (charData.appearances || 1);
+          const existingChar =
+            novelCharacterMaps[novelId].chars[existingCharId];
+
+          const newAppearances =
+            (existingChar.appearances || 0) + (charData.appearances || 1);
 
           let mergedGender = existingChar.gender;
           let mergedConfidence = existingChar.confidence || 0;
@@ -656,11 +715,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           if (newConfidence > mergedConfidence) {
             mergedGender = charData.gender;
             mergedConfidence = newConfidence;
-            mergedEvidences = Array.isArray(charData.evidences) ? charData.evidences : [];
-          }
-          else if (newConfidence === mergedConfidence && Array.isArray(charData.evidences)) {
+            mergedEvidences = Array.isArray(charData.evidences)
+              ? charData.evidences
+              : [];
+          } else if (
+            newConfidence === mergedConfidence &&
+            Array.isArray(charData.evidences)
+          ) {
             charData.evidences.forEach((item) => {
-              if (!mergedEvidences.includes(item) && mergedEvidences.length < 5) {
+              if (
+                !mergedEvidences.includes(item) &&
+                mergedEvidences.length < 5
+              ) {
                 mergedEvidences.push(item);
               }
             });
@@ -672,22 +738,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             confidence: mergedConfidence,
             appearances: newAppearances
           };
-          
+
           if (mergedEvidences.length > 0) {
-            novelCharacterMaps[novelId].chars[existingCharId].evidences = mergedEvidences.slice(0, 5);
+            novelCharacterMaps[novelId].chars[existingCharId].evidences =
+              mergedEvidences.slice(0, 5);
           }
         } else {
           const nextId = getNextCharacterId(novelCharacterMaps[novelId].chars);
-          
+
           novelCharacterMaps[novelId].chars[nextId] = {
             name: charData.name,
             gender: charData.gender,
             confidence: parseFloat(charData.confidence) || 0,
             appearances: parseInt(charData.appearances) || 1
           };
-          
-          if (Array.isArray(charData.evidences) && charData.evidences.length > 0) {
-            novelCharacterMaps[novelId].chars[nextId].evidences = charData.evidences.slice(0, 5);
+
+          if (
+            Array.isArray(charData.evidences) &&
+            charData.evidences.length > 0
+          ) {
+            novelCharacterMaps[novelId].chars[nextId].evidences =
+              charData.evidences.slice(0, 5);
           }
         }
       });
@@ -706,34 +777,51 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (!novelCharacterMaps[novelId]) {
-      sendResponse({ 
-        status: "ok", 
+      sendResponse({
+        status: "ok",
         characterMap: {},
-        enhancedChapters: []
+        enhancedChapters: [],
+        isChapterEnhanced: false
       });
       return false;
     }
-    
+
     novelCharacterMaps[novelId].lastAccess = Date.now();
-    
+
     const response = {
       status: "ok",
       characterMap: {},
-      enhancedChapters: []
+      enhancedChapters: [],
+      isChapterEnhanced: false
     };
 
-    Object.entries(novelCharacterMaps[novelId].chars).forEach(([charId, charData]) => {
-      const characterName = charData.name;
-      response.characterMap[characterName] = {
-        gender: expandGender(charData.gender),
-        confidence: charData.confidence,
-        appearances: charData.appearances,
-        evidence: charData.evidences || []
-      };
-    });
+    if (request.checkChapter && request.chapterNumber) {
+      const checkChapterNum = parseInt(request.chapterNumber, 10);
+      const isEnhanced =
+        Array.isArray(novelCharacterMaps[novelId].chaps) &&
+        novelCharacterMaps[novelId].chaps.includes(checkChapterNum);
+
+      response.isChapterEnhanced = isEnhanced;
+    }
+
+    Object.entries(novelCharacterMaps[novelId].chars).forEach(
+      ([charId, charData]) => {
+        const characterName = charData.name;
+        response.characterMap[characterName] = {
+          gender: expandGender(charData.gender),
+          confidence: charData.confidence,
+          appearances: charData.appearances,
+          evidence: charData.evidences || []
+        };
+      }
+    );
 
     if (Array.isArray(novelCharacterMaps[novelId].chaps)) {
-      response.enhancedChapters = novelCharacterMaps[novelId].chaps.map(num => ({ chapterNumber: num }));
+      response.enhancedChapters = novelCharacterMaps[novelId].chaps.map(
+        (num) => ({
+          chapterNumber: parseInt(num, 10)
+        })
+      );
     }
 
     sendResponse(response);
@@ -861,35 +949,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   } else if (request.action === "getNovelStyle") {
     const novelId = request.novelId;
-    
+
     if (!novelId) {
       sendResponse({ status: "error", message: "No novel ID provided" });
       return false;
     }
-    
+
     const novelData = novelCharacterMaps[novelId] || {};
-    
+
     const migratedData = migrateToNewFormat(novelData);
-    
+
     migratedData.lastAccess = Date.now();
     novelCharacterMaps[novelId] = migratedData;
-    
+
     if (migratedData.style) {
       sendResponse({ status: "ok", style: migratedData.style });
     } else {
       sendResponse({ status: "ok", style: null });
     }
-    
+
     return false;
   } else if (request.action === "updateNovelStyle") {
     const novelId = request.novelId;
     const style = request.style;
-    
+
     if (!novelId || !style) {
-      sendResponse({ status: "error", message: "Missing novel ID or style data" });
+      sendResponse({
+        status: "error",
+        message: "Missing novel ID or style data"
+      });
       return false;
     }
-    
+
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -903,9 +994,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       migratedData.lastAccess = Date.now();
       novelCharacterMaps[novelId] = migratedData;
     }
-    
+
     storeNovelCharacterMaps(novelCharacterMaps);
-    
+
     sendResponse({ status: "ok" });
     return false;
   }

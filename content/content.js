@@ -271,6 +271,9 @@ async function enhancePage() {
   isEnhancing = true;
   terminateRequested = false;
 
+  // Show initial progress message that won't disappear
+  toaster.showLoading("Starting enhancement process...");
+
   if (typeof observer !== "undefined" && observer) {
     observer.disconnect();
   }
@@ -308,6 +311,7 @@ async function enhancePage() {
     }
 
     // Get character context first to improve prompt quality
+    toaster.showLoading("Analyzing characters...");
     await enhancerIntegration.setupCharacterContext();
 
     // Delegate to the appropriate enhancement method based on content structure
@@ -363,6 +367,9 @@ async function processSingleContentBlock() {
   console.log("Processing full content as a single block");
   toaster.updateProgress(0, 1);
 
+  // Show a persistent message that will stay visible during processing
+  toaster.showLoading("Processing content...");
+
   try {
     // Use the enhancerIntegration to enhance the entire text
     const enhancedText = await enhancerIntegration.enhanceText(originalText);
@@ -393,6 +400,11 @@ async function processMultipleParagraphs(paragraphs) {
 
   console.log(
     `Processing ${totalParagraphs} paragraphs in chunks of ${chunkSize}`
+  );
+
+  // Show a persistent message at the start that won't auto-disappear
+  toaster.showLoading(
+    `Preparing to process ${totalParagraphs} paragraphs...`
   );
 
   for (let i = 0; i < paragraphs.length; i += chunkSize) {
@@ -428,7 +440,18 @@ async function processParagraphBatch(
   console.log(
     `Enhancement progress: ${startIndex}/${paragraphs.length} paragraphs`
   );
+
+  // Update progress bar first
   toaster.updateProgress(startIndex, totalParagraphs);
+
+  // Then update the message text with batch info (persistent, duration=0)
+  toaster.showLoading(
+    `Processing paragraphs ${startIndex + 1}-${Math.min(
+      startIndex + chunkSize,
+      paragraphs.length
+    )}...`,
+    0
+  );
 
   const batch = Array.from(paragraphs).slice(
     startIndex,

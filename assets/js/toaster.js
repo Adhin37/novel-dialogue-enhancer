@@ -403,6 +403,10 @@ class Toaster {
       this.progressText.textContent = message ? String(message) : "";
     }
 
+    if (duration === 0) {
+      return;
+    }
+
     // Validate and set duration
     duration = typeof duration === "number" && duration > 0 ? duration : 3000;
     duration = Math.min(duration, 10000);
@@ -431,6 +435,10 @@ class Toaster {
 
   showInfo(message) {
     this.showMessage(message || "Information", "info", 3000);
+  }
+
+  showLoading(message) {
+    this.showMessage(message || "Loading...", "loading", 0);
   }
 
   removeToaster() {

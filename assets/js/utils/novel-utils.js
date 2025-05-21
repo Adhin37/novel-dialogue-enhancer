@@ -42,7 +42,7 @@ class NovelUtils {
       novelName = title.replace(/[^\w\s]/g, "").trim();
     }
 
-    const novelId = `${domain}_${novelName}`
+    const novelId = `${domain}__${novelName}`
       .toLowerCase()
       .replace(/[^\w]/g, "_")
       .replace(/_+/g, "_")
@@ -678,7 +678,7 @@ class NovelUtils {
    * Extract character names from text
    * @param {string} text - Text to analyze
    * @param {object} existingCharacterMap - Existing character data
-   * @return {object} - Updated character map
+   * @return {Promise<object>} - Updated character map
    */
   async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
@@ -705,13 +705,23 @@ class NovelUtils {
 
       // Check if this chapter has already been enhanced
       if (this.chapterInfo && this.chapterInfo.chapterNumber) {
+        // Make sure chapter number is treated as a number for comparison
+        const currentChapter = parseInt(this.chapterInfo.chapterNumber, 10);
+
+        // First use the direct comparison method
         this.isCurrentChapterEnhanced = this.enhancedChapters.some(
-          (chapter) => chapter.chapterNumber === this.chapterInfo.chapterNumber
+          (chapter) => parseInt(chapter.chapterNumber, 10) === currentChapter
         );
+
+        // If not found, double-check with the server directly
+        if (!this.isCurrentChapterEnhanced) {
+          this.isCurrentChapterEnhanced =
+            await this.verifyChapterEnhancementStatus(currentChapter);
+        }
 
         if (this.isCurrentChapterEnhanced) {
           console.log(
-            `Chapter ${this.chapterInfo.chapterNumber} was previously enhanced, using existing character data`
+            `Chapter ${currentChapter} was previously enhanced, using existing character data`
           );
           this.characterMap = characterMap;
           return characterMap;
@@ -1011,6 +1021,41 @@ class NovelUtils {
     });
 
     return cleanedMap;
+  }
+
+  /**
+   * Verify directly with storage if a chapter has been enhanced
+   * @param {number} chapterNumber - The chapter number to verify
+   * @return {Promise<boolean>} - Whether the chapter is enhanced
+   */
+  verifyChapterEnhancementStatus(chapterNumber) {
+    return new Promise((resolve) => {
+      if (!this.novelId || !chapterNumber) {
+        resolve(false);
+        return;
+      }
+
+      chrome.runtime.sendMessage(
+        {
+          action: "getNovelData",
+          novelId: this.novelId,
+          checkChapter: true,
+          chapterNumber: chapterNumber
+        },
+        (response) => {
+          if (
+            chrome.runtime.lastError ||
+            !response ||
+            response.status !== "ok"
+          ) {
+            resolve(false);
+            return;
+          }
+
+          resolve(response.isChapterEnhanced === true);
+        }
+      );
+    }).catch(() => false);
   }
 
   /**
