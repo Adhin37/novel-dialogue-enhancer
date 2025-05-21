@@ -91,7 +91,7 @@ class Toaster {
         --toaster-error-color: #f44336;
         --toaster-info-color: #3498db;
         --toaster-warn-color: #ff9800;
-        --toaster-gear-color: #ffffffe7;
+        --toaster-loading-color: #ffffffe7;
       }
       
       @media (prefers-color-scheme: dark) {
@@ -100,6 +100,7 @@ class Toaster {
           --toaster-error-color: #f44336;
           --toaster-info-color: #3498db;
           --toaster-warn-color: #ff9800;
+          --toaster-loading-color: #ffffff;
           --toaster-gear-color: #ffffffe7;
         }
       }
@@ -118,9 +119,22 @@ class Toaster {
         transform-origin: center center;
         animation: spin 2s linear infinite;
       }
-      /* Make sure SVG elements are visible in both light and dark modes */
       #${this.iconId} svg {
         color-scheme: light dark;
+      }
+
+      #${this.iconId} {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 24px;
+        min-height: 24px;
+      }
+
+      #${this.iconId} svg {
+        color-scheme: light dark;
+        width: 24px;
+        height: 24px;
       }
     `;
     document.head.appendChild(style);
@@ -148,9 +162,12 @@ class Toaster {
 
     switch (severity) {
       case "success": {
-        const successColor = "var(--toaster-success-color)";
+        // Use direct hex color instead of CSS variable
+        const successColor = "var(--toaster-success-color) !important";
         svg.setAttribute("stroke", successColor);
-        svg.setAttribute("stroke-width", "3");
+        svg.setAttribute("stroke-width", "2.5");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
 
         const successCircle = document.createElementNS(svgNS, "circle");
         successCircle.setAttribute("cx", "12");
@@ -159,9 +176,13 @@ class Toaster {
         successCircle.setAttribute("stroke", successColor);
         successCircle.setAttribute("fill", "none");
 
+        // Use path element instead of separate lines for checkmark
         const checkmark = document.createElementNS(svgNS, "path");
-        checkmark.setAttribute("d", "M8 12l3 3 6-6");
+        checkmark.setAttribute("d", "M8 12L11 15L16 9");
         checkmark.setAttribute("stroke", successColor);
+        checkmark.setAttribute("stroke-width", "2.5");
+        checkmark.setAttribute("stroke-linecap", "round");
+        checkmark.setAttribute("stroke-linejoin", "round");
         checkmark.setAttribute("fill", "none");
 
         svg.appendChild(successCircle);
@@ -170,9 +191,12 @@ class Toaster {
       }
 
       case "error": {
-        const errorColor = "var(--toaster-error-color)";
+        // Use direct hex color instead of CSS variable
+        const errorColor = "var(--toaster-error-color) !important";
         svg.setAttribute("stroke", errorColor);
-        svg.setAttribute("stroke-width", "3");
+        svg.setAttribute("stroke-width", "2.5");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
 
         const errorCircle = document.createElementNS(svgNS, "circle");
         errorCircle.setAttribute("cx", "12");
@@ -181,63 +205,59 @@ class Toaster {
         errorCircle.setAttribute("stroke", errorColor);
         errorCircle.setAttribute("fill", "none");
 
-        const line1 = document.createElementNS(svgNS, "line");
-        line1.setAttribute("x1", "15");
-        line1.setAttribute("y1", "9");
-        line1.setAttribute("x2", "9");
-        line1.setAttribute("y2", "15");
-        line1.setAttribute("stroke", errorColor);
-
-        const line2 = document.createElementNS(svgNS, "line");
-        line2.setAttribute("x1", "9");
-        line2.setAttribute("y1", "9");
-        line2.setAttribute("x2", "15");
-        line2.setAttribute("y2", "15");
-        line2.setAttribute("stroke", errorColor);
+        // Use path element instead of separate lines for X mark
+        const xMark = document.createElementNS(svgNS, "path");
+        xMark.setAttribute("d", "M15 9L9 15M9 9L15 15");
+        xMark.setAttribute("stroke", errorColor);
+        xMark.setAttribute("stroke-width", "2.5");
+        xMark.setAttribute("stroke-linecap", "round");
+        xMark.setAttribute("stroke-linejoin", "round");
+        xMark.setAttribute("fill", "none");
 
         svg.appendChild(errorCircle);
-        svg.appendChild(line1);
-        svg.appendChild(line2);
+        svg.appendChild(xMark);
         break;
       }
 
       case "info": {
-        const infoColor = "var(--toaster-info-color)";
+        const infoColor = "var(--toaster-info-color) !important";
         svg.setAttribute("stroke", infoColor);
-        svg.setAttribute("stroke-width", "2");
-
+        
+        // Add style to ensure color is respected
+        svg.setAttribute("style", `stroke: ${infoColor} !important;`);
+        
         const infoCircle = document.createElementNS(svgNS, "circle");
         infoCircle.setAttribute("cx", "12");
         infoCircle.setAttribute("cy", "12");
         infoCircle.setAttribute("r", "10");
         infoCircle.setAttribute("stroke", infoColor);
         infoCircle.setAttribute("fill", "none");
-
-        const infoLine1 = document.createElementNS(svgNS, "line");
-        infoLine1.setAttribute("x1", "12");
-        infoLine1.setAttribute("y1", "16");
-        infoLine1.setAttribute("x2", "12");
-        infoLine1.setAttribute("y2", "12");
-        infoLine1.setAttribute("stroke", infoColor);
-
-        const infoLine2 = document.createElementNS(svgNS, "line");
-        infoLine2.setAttribute("x1", "12");
-        infoLine2.setAttribute("y1", "8");
-        infoLine2.setAttribute("x2", "12.01");
-        infoLine2.setAttribute("y2", "8");
-        infoLine2.setAttribute("stroke", infoColor);
-
+        // Add inline style to force color
+        infoCircle.setAttribute("style", `stroke: ${infoColor} !important;`);
+        
+        // Use path element instead of lines for better consistency
+        const infoSymbol = document.createElementNS(svgNS, "path");
+        infoSymbol.setAttribute("d", "M12 16L12 12M12 8L12.01 8");
+        infoSymbol.setAttribute("stroke", infoColor);
+        infoSymbol.setAttribute("stroke-width", "3");
+        infoSymbol.setAttribute("stroke-linecap", "round");
+        infoSymbol.setAttribute("fill", "none");
+        // Add inline style to force color
+        infoSymbol.setAttribute("style", `stroke: ${infoColor} !important;`);
+        
         svg.appendChild(infoCircle);
-        svg.appendChild(infoLine1);
-        svg.appendChild(infoLine2);
+        svg.appendChild(infoSymbol);
         break;
       }
-
+  
       case "warn": {
-        const warnColor = "var(--toaster-warn-color)";
+        const warnColor = "var(--toaster-warn-color) !important";
         svg.setAttribute("stroke", warnColor);
-        svg.setAttribute("stroke-width", "2");
-
+        
+        // Add style to ensure color is respected
+        svg.setAttribute("style", `stroke: ${warnColor} !important;`);
+        
+        // Triangle for warning
         const triangle = document.createElementNS(svgNS, "path");
         triangle.setAttribute(
           "d",
@@ -245,29 +265,28 @@ class Toaster {
         );
         triangle.setAttribute("stroke", warnColor);
         triangle.setAttribute("fill", "none");
-
-        const exclamation = document.createElementNS(svgNS, "line");
-        exclamation.setAttribute("x1", "12");
-        exclamation.setAttribute("y1", "9");
-        exclamation.setAttribute("x2", "12");
-        exclamation.setAttribute("y2", "13");
+        triangle.setAttribute("stroke-width", "2");
+        // Add inline style to force color
+        triangle.setAttribute("style", `stroke: ${warnColor} !important;`);
+        
+        // Use path element for exclamation mark instead of separate lines
+        const exclamation = document.createElementNS(svgNS, "path");
+        exclamation.setAttribute("d", "M12 9L12 13M12 17L12.01 17");
         exclamation.setAttribute("stroke", warnColor);
-
-        const dot = document.createElementNS(svgNS, "line");
-        dot.setAttribute("x1", "12");
-        dot.setAttribute("y1", "17");
-        dot.setAttribute("x2", "12.01");
-        dot.setAttribute("y2", "17");
-        dot.setAttribute("stroke", warnColor);
-
+        exclamation.setAttribute("stroke-width", "2");
+        exclamation.setAttribute("stroke-linecap", "round");
+        exclamation.setAttribute("fill", "none");
+        // Add inline style to force color
+        exclamation.setAttribute("style", `stroke: ${warnColor} !important;`);
+        
         svg.appendChild(triangle);
         svg.appendChild(exclamation);
-        svg.appendChild(dot);
         break;
       }
 
       case "loading":
       default: {
+        const loadingColor = "var(--toaster-loading-color) !important";
         // Use a properly centered SVG for the gear
         svg.setAttribute("class", "gear");
         svg.setAttribute("width", "24");
@@ -276,7 +295,6 @@ class Toaster {
 
         // Create a centered gear with proper rotation point
         const gear = document.createElementNS(svgNS, "g");
-        const gearColor = "var(--toaster-gear-color)";
 
         // Center circle
         const circle = document.createElementNS(svgNS, "circle");
@@ -284,8 +302,8 @@ class Toaster {
         circle.setAttribute("cy", "12");
         circle.setAttribute("r", "2");
         circle.setAttribute("stroke-width", "2");
-        circle.setAttribute("fill", gearColor);
-        circle.setAttribute("stroke", gearColor);
+        circle.setAttribute("fill", loadingColor);
+        circle.setAttribute("stroke", loadingColor);
 
         // Create spokes/teeth for the gear at equal angles
         for (let i = 0; i < 8; i++) {
@@ -300,8 +318,8 @@ class Toaster {
           line.setAttribute("y1", innerY);
           line.setAttribute("x2", outerX);
           line.setAttribute("y2", outerY);
-          line.setAttribute("stroke", gearColor);
-          line.setAttribute("stroke-width", "2");
+          line.setAttribute("stroke", loadingColor);
+          line.setAttribute("stroke-width", "1");
           line.setAttribute("stroke-linecap", "round");
 
           gear.appendChild(line);
@@ -367,28 +385,47 @@ class Toaster {
     }, 3000);
   }
 
+  /**
+   * Main message display method for the toaster
+   * @param {string} message - Message to display
+   * @param {string} severity - Message severity: "info", "success", "error", "warn", "loading"
+   * @param {number} duration - Display duration in ms, 0 for persistent
+   */
   showMessage(message, severity = "info", duration = 3000) {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
 
-    // Set up the progress bar based on severity
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = null;
+    }
+
     if (this.progressBar) {
       switch (severity) {
         case "success":
           this.progressBar.style.width = "100%";
           this.progressBar.style.backgroundColor =
             "var(--toaster-success-color)";
+          this.progressBar.style.display = "block";
           break;
         case "error":
           this.progressBar.style.width = "100%";
           this.progressBar.style.backgroundColor = "var(--toaster-error-color)";
+          this.progressBar.style.display = "block";
           break;
         case "warn":
           this.progressBar.style.width = "100%";
           this.progressBar.style.backgroundColor = "var(--toaster-warn-color)";
+          this.progressBar.style.display = "block";
+          break;
+        case "loading":
+          this.progressBar.style.backgroundColor =
+            "var(--toaster-loading-color)";
           break;
         case "info":
+          this.progressBar.style.backgroundColor = "var(--toaster-info-color)";
+          break;
         default:
           this.progressBar.style.display = "none";
           break;
@@ -410,10 +447,6 @@ class Toaster {
     // Validate and set duration
     duration = typeof duration === "number" && duration > 0 ? duration : 3000;
     duration = Math.min(duration, 10000);
-
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-    }
 
     this.timeoutId = setTimeout(() => {
       this.removeToaster();

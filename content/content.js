@@ -179,7 +179,7 @@ async function checkOllamaStatus() {
     const reason = status
       ? window.DOMPurify.sanitize(status.reason || "Unknown error")
       : "Unknown error";
-    console.warn(`Ollama is not available: ${reason}`);
+    console.info(`Ollama is not available: ${reason}`);
     toaster.showError(`Ollama is not available: ${reason}`);
 
     // If we reached the maximum retries or got a definitive "not available" response
@@ -449,8 +449,7 @@ async function processParagraphBatch(
     `Processing paragraphs ${startIndex + 1}-${Math.min(
       startIndex + chunkSize,
       paragraphs.length
-    )}...`,
-    0
+    )}...`
   );
 
   const batch = Array.from(paragraphs).slice(
