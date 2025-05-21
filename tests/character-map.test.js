@@ -8,7 +8,7 @@ const {
   migrateToNewFormat, 
   getNextCharacterId, 
   purgeOldNovels 
-} = require('./testHelpers');
+} = require('./test-helpers');
 
 // Test gender compression
 console.log('\n--- Testing Gender Compression ---');

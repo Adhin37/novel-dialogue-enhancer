@@ -1,6 +1,7 @@
 // content.js
 /**
  * Content script for Novel Dialogue Enhancer
+ * Orchestrates the enhancement process on web pages
  */
 let contentElement = null;
 let settings = {
@@ -20,49 +21,67 @@ const maxRetries = 3;
  * Initializes the extension
  */
 function init() {
+  // Initialize components
   enhancerIntegration = new EnhancerIntegration();
   toaster = new Toaster();
   toaster.createToaster();
 
   // First check if current site is whitelisted with timeout handling
-  const checkPermissionPromise = new Promise((resolve) => {
-    const permissionTimeout = setTimeout(() => {
-      console.warn("Whitelist check timed out");
-      resolve({ hasPermission: false, error: "Timeout" });
-    }, 5000); // 5 second timeout
+  checkSitePermissions()
+    .then((isWhitelisted) => {
+      isCurrentSiteWhitelisted = isWhitelisted;
 
-    chrome.runtime.sendMessage(
-      { action: "checkSitePermission", url: window.location.href },
-      (response) => {
-        clearTimeout(permissionTimeout);
-        
-        if (chrome.runtime.lastError) {
-          console.warn("Error checking site permission:", chrome.runtime.lastError);
-          resolve({ hasPermission: false, error: chrome.runtime.lastError.message });
-          return;
-        }
-        
-        resolve(response || { hasPermission: false });
+      if (!isCurrentSiteWhitelisted) {
+        console.log("Site not whitelisted, extension inactive");
+        return;
       }
-    );
-  });
 
-  checkPermissionPromise.then((response) => {
-    isCurrentSiteWhitelisted = response && response.hasPermission;
-    
-    if (response.error) {
-      console.warn(`Site permission check failed: ${response.error}`);
-      toaster.showWarning("Extension permission check failed. Try refreshing the page.");
-    }
+      console.log("Site is whitelisted, activating extension features");
 
-    if (!isCurrentSiteWhitelisted) {
-      console.log("Site not whitelisted, extension inactive");
-      return;
-    }
+      // Only load settings if the site is whitelisted
+      loadSettings()
+        .then(() => {
+          // Use a shorter delay for better feedback
+          setTimeout(async () => {
+            if (!settings.isExtensionPaused) {
+              console.log("Extension is enabled, checking Ollama availability");
+              try {
+                const isAvailable = await checkOllamaStatus();
+                if (isAvailable) {
+                  console.log("Ollama is available, starting page enhancement");
+                  enhancePage();
+                } else {
+                  console.log(
+                    "Ollama is not available, page enhancement skipped"
+                  );
+                }
+              } catch (error) {
+                console.error("Error checking Ollama status:", error);
+                toaster.showError(`Ollama check failed: ${error.message}`);
+              }
+            } else {
+              console.log("Extension is paused in settings");
+            }
+          }, 800);
+        })
+        .catch((error) => {
+          console.error("Failed to load settings:", error);
+        });
+    })
+    .catch((error) => {
+      console.error("Fatal error during initialization:", error);
+      toaster.showError(
+        "Extension initialization failed. Please try refreshing the page."
+      );
+    });
+}
 
-    console.log("Site is whitelisted, activating extension features");
-    
-    // Only load settings if the site is whitelisted
+/**
+ * Load extension settings from storage
+ * @return {Promise} - Promise resolving with loaded settings
+ */
+function loadSettings() {
+  return new Promise((resolve, reject) => {
     chrome.storage.sync.get(
       ["isExtensionPaused", "preserveNames", "fixPronouns"],
       (data) => {
@@ -74,6 +93,7 @@ function init() {
             preserveNames: true,
             fixPronouns: true
           };
+          reject(chrome.runtime.lastError);
         } else {
           settings = {
             isExtensionPaused:
@@ -87,33 +107,41 @@ function init() {
             fixPronouns:
               data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
           };
+          resolve(settings);
         }
-
-        // Use a shorter delay and provide better feedback
-        setTimeout(async () => {
-          if (!settings.isExtensionPaused) {
-            console.log("Extension is enabled, checking Ollama availability");
-            try {
-              const isAvailable = await checkOllamaStatus();
-              if (isAvailable) {
-                console.log("Ollama is available, starting page enhancement");
-                enhancePage();
-              } else {
-                console.log("Ollama is not available, page enhancement skipped");
-              }
-            } catch (error) {
-              console.error("Error checking Ollama status:", error);
-              toaster.showError(`Ollama check failed: ${error.message}`);
-            }
-          } else {
-            console.log("Extension is paused in settings");
-          }
-        }, 800); // Slightly shorter delay for better responsiveness
       }
     );
-  }).catch(error => {
-    console.error("Fatal error during initialization:", error);
-    toaster.showError("Extension initialization failed. Please try refreshing the page.");
+  });
+}
+
+/**
+ * Check site permissions with a timeout
+ * @return {Promise<boolean>} - Whether the site is whitelisted
+ */
+function checkSitePermissions() {
+  return new Promise((resolve) => {
+    const permissionTimeout = setTimeout(() => {
+      console.warn("Whitelist check timed out");
+      resolve(false);
+    }, 5000); // 5 second timeout
+
+    chrome.runtime.sendMessage(
+      { action: "checkSitePermission", url: window.location.href },
+      (response) => {
+        clearTimeout(permissionTimeout);
+
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "Error checking site permission:",
+            chrome.runtime.lastError
+          );
+          resolve(false);
+          return;
+        }
+
+        resolve(response && response.hasPermission);
+      }
+    );
   });
 }
 
@@ -125,20 +153,10 @@ async function checkOllamaStatus() {
   console.log("Checking Ollama status...");
   let retries = 0;
   let status = null;
-  const TIMEOUT = 10000; // 10 seconds timeout per check
 
   while (retries < maxRetries) {
     try {
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Ollama check timed out")), TIMEOUT);
-      });
-      
-      // Create the actual check promise
-      const checkPromise = enhancerIntegration.ollamaClient.checkOllamaAvailability();
-      
-      // Race the promises
-      status = await Promise.race([checkPromise, timeoutPromise]);
+      status = await enhancerIntegration.ollamaClient.checkOllamaAvailability();
       break;
     } catch (err) {
       console.warn(
@@ -197,6 +215,15 @@ function findContentElement() {
     }
   }
 
+  // Find largest text block as fallback
+  return findLargestTextBlock();
+}
+
+/**
+ * Finds the largest text block on the page as a fallback
+ * @return {HTMLElement|null} - Largest text block or null
+ */
+function findLargestTextBlock() {
   let largestTextBlock = null;
   let maxTextLength = 0;
 
@@ -268,17 +295,10 @@ async function enhancePage() {
   }
 
   try {
-    // Create a timeout for the Ollama check
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Ollama availability check timed out")), 10000);
-    });
-    
-    // The actual check
-    const checkPromise = enhancerIntegration.ollamaClient.checkOllamaAvailability();
-    
-    // Race the promises
-    const ollamaStatus = await Promise.race([checkPromise, timeoutPromise]);
-    
+    // Check Ollama availability
+    const ollamaStatus =
+      await enhancerIntegration.ollamaClient.checkOllamaAvailability();
+
     if (!ollamaStatus.available) {
       const safeReason = window.DOMPurify.sanitize(
         ollamaStatus.reason || "Unknown error"
@@ -287,7 +307,18 @@ async function enhancePage() {
       throw new Error(`Ollama not available: ${safeReason}`);
     }
 
-    await enhancePageWithLLM();
+    // Get character context first to improve prompt quality
+    await enhancerIntegration.setupCharacterContext();
+
+    // Delegate to the appropriate enhancement method based on content structure
+    const paragraphs = contentElement.querySelectorAll("p");
+
+    if (paragraphs.length === 0) {
+      await processSingleContentBlock();
+    } else {
+      await processMultipleParagraphs(paragraphs);
+    }
+
     const stats = enhancerIntegration.statsUtils.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
     toaster.showSuccess("Enhancement complete!");
@@ -318,82 +349,37 @@ async function enhancePage() {
 }
 
 /**
- * Enhances the page content using LLM
- */
-async function enhancePageWithLLM() {
-  console.log("Novel Dialogue Enhancer: Using LLM enhancement");
-  console.time("LLMEnhancement");
-
-  try {
-    // Check if current chapter is already enhanced
-    const novelUtils = enhancerIntegration.novelUtils;
-    if (novelUtils.isCurrentChapterEnhanced) {
-      console.log("This chapter has already been enhanced previously");
-      toaster.showInfo("This chapter was previously enhanced");
-      // We still need to extract character information for context
-      await enhancerIntegration.setupCharacterContext();
-      return;
-    }
-    
-    const paragraphs = contentElement.querySelectorAll("p");
-    const totalParagraphs = paragraphs.length || 1;
-
-    toaster.updateProgress(0, totalParagraphs);
-
-    if (paragraphs.length === 0) {
-      await processSingleContentBlock();
-    } else {
-      await processMultipleParagraphs(paragraphs);
-    }
-
-    enhancerIntegration.statsUtils.setTotalDialoguesEnhanced(
-      paragraphs.length || 1
-    );
-    console.log("Novel Dialogue Enhancer: LLM enhancement complete");
-    
-    // Ensure the chapter is marked as enhanced in storage
-    if (novelUtils.chapterInfo && novelUtils.chapterInfo.chapterNumber) {
-      novelUtils.syncCharacterMap(novelUtils.characterMap);
-    }
-  } catch (error) {
-    console.error(
-      "Novel Dialogue Enhancer: LLM enhancement failed completely",
-      error
-    );
-    toaster.showError(
-      "LLM enhancement failed: " + window.DOMPurify.sanitize(error.message)
-    );
-    throw error;
-  } finally {
-    console.timeEnd("LLMEnhancement");
-  }
-}
-
-/**
  * Processes a single content block for enhancement
  */
 async function processSingleContentBlock() {
   const originalText = contentElement.textContent;
 
   if (terminateRequested) {
-    console.log("LLM enhancement terminated by user before processing");
+    console.log("Enhancement terminated by user before processing");
     toaster.showWarning("Enhancement terminated by user");
     return;
   }
 
-  console.log("Sending content to LLM for full-content enhancement");
+  console.log("Processing full content as a single block");
   toaster.updateProgress(0, 1);
 
-  const llmEnhancedText = await enhancerIntegration.enhanceText(originalText);
+  try {
+    // Use the enhancerIntegration to enhance the entire text
+    const enhancedText = await enhancerIntegration.enhanceText(originalText);
 
-  if (terminateRequested) {
-    console.log("LLM enhancement terminated by user after processing");
-    toaster.showWarning("Enhancement terminated by user");
-    return;
+    if (terminateRequested) {
+      console.log("Enhancement terminated by user after processing");
+      toaster.showWarning("Enhancement terminated by user");
+      return;
+    }
+
+    // Update the DOM with the enhanced text
+    contentElement.innerHTML = window.DOMPurify.sanitize(enhancedText);
+    toaster.updateProgress(1, 1);
+  } catch (error) {
+    console.error("Failed to enhance content block:", error);
+    throw error;
   }
-
-  contentElement.innerHTML = window.DOMPurify.sanitize(llmEnhancedText);
-  toaster.updateProgress(1, 1);
 }
 
 /**
@@ -412,7 +398,7 @@ async function processMultipleParagraphs(paragraphs) {
   for (let i = 0; i < paragraphs.length; i += chunkSize) {
     if (terminateRequested) {
       console.log(
-        `LLM enhancement terminated by user at batch ${i}/${paragraphs.length}`
+        `Enhancement terminated by user at batch ${i}/${paragraphs.length}`
       );
       toaster.showWarning("Enhancement terminated by user");
       break;
@@ -440,7 +426,7 @@ async function processParagraphBatch(
   totalParagraphs
 ) {
   console.log(
-    `LLM enhancement progress: ${startIndex}/${paragraphs.length} paragraphs`
+    `Enhancement progress: ${startIndex}/${paragraphs.length} paragraphs`
   );
   toaster.updateProgress(startIndex, totalParagraphs);
 
@@ -453,16 +439,16 @@ async function processParagraphBatch(
 
   try {
     console.log(
-      `Sending large batch ${startIndex}-${
-        startIndex + batch.length - 1
-      } to LLM (${batchText.length} chars)`
+      `Processing batch ${startIndex}-${startIndex + batch.length - 1} (${
+        batchText.length
+      } chars)`
     );
 
-    const llmEnhancedText = await enhancerIntegration.enhanceText(batchText);
+    const enhancedText = await enhancerIntegration.enhanceText(batchText);
 
     if (terminateRequested) {
       console.log(
-        `LLM enhancement terminated by user during batch ${startIndex}-${
+        `Enhancement terminated by user during batch ${startIndex}-${
           startIndex + batch.length - 1
         }`
       );
@@ -470,7 +456,7 @@ async function processParagraphBatch(
       return;
     }
 
-    const enhancedParagraphs = llmEnhancedText.split("\n\n");
+    const enhancedParagraphs = enhancedText.split("\n\n");
 
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
       batch[j].innerHTML = window.DOMPurify.sanitize(enhancedParagraphs[j]);
@@ -482,9 +468,7 @@ async function processParagraphBatch(
     );
   } catch (error) {
     console.error(
-      `LLM enhancement failed for batch ${startIndex}-${
-        startIndex + chunkSize
-      }:`,
+      `Enhancement failed for batch ${startIndex}-${startIndex + chunkSize}:`,
       error
     );
     toaster.showMessage(
@@ -529,6 +513,7 @@ function handleTerminationRequest() {
   }
 }
 
+// Message handler for communication with popup and background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || typeof request !== "object" || !request.action) {
     console.error("Invalid message format received");
@@ -618,6 +603,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return false;
 });
 
+// Create a MutationObserver to detect page changes
 const observer = new MutationObserver((mutations) => {
   // Only process if site is whitelisted, extension not paused, and not already enhancing
   if (
@@ -653,6 +639,7 @@ const observer = new MutationObserver((mutations) => {
 // Start safely with DOMPurify loaded
 init();
 
+// Set up observer after a short delay
 setTimeout(() => {
   // Only set up observer if the site is whitelisted
   if (isCurrentSiteWhitelisted) {

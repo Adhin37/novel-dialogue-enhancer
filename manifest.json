@@ -44,11 +44,13 @@
       ],
       "js": [
         "assets/js/lib/purify.min.js",
-        "assets/js/utils/genderUtils.js",
-        "assets/js/utils/novelUtils.js",
-        "assets/js/utils/statsUtils.js",
-        "assets/js/enhancerIntegration.js",
-        "assets/js/ollamaClient.js",
+        "assets/js/utils/gender-utils.js",
+        "assets/js/utils/novel-utils.js",
+        "assets/js/utils/stats-utils.js",
+        "assets/js/llm/text-processor.js",
+        "assets/js/llm/prompt-generator.js",
+        "assets/js/llm/ollama-client.js",
+        "assets/js/enhancer-integration.js",
         "assets/js/toaster.js",
         "content/content.js"
       ],

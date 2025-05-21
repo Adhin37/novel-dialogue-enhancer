@@ -10,6 +10,8 @@ class EnhancerIntegration {
     this.ollamaClient = new OllamaClient();
     this.novelUtils = new NovelUtils(window.location.href, document.title);
     this.statsUtils = new StatsUtils();
+    this.textProcessor = new TextProcessor();
+    this.promptGenerator = new PromptGenerator();
 
     console.log(
       "Novel Dialogue Enhancer: Integration module initialized with LLM support"
@@ -25,7 +27,7 @@ class EnhancerIntegration {
     const startTime = performance.now();
 
     try {
-      const sanitizedText = this.novelUtils.sanitizeText(text);
+      const sanitizedText = this.textProcessor.sanitizeText(text);
 
       // Extract character information using novelUtils
       const characterMap = await this.extractCharacterInfo(sanitizedText);
@@ -48,7 +50,7 @@ class EnhancerIntegration {
         return text;
       }
 
-      // Use the ollamaClient directly, passing the character summary
+      // Use the ollamaClient with our newly refactored components
       const enhancedText = await this.enhanceTextWithLLM(
         sanitizedText,
         characterSummary
@@ -183,7 +185,7 @@ class EnhancerIntegration {
         );
       }
 
-      // Format novel style information for the LLM
+      // Format novel style information
       const novelInfo = {
         style: novelStyle.style,
         tone: novelStyle.tone,
@@ -192,20 +194,87 @@ class EnhancerIntegration {
         chapterInfo: this.novelUtils.chapterInfo
       };
 
-      // Process with Ollama
-      const enhancedText = await this.ollamaClient.enhanceWithLLM(
-        text,
+      // Split text into manageable chunks
+      const settings = await this.ollamaClient.getLLMSettings();
+      const textChunks = this.textProcessor.splitIntoChunks(text, settings.maxChunkSize);
+      
+      // Process each chunk
+      const enhancedChunks = await this.processChunks(
+        textChunks,
         characterSummary,
-        novelInfo
+        novelInfo,
+        settings
       );
 
+      const enhancedText = enhancedChunks.join("\n\n");
       console.log("Text enhancement complete!");
 
-      return enhancedText;
+      return this.textProcessor.cleanLLMResponse(enhancedText);
     } catch (error) {
       console.error("LLM enhancement error:", error);
       throw error;
     }
+  }
+
+  /**
+   * Process all text chunks sequentially
+   * @param {Array<string>} chunks - Text chunks to process
+   * @param {string} characterContext - Character information
+   * @param {object} novelInfo - Novel style information
+   * @param {object} settings - LLM settings
+   * @return {Promise<Array<string>>} - Array of enhanced text chunks
+   */
+  async processChunks(chunks, characterContext, novelInfo, settings) {
+    const enhancedChunks = [];
+    const BATCH_DELAY = 800;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      console.log(
+        `Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`
+      );
+
+      // Build context that includes surrounding text
+      const contextInfo = this.textProcessor.buildChunkContext(chunks, i);
+      
+      // Create the prompt using our prompt generator
+      const prompt = this.promptGenerator.createEnhancementPrompt(
+        chunk,
+        characterContext,
+        contextInfo,
+        novelInfo
+      );
+
+      // Create a cache key for the background service
+      const cacheKey = this.textProcessor.createHash(chunk + contextInfo);
+
+      try {
+        // Process with LLM via the Ollama client
+        const enhancedChunk = await this.ollamaClient.processWithLLM(
+          settings.modelName,
+          prompt,
+          {
+            max_tokens: settings.contextSize,
+            temperature: settings.temperature,
+            top_p: settings.topP,
+            timeout: settings.timeout,
+            cacheKey: cacheKey
+          }
+        );
+        
+        enhancedChunks.push(enhancedChunk);
+      } catch (chunkError) {
+        console.warn("Failed to enhance chunk, using original:", chunkError);
+        enhancedChunks.push(chunk);
+      }
+
+      // Add delay between chunks to avoid overwhelming the LLM
+      if (i < chunks.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
+      }
+    }
+
+    return enhancedChunks;
   }
 }
 

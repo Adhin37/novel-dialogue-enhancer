@@ -5,7 +5,10 @@
   "main": "content.js",
   "scripts": {
     "test": "node tests/characterMap.test.js",
-    "build:zip": "zip -r dist/novel-dialogue-enhancer.zip assets/* background/* content/* popup/* options/* manifest.json README.md"
+    "build:zip": "run-script-os",
+    "build:zip:windows": "powershell -Command \"if (Test-Path 'dist/novel-dialogue-enhancer.zip') { Remove-Item 'dist/novel-dialogue-enhancer.zip' -Force }; Compress-Archive -Path assets/*,background/*,content/*,popup/*,options/*,manifest.json,README.md -DestinationPath dist/novel-dialogue-enhancer.zip\"",
+    "build:zip:linux": "rm -f dist/novel-dialogue-enhancer.zip && zip -r dist/novel-dialogue-enhancer.zip assets/* background/* content/* popup/* options/* manifest.json README.md",
+    "build:zip:default": "echo 'Unsupported OS for build:zip'"
   },
   "repository": {
     "type": "git",
@@ -23,6 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^9.26.0",
     "eslint": "^9.26.0",
-    "globals": "^16.1.0"
+    "globals": "^16.1.0",
+    "run-script-os": "^1.1.6"
   }
 }

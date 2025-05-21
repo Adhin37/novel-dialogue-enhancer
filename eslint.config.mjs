@@ -19,6 +19,8 @@ export default defineConfig([
         OllamaClient: "readonly",
         EnhancerIntegration: "readonly",
         Toaster: "readonly",
+        TextProcessor: "readonly",
+        PromptGenerator: "readonly",
         DOMPurify: "readonly"
       }
     },
