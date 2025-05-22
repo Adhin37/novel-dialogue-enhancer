@@ -114,6 +114,10 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
     const purgedMaps = purgeOldNovels(novelCharacterMaps);
 
     Object.entries(purgedMaps).forEach(([novelId, data]) => {
+      if (!novelId || !data) {
+        console.warn(`Invalid novel entry: ${novelId}`);
+        return;
+      }
       purgedMaps[novelId] = migrateToNewFormat(data);
     });
 
@@ -132,7 +136,19 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
 
       const novelEntries = Object.entries(purgedMaps);
 
+      // Validate novelEntries before sorting
+      if (!Array.isArray(novelEntries) || novelEntries.length === 0) {
+        console.warn("No valid novel entries found for pruning");
+        return;
+      }
+
       novelEntries.sort((a, b) => {
+        // Use entry data for validation
+        if (!a[1] || !b[1]) {
+          console.warn("Invalid entry data during sorting:", a[0], b[0]);
+          return 0;
+        }
+
         const aLastAccess = a[1].lastAccess || 0;
         const bLastAccess = b[1].lastAccess || 0;
 
@@ -147,8 +163,10 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
 
       const toRemove = Math.max(1, Math.floor(novelEntries.length * 0.2));
       for (let i = 0; i < toRemove; i++) {
-        if (novelEntries[i]) {
-          delete purgedMaps[novelEntries[i][0]];
+        if (novelEntries[i] && novelEntries[i][0]) {
+          const entryId = novelEntries[i][0];
+          console.log(`Removing novel entry: ${entryId}`);
+          delete purgedMaps[entryId];
         }
       }
     }
@@ -158,6 +176,10 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
         console.error(
           "Error storing character maps:",
           chrome.runtime.lastError
+        );
+      } else {
+        console.log(
+          `Successfully stored ${Object.keys(purgedMaps).length} novel entries`
         );
       }
     });
@@ -184,6 +206,13 @@ function handleOllamaRequest(request, sendResponse) {
           error:
             "Error retrieving settings: " + chrome.runtime.lastError.message
         });
+        return;
+      }
+
+      // Validate retrieved data
+      if (!data || typeof data !== "object") {
+        console.warn("Invalid settings data retrieved:", data);
+        sendResponse({ error: "Invalid settings configuration" });
         return;
       }
 
@@ -219,6 +248,7 @@ function handleOllamaRequest(request, sendResponse) {
           sendResponse({ error: "Invalid stream value" });
         }
       } catch (error) {
+        console.error("Error preparing request:", error);
         sendResponse({ error: error.message });
       }
     }
@@ -358,9 +388,25 @@ function checkOllamaAvailability(sendResponse) {
     signal: controller.signal
   })
     .then((response) => {
+      if (!response) {
+        throw new Error("No response received from Ollama");
+      }
+
       if (response.ok) {
         return response.json().then((data) => {
-          console.log(`Ollama version check successful: ${data.version}`);
+          // Validate data parameter
+          if (!data || typeof data !== "object") {
+            console.warn("Invalid version data received:", data);
+            sendResponse({
+              available: false,
+              reason: "Invalid version data format"
+            });
+            return;
+          }
+
+          console.log(
+            `Ollama version check successful: ${data.version || "unknown"}`
+          );
 
           const modelsController = new AbortController();
           const modelsTimeoutId = setTimeout(
@@ -373,12 +419,38 @@ function checkOllamaAvailability(sendResponse) {
             headers: { "Content-Type": "application/json" },
             signal: modelsController.signal
           })
-            .then((modelsResponse) => modelsResponse.json())
+            .then((modelsResponse) => {
+              if (!modelsResponse || !modelsResponse.ok) {
+                console.warn(
+                  "Models endpoint not accessible:",
+                  modelsResponse?.status
+                );
+                sendResponse({
+                  available: true,
+                  version: data.version,
+                  reason: "Could not fetch models list"
+                });
+                return;
+              }
+
+              return modelsResponse.json();
+            })
             .then((modelsData) => {
+              // Use modelsData parameter with validation
+              if (!modelsData || typeof modelsData !== "object") {
+                console.warn("Invalid models data:", modelsData);
+                sendResponse({
+                  available: true,
+                  version: data.version,
+                  models: []
+                });
+                return;
+              }
+
               const availableModels = Array.isArray(modelsData.models)
                 ? modelsData.models
-                    .filter((m) => m && m.name)
-                    .map((m) => m.name)
+                    .filter((model) => model && model.name)
+                    .map((model) => model.name)
                 : [];
 
               console.log(
@@ -396,7 +468,11 @@ function checkOllamaAvailability(sendResponse) {
               console.log(
                 `Ollama is available, version: ${data.version}, but couldn't fetch models: ${modelError.message}`
               );
-              sendResponse({ available: true, version: data.version });
+              sendResponse({
+                available: true,
+                version: data.version,
+                reason: `Models fetch failed: ${modelError.message}`
+              });
             })
             .finally(() => clearTimeout(modelsTimeoutId));
         });
@@ -410,9 +486,19 @@ function checkOllamaAvailability(sendResponse) {
         });
       }
     })
-    .catch((err) => {
-      console.warn("Ollama availability check failed:", err);
-      sendResponse({ available: false, reason: err.message });
+    .catch((error) => {
+      // Use error parameter
+      if (!error) {
+        console.warn("Unknown error during Ollama check");
+        sendResponse({ available: false, reason: "Unknown error" });
+        return;
+      }
+
+      console.warn("Ollama availability check failed:", error.message || error);
+      sendResponse({
+        available: false,
+        reason: error.message || "Connection failed"
+      });
     })
     .finally(() => clearTimeout(timeoutId));
 }
@@ -667,7 +753,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
-    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -683,19 +768,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         novelCharacterMaps[novelId].chaps = [];
       }
 
-      if (!novelCharacterMaps[novelId].chaps.includes(request.chapterNumber)) {
-        novelCharacterMaps[novelId].chaps.push(request.chapterNumber);
+      const chapterNum = parseInt(request.chapterNumber, 10);
+      if (
+        !isNaN(chapterNum) &&
+        !novelCharacterMaps[novelId].chaps.includes(chapterNum)
+      ) {
+        novelCharacterMaps[novelId].chaps.push(chapterNum);
+        console.log(`Added chapter ${chapterNum} to novel ${novelId}`);
       }
     }
 
     if (request.chars && typeof request.chars === "object") {
       Object.entries(request.chars).forEach(([charId, charData]) => {
+        // Use charId parameter for validation
+        if (!charId || charId.trim() === "") {
+          console.warn("Invalid character ID provided:", charId);
+          return;
+        }
+
+        // Use charData parameter for validation
+        if (!charData || typeof charData !== "object" || !charData.name) {
+          console.warn(`Invalid character data for ID ${charId}:`, charData);
+          return;
+        }
+
         let existingCharId = null;
 
         for (const [id, character] of Object.entries(
           novelCharacterMaps[novelId].chars
         )) {
-          if (character.name === charData.name) {
+          if (character && character.name === charData.name) {
             existingCharId = id;
             break;
           }
@@ -704,6 +806,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         if (existingCharId !== null) {
           const existingChar =
             novelCharacterMaps[novelId].chars[existingCharId];
+
+          if (!existingChar) {
+            console.warn(
+              `Existing character data missing for ID ${existingCharId}`
+            );
+            return;
+          }
 
           const newAppearances =
             (existingChar.appearances || 0) + (charData.appearances || 1);
@@ -725,6 +834,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           ) {
             charData.evidences.forEach((item) => {
               if (
+                item &&
                 !mergedEvidences.includes(item) &&
                 mergedEvidences.length < 5
               ) {
@@ -744,6 +854,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             novelCharacterMaps[novelId].chars[existingCharId].evidences =
               mergedEvidences.slice(0, 5);
           }
+
+          console.log(
+            `Updated existing character: ${charData.name} (ID: ${existingCharId})`
+          );
         } else {
           const nextId = getNextCharacterId(novelCharacterMaps[novelId].chars);
 
@@ -761,6 +875,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             novelCharacterMaps[novelId].chars[nextId].evidences =
               charData.evidences.slice(0, 5);
           }
+
+          console.log(`Added new character: ${charData.name} (ID: ${nextId})`);
         }
       });
     }
@@ -768,7 +884,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
-    return false; // Synchronous operation
+    return false;
   } else if (request.action === "getNovelData") {
     const novelId = request.novelId;
 
@@ -1027,5 +1143,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false; // Synchronous operation
   }
 
-  return false; // Default for unhandled actions
+  return false;
 });
