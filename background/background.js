@@ -667,6 +667,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -767,7 +768,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
-    return false;
+    return false; // Synchronous operation
   } else if (request.action === "getNovelData") {
     const novelId = request.novelId;
 
@@ -776,6 +777,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       sendResponse({
         status: "ok",
@@ -825,68 +827,87 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     sendResponse(response);
-    return false;
+    return false; // Synchronous operation
   } else if (request.action === "checkSitePermission") {
-    checkSitePermission(request.url).then((hasPermission) => {
-      sendResponse({ hasPermission });
-    });
-    return true;
+    // Async operation - return true to keep channel open
+    checkSitePermission(request.url)
+      .then((hasPermission) => {
+        sendResponse({ hasPermission });
+      })
+      .catch((error) => {
+        console.error("Error in checkSitePermission:", error);
+        sendResponse({ hasPermission: false, error: error.message });
+      });
+    return true; // Keep message channel open for async response
   } else if (request.action === "addSiteToWhitelist") {
     const url = request.url;
     try {
       const hostname = new URL(url).hostname;
       chrome.storage.sync.get("whitelistedSites", async (data) => {
-        const whitelistedSites = data.whitelistedSites || [];
+        try {
+          const whitelistedSites = data.whitelistedSites || [];
 
-        if (!whitelistedSites.includes(hostname)) {
-          if (await requestPermission(hostname)) {
-            whitelistedSites.push(hostname);
-            chrome.storage.sync.set({ whitelistedSites }, () => {
-              whitelistCache.set(hostname, {
-                isWhitelisted: true,
-                timestamp: Date.now()
+          if (!whitelistedSites.includes(hostname)) {
+            const permissionGranted = await requestPermission(hostname);
+            if (permissionGranted) {
+              whitelistedSites.push(hostname);
+              chrome.storage.sync.set({ whitelistedSites }, () => {
+                whitelistCache.set(hostname, {
+                  isWhitelisted: true,
+                  timestamp: Date.now()
+                });
+
+                sendResponse({
+                  success: true,
+                  message: `${hostname} added to whitelist`
+                });
               });
-
+            } else {
               sendResponse({
-                success: true,
-                message: `${hostname} added to whitelist`
+                success: false,
+                message: `Permission denied for ${hostname}`
               });
-            });
+            }
           } else {
             sendResponse({
               success: false,
-              message: `Permission denied for ${hostname}`
+              message: `${hostname} is already whitelisted`
             });
           }
-        } else {
+        } catch (error) {
           sendResponse({
             success: false,
-            message: `${hostname} is already whitelisted`
+            message: `Error processing request: ${error.message}`
           });
         }
       });
     } catch (e) {
       sendResponse({ success: false, message: `Invalid URL: ${e.message}` });
     }
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "removeSiteFromWhitelist") {
     const hostname = request.hostname;
     chrome.storage.sync.get("whitelistedSites", (data) => {
-      let whitelistedSites = data.whitelistedSites || [];
-      whitelistedSites = whitelistedSites.filter((site) => site !== hostname);
-      chrome.storage.sync.set({ whitelistedSites }, () => {
-        whitelistCache.set(hostname, {
-          isWhitelisted: false,
-          timestamp: Date.now()
-        });
+      try {
+        let whitelistedSites = data.whitelistedSites || [];
+        whitelistedSites = whitelistedSites.filter((site) => site !== hostname);
+        chrome.storage.sync.set({ whitelistedSites }, () => {
+          whitelistCache.set(hostname, {
+            isWhitelisted: false,
+            timestamp: Date.now()
+          });
 
-        sendResponse({ success: true });
-      });
+          sendResponse({ success: true });
+        });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
     });
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "ollamaRequest") {
+    // Async operation - return true to keep channel open
     handleOllamaRequest(request, sendResponse);
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "checkActiveTabPermission") {
     if (!request.url) {
       sendResponse({ hasPermission: false, error: "No URL provided" });
@@ -895,6 +916,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     try {
       const url = request.url;
+      // Async operation - return true to keep channel open
       isSiteWhitelisted(url)
         .then((isWhitelisted) => {
           if (isWhitelisted) {
@@ -927,9 +949,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         hasPermission: false,
         error: error.message || "Invalid URL format"
       });
+      return false;
     }
 
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "terminateAllRequests") {
     console.log(`Terminating ${activeRequestControllers.size} active requests`);
 
@@ -943,10 +966,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       status: "terminated",
       count: activeRequestControllers.size
     });
-    return false;
+    return false; // Synchronous operation
   } else if (request.action === "checkOllamaAvailability") {
+    // Async operation - return true to keep channel open
     checkOllamaAvailability(sendResponse);
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "getNovelStyle") {
     const novelId = request.novelId;
 
@@ -955,6 +979,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Synchronous operation - return false immediately
     const novelData = novelCharacterMaps[novelId] || {};
 
     const migratedData = migrateToNewFormat(novelData);
@@ -968,7 +993,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ status: "ok", style: null });
     }
 
-    return false;
+    return false; // Synchronous operation
   } else if (request.action === "updateNovelStyle") {
     const novelId = request.novelId;
     const style = request.style;
@@ -981,6 +1006,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -998,8 +1024,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
-    return false;
+    return false; // Synchronous operation
   }
 
-  return false;
+  return false; // Default for unhandled actions
 });

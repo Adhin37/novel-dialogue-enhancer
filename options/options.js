@@ -61,6 +61,9 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  /**
+   * Adds a site manually to the whitelist
+   */
   function addSiteManually() {
     let domain = siteUrlInput.value.trim();
 
@@ -90,17 +93,28 @@ document.addEventListener("DOMContentLoaded", () => {
         url: "https://" + domain
       },
       (response) => {
+        // Handle potential runtime errors
+        if (chrome.runtime.lastError) {
+          console.error("Runtime error:", chrome.runtime.lastError);
+          window.feedbackManager.show(
+            "Error communicating with extension",
+            "warning"
+          );
+          siteModal.style.display = "none";
+          siteUrlInput.value = "";
+          return;
+        }
+
         if (response && response.success) {
           // Hide modal
           siteModal.style.display = "none";
           siteUrlInput.value = "";
 
           window.feedbackManager.show(response.message, "success");
-
           loadWhitelist();
         } else {
           window.feedbackManager.show(
-            response.message || "Error adding site",
+            response?.message || "Error adding site",
             "warning"
           );
 
@@ -110,6 +124,104 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     );
   }
+
+  /**
+   * Removes a site from the whitelist
+   */
+  function removeSiteFromWhitelist(site) {
+    chrome.runtime.sendMessage(
+      {
+        action: "removeSiteFromWhitelist",
+        hostname: site
+      },
+      (response) => {
+        // Handle potential runtime errors
+        if (chrome.runtime.lastError) {
+          console.error("Runtime error:", chrome.runtime.lastError);
+          window.feedbackManager.show(
+            "Error communicating with extension",
+            "warning"
+          );
+          return;
+        }
+
+        if (response && response.success) {
+          window.feedbackManager.show(
+            `Removed ${site} from whitelist`,
+            "success"
+          );
+          loadWhitelist();
+        } else {
+          window.feedbackManager.show(
+            response?.message || "Error removing site",
+            "warning"
+          );
+        }
+      }
+    );
+  }
+
+  /**
+   * Test Ollama connection with proper error handling
+   */
+  function testOllamaConnection() {
+    ollamaStatus.textContent = "Testing Ollama connection...";
+    ollamaStatus.className = "status-message pending";
+    ollamaStatus.style.display = "block";
+
+    // Add timeout for the request
+    const timeoutId = setTimeout(() => {
+      ollamaStatus.textContent = "Connection test timed out";
+      ollamaStatus.className = "status-message error";
+    }, 10000);
+
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: "checkOllamaAvailability"
+        },
+        (response) => {
+          clearTimeout(timeoutId);
+
+          if (chrome.runtime.lastError) {
+            console.error("Runtime error:", chrome.runtime.lastError);
+            ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
+            ollamaStatus.className = "status-message error";
+            return;
+          }
+
+          if (!response) {
+            ollamaStatus.textContent = "No response from Ollama service";
+            ollamaStatus.className = "status-message error";
+            return;
+          }
+
+          if (response.available) {
+            ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
+            if (response.models && response.models.length > 0) {
+              ollamaStatus.textContent += `\nAvailable models: ${response.models.join(
+                ", "
+              )}`;
+            }
+            ollamaStatus.className = "status-message success";
+          } else {
+            ollamaStatus.textContent = `Ollama not available: ${
+              response.reason || "Unknown reason"
+            }`;
+            ollamaStatus.className = "status-message error";
+          }
+        }
+      );
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.error("Exception in testOllamaConnection:", err);
+      ollamaStatus.textContent = `Error: ${err.message}`;
+      ollamaStatus.className = "status-message error";
+    }
+  }
+
+  // Update the event listener in the init function
+  testOllamaButton.addEventListener("click", testOllamaConnection);
 
   /**
    * Initializes the tabs functionality
@@ -232,28 +344,6 @@ document.addEventListener("DOMContentLoaded", () => {
       itemElement.appendChild(removeButton);
       whitelistItemsContainer.appendChild(itemElement);
     });
-  }
-
-  /**
-   * Removes a site from the whitelist
-   */
-  function removeSiteFromWhitelist(site) {
-    chrome.runtime.sendMessage(
-      {
-        action: "removeSiteFromWhitelist",
-        hostname: site
-      },
-      (response) => {
-        if (response && response.success) {
-          window.feedbackManager.show(
-            `Removed ${site} from whitelist`,
-            "success"
-          );
-
-          loadWhitelist();
-        }
-      }
-    );
   }
 
   function focusModal(errorMessage = null) {
@@ -491,16 +581,16 @@ document.addEventListener("DOMContentLoaded", () => {
    */
   function formatNovelId(novelId) {
     if (!novelId) return "Unknown Novel";
-  
+
     const [domainPart, novelPart] = novelId.split("__");
-  
+
     const domain = domainPart.replace(/_/g, ".");
-  
+
     const novelName = novelPart
       .split("_")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  
+
     return `<span style="color:var(--primary-color);">${domain}</span> | ${novelName}`;
   }
 
@@ -598,7 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     if (novelsTab) {
-      novelsTab.addEventListener('click', () => {
+      novelsTab.addEventListener("click", () => {
         loadNovelCharacterMaps();
       });
     }

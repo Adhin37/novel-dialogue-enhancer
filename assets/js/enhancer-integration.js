@@ -236,7 +236,7 @@ class EnhancerIntegration {
   }
 
   /**
-   * Process all text chunks sequentially
+   * Process all text chunks sequentially with enhanced context
    * @param {Array<string>} chunks - Text chunks to process
    * @param {string} characterContext - Character information
    * @param {object} novelInfo - Novel style information
@@ -253,8 +253,13 @@ class EnhancerIntegration {
         `Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`
       );
 
-      // Build context that includes surrounding text
-      const contextInfo = this.textProcessor.buildChunkContext(chunks, i);
+      // Build context using enhanced chunks when available
+      const contextInfo = this.textProcessor.buildChunkContext(
+        enhancedChunks.length > 0
+          ? [...enhancedChunks, ...chunks.slice(enhancedChunks.length)]
+          : chunks,
+        i
+      );
 
       // Create the prompt using our prompt generator
       const prompt = this.promptGenerator.createEnhancementPrompt(

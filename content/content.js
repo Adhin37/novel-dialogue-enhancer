@@ -403,9 +403,7 @@ async function processMultipleParagraphs(paragraphs) {
   );
 
   // Show a persistent message at the start that won't auto-disappear
-  toaster.showLoading(
-    `Preparing to process ${totalParagraphs} paragraphs...`
-  );
+  toaster.showLoading(`Preparing to process ${totalParagraphs} paragraphs...`);
 
   for (let i = 0; i < paragraphs.length; i += chunkSize) {
     if (terminateRequested) {
@@ -539,17 +537,18 @@ function handleTerminationRequest() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (!request || typeof request !== "object" || !request.action) {
     console.error("Invalid message format received");
+    sendResponse({ status: "error", error: "Invalid message format" });
     return false;
   }
 
   if (request.action === "ping") {
     sendResponse({ status: "active", whitelisted: isCurrentSiteWhitelisted });
-    return true;
+    return false; // Synchronous response
   } else if (request.action === "checkCurrentSiteWhitelist") {
     isCurrentSiteWhitelisted = request.isWhitelisted;
     console.log(`Site whitelist status updated: ${isCurrentSiteWhitelisted}`);
     sendResponse({ status: "updated" });
-    return true;
+    return false; // Synchronous response
   } else if (request.action === "enhanceNow") {
     // First check if site is whitelisted
     if (!isCurrentSiteWhitelisted) {
@@ -579,6 +578,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       };
     }
 
+    // Async operation - return true to keep channel open
     enhancePage()
       .then((result) => {
         const stats = enhancerIntegration.statsUtils.getStats();
@@ -602,12 +602,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
       });
 
-    return true;
+    return true; // Keep message channel open for async response
   } else if (request.action === "terminateOperations") {
     console.log("Termination request received from popup");
     handleTerminationRequest();
     sendResponse({ status: "terminating" });
-    return false;
+    return false; // Synchronous response
   } else if (request.action === "updatePageStatus") {
     console.log(`Page status updated: disabled=${Boolean(request.disabled)}`);
 
@@ -619,9 +619,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     sendResponse({ status: "updated" });
-    return false;
+    return false; // Synchronous response
   }
 
+  // Default for unhandled actions
+  sendResponse({ status: "error", error: "Unknown action" });
   return false;
 });
 

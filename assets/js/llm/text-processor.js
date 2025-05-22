@@ -10,7 +10,9 @@ class TextProcessor {
    */
   constructor(options = {}) {
     this.maxChunkSize = options.maxChunkSize || 4000;
-    console.log(`Novel Dialogue Enhancer: Text Processor initialized (max chunk size: ${this.maxChunkSize})`);
+    console.log(
+      `Novel Dialogue Enhancer: Text Processor initialized (max chunk size: ${this.maxChunkSize})`
+    );
   }
 
   /**
@@ -21,7 +23,7 @@ class TextProcessor {
    */
   splitIntoChunks(text, maxChunkSize) {
     const chunkSize = maxChunkSize || this.maxChunkSize;
-    
+
     if (!text || text.length <= 0) {
       return [];
     }
@@ -101,7 +103,7 @@ class TextProcessor {
 
   /**
    * Build a context object that includes surrounding text chunks for coherence
-   * @param {Array<string>} chunks - All text chunks
+   * @param {Array<string>} chunks - All text chunks (may include enhanced and original)
    * @param {number} currentIndex - Current chunk index
    * @return {string} - Combined context information
    */
@@ -112,23 +114,23 @@ class TextProcessor {
 
     let contextInfo = "";
 
-    // Add previous chunk context for continuity
+    // Add previous chunk context for continuity (use enhanced version if available)
     if (currentIndex > 0 && chunks[currentIndex - 1]) {
       const prevChunkLines = chunks[currentIndex - 1].split("\n");
       // Get last paragraph or up to 3 sentences
       const lastParagraph = prevChunkLines.slice(-1)[0];
       if (lastParagraph && lastParagraph.length > 20) {
-        contextInfo += `CONTEXT FROM PREVIOUS SECTION (for continuity reference only):\n${lastParagraph}\n\n`;
+        contextInfo += `CONTEXT FROM PREVIOUS SECTION (enhanced, for continuity reference only):\n${lastParagraph}\n\n`;
       }
     }
 
-    // Add next chunk context for continuity
+    // Add next chunk context for continuity (will be original text)
     if (currentIndex < chunks.length - 1 && chunks[currentIndex + 1]) {
       const nextChunkLines = chunks[currentIndex + 1].split("\n");
       // Get first paragraph or up to 3 sentences
       const firstParagraph = nextChunkLines[0];
       if (firstParagraph && firstParagraph.length > 20) {
-        contextInfo += `CONTEXT FROM NEXT SECTION (for continuity reference only):\n${firstParagraph}\n\n`;
+        contextInfo += `CONTEXT FROM NEXT SECTION (original, for continuity reference only):\n${firstParagraph}\n\n`;
       }
     }
 
@@ -142,7 +144,7 @@ class TextProcessor {
    */
   cleanLLMResponse(llmResponse) {
     if (!llmResponse) return "";
-    
+
     // If the response contains markdown code blocks, remove them
     let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
 
@@ -168,7 +170,7 @@ class TextProcessor {
    */
   createHash(input) {
     if (!input) return "";
-    
+
     let hash = 0;
     for (let i = 0; i < input.length; i++) {
       const char = input.charCodeAt(i);
