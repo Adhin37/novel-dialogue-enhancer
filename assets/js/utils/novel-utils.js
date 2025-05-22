@@ -1283,7 +1283,7 @@ class NovelUtils {
   /**
    * Sync novel style with background storage
    */
-  #syncNovelStyle() {
+  syncNovelStyle() {
     if (!this.novelId || !this.novelStyle) {
       return;
     }
@@ -1293,19 +1293,6 @@ class NovelUtils {
       novelId: this.novelId,
       style: this.novelStyle
     });
-  }
-
-  /**
-   * Expands compressed gender code to full form
-   * @param {string} code - Compressed gender code ("m", "f", "u")
-   * @return {string} - Full gender string ("male", "female", "unknown")
-   */
-  #expandGender(code) {
-    if (!code || typeof code !== "string") return "unknown";
-
-    if (code === "m") return "male";
-    if (code === "f") return "female";
-    return "unknown";
   }
 
   /**
@@ -1411,7 +1398,7 @@ class NovelUtils {
    * @param {object} dialoguePatterns - Extracted dialogue patterns
    * @return {Set} - Set of character names
    */
-  #extractCharactersFromDialogue(dialoguePatterns) {
+  extractCharactersFromDialogue(dialoguePatterns) {
     const characters = new Set();
 
     dialoguePatterns.quotedDialogue.forEach((item) => {

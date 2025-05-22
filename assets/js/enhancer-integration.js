@@ -38,6 +38,18 @@ class EnhancerIntegration {
       const dialogueCount = this.countDialogues(dialoguePatterns);
       this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
 
+      // Extract additional characters from dialogue patterns
+      const dialogueCharacters =
+        this.novelUtils.extractCharactersFromDialogue(dialoguePatterns);
+      for (const characterName of dialogueCharacters) {
+        if (!characterMap[characterName]) {
+          characterMap[characterName] = {
+            gender: "unknown",
+            appearances: 1
+          };
+        }
+      }
+
       // Create character summary for LLM context
       const characterSummary = this.novelUtils.createCharacterSummary(
         this.convertCharacterMapToArray(characterMap)
@@ -49,6 +61,10 @@ class EnhancerIntegration {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
+
+      // Analyze novel style and sync it to storage
+      const novelStyle = await this.novelUtils.analyzeNovelStyle(sanitizedText);
+      this.novelUtils.syncNovelStyle();
 
       // Use the ollamaClient with our newly refactored components
       const enhancedText = await this.enhanceTextWithLLM(
