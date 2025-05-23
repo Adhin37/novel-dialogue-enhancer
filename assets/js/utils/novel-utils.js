@@ -680,12 +680,6 @@ class NovelUtils {
    * @param {object} existingCharacterMap - Existing character data
    * @return {Promise<object>} - Updated character map
    */
-  /**
-   * Extract character names from text
-   * @param {string} text - Text to analyze
-   * @param {object} existingCharacterMap - Existing character data
-   * @return {Promise<object>} - Updated character map
-   */
   async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
     let characterMap = { ...existingCharacterMap };
@@ -702,10 +696,10 @@ class NovelUtils {
       return this.characterMap;
     }
 
-    // Process text to extract character names
+    // Process text to extract character names - USE RETURNED VALUE
     characterMap = this.#extractNamesFromText(text, characterMap);
 
-    // Clean up and finalize character map
+    // Clean up and finalize character map - USE RETURNED VALUE
     characterMap = this.#finalizeCharacterMap(characterMap, startCharCount);
 
     return characterMap;
@@ -742,7 +736,13 @@ class NovelUtils {
 
     const novelData = await this.#loadExistingNovelData();
 
-    Object.assign(characterMap, novelData.characterMap || {});
+    // Don't mutate the original characterMap, return the merged result
+    const mergedCharacterMap = {
+      ...characterMap,
+      ...(novelData.characterMap || {})
+    };
+    this.characterMap = mergedCharacterMap; // Update instance property
+
     this.enhancedChapters = novelData.enhancedChapters || [];
 
     // Check if this chapter has already been enhanced
@@ -762,7 +762,6 @@ class NovelUtils {
         console.log(
           `Chapter ${currentChapter} was previously enhanced, using existing character data`
         );
-        this.characterMap = characterMap;
         return true;
       }
     }
@@ -783,6 +782,7 @@ class NovelUtils {
     const processedText = text.substring(0, maxTextLength);
     const maxMatches = 1000;
     let totalMatches = 0;
+    let updatedCharacterMap = { ...characterMap };
 
     for (const pattern of namePatterns) {
       let match;
@@ -804,12 +804,16 @@ class NovelUtils {
         const extractedName = this.extractCharacterName(sanitizedName);
 
         if (extractedName) {
-          this.#addOrUpdateCharacter(characterMap, extractedName);
+          // USE RETURNED VALUE from #addOrUpdateCharacter
+          updatedCharacterMap = this.#addOrUpdateCharacter(
+            updatedCharacterMap,
+            extractedName
+          );
         }
       }
     }
 
-    return characterMap;
+    return updatedCharacterMap;
   }
 
   /**
@@ -864,18 +868,25 @@ class NovelUtils {
    * Add or update a character in the character map
    * @param {object} characterMap - Character map to update
    * @param {string} characterName - Character name to add/update
+   * @return {object} - Updated character map
    * @private
    */
   #addOrUpdateCharacter(characterMap, characterName) {
-    if (!characterMap[characterName]) {
-      characterMap[characterName] = {
+    const updatedMap = { ...characterMap };
+
+    if (!updatedMap[characterName]) {
+      updatedMap[characterName] = {
         gender: "unknown",
         appearances: 1
       };
     } else {
-      characterMap[characterName].appearances =
-        (characterMap[characterName].appearances || 0) + 1;
+      updatedMap[characterName] = {
+        ...updatedMap[characterName],
+        appearances: (updatedMap[characterName].appearances || 0) + 1
+      };
     }
+
+    return updatedMap;
   }
 
   /**
@@ -886,21 +897,21 @@ class NovelUtils {
    * @private
    */
   #finalizeCharacterMap(characterMap, startCharCount) {
-    characterMap = this.#cleanupCharacterMap(characterMap);
+    const cleanedMap = this.#cleanupCharacterMap(characterMap);
 
-    const newCharCount = Object.keys(characterMap).length - startCharCount;
+    const newCharCount = Object.keys(cleanedMap).length - startCharCount;
     console.log(
       `Extracted ${newCharCount} new characters, total: ${
-        Object.keys(characterMap).length
+        Object.keys(cleanedMap).length
       }`
     );
 
-    if (this.novelId && Object.keys(characterMap).length > 0) {
-      this.syncCharacterMap(characterMap);
+    if (this.novelId && Object.keys(cleanedMap).length > 0) {
+      this.syncCharacterMap(cleanedMap);
     }
 
-    this.characterMap = characterMap;
-    return characterMap;
+    this.characterMap = cleanedMap;
+    return cleanedMap;
   }
 
   /**

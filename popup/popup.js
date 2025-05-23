@@ -7,7 +7,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const enhanceNowBtn = document.getElementById("enhance-now-btn");
   const statusMessage = document.getElementById("status-message");
   const currentSite = document.getElementById("current-site");
-  const pauseBtn = document.getElementById("pause-button");
 
   let currentTabUrl = "";
   let currentTabHostname = "";
@@ -107,8 +106,11 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Handle pause/resume button
+  // Handle pause/resume button with combined functionality
   pauseButton.addEventListener("click", () => {
+    // Toggle paused CSS class for visual feedback
+    document.getElementById("header").classList.toggle("paused");
+
     isExtensionPaused = !isExtensionPaused;
 
     chrome.storage.sync.set({ isExtensionPaused: isExtensionPaused }, () => {
@@ -184,10 +186,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updatePauseButton();
     updateStatus();
-  });
-
-  pauseBtn.addEventListener("click", () => {
-    document.getElementById("header").classList.toggle("paused");
   });
 
   preserveNamesToggle.addEventListener("change", function () {
@@ -562,10 +560,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
-  // Update the event listeners in the DOMContentLoaded handler
-  whitelistButton.addEventListener("click", handleWhitelistButtonClick);
-  enhanceNowBtn.addEventListener("click", handleEnhanceNowClick);
 
   // Helper function to check if a site is whitelisted
   function isSiteWhitelisted(hostname, whitelistedSites) {

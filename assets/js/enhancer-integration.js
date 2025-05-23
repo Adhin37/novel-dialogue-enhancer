@@ -118,12 +118,12 @@ class EnhancerIntegration {
     const startCharCount = Object.keys(this.novelUtils.characterMap).length;
 
     // Let novelUtils extract the character names (now async)
-    const characterMap = await this.novelUtils.extractCharacterNames(text);
+    let characterMap = await this.novelUtils.extractCharacterNames(text);
 
     // If the current chapter was already enhanced, we might be using cached data
     if (!this.novelUtils.isCurrentChapterEnhanced) {
       // Apply gender detection to any characters with unknown gender
-      await this.determineCharacterGenders(characterMap, text);
+      characterMap = await this.determineCharacterGenders(characterMap, text);
     }
 
     // Track new characters found
@@ -149,7 +149,9 @@ class EnhancerIntegration {
    * @return {Promise<object>} - Updated character map with gender information
    */
   async determineCharacterGenders(characterMap, text) {
-    for (const [name, data] of Object.entries(characterMap)) {
+    const updatedCharacterMap = { ...characterMap };
+
+    for (const [name, data] of Object.entries(updatedCharacterMap)) {
       const needsGenderDetermination =
         data.gender === "unknown" || !data.confidence || data.confidence < 0.7;
 
@@ -157,19 +159,22 @@ class EnhancerIntegration {
         const genderInfo = this.genderUtils.guessGender(
           name,
           text,
-          characterMap
+          updatedCharacterMap
         );
 
-        characterMap[name].gender = genderInfo.gender;
-        characterMap[name].confidence = genderInfo.confidence;
-        characterMap[name].evidence = genderInfo.evidence;
+        updatedCharacterMap[name] = {
+          ...updatedCharacterMap[name],
+          gender: genderInfo.gender,
+          confidence: genderInfo.confidence,
+          evidence: genderInfo.evidence
+        };
       }
     }
 
     // Let novelUtils handle the sync to storage
-    this.novelUtils.syncCharacterMap(characterMap);
+    this.novelUtils.syncCharacterMap(updatedCharacterMap);
 
-    return characterMap;
+    return updatedCharacterMap;
   }
 
   /**

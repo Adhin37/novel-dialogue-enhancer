@@ -111,6 +111,7 @@ function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
 
 function storeNovelCharacterMaps(novelCharacterMaps) {
   try {
+    // USE RETURNED VALUE from purgeOldNovels
     const purgedMaps = purgeOldNovels(novelCharacterMaps);
 
     Object.entries(purgedMaps).forEach(([novelId, data]) => {
@@ -780,13 +781,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     if (request.chars && typeof request.chars === "object") {
       Object.entries(request.chars).forEach(([charId, charData]) => {
-        // Use charId parameter for validation
+        // Skip invalid entries
         if (!charId || charId.trim() === "") {
           console.warn("Invalid character ID provided:", charId);
           return;
         }
 
-        // Use charData parameter for validation
         if (!charData || typeof charData !== "object" || !charData.name) {
           console.warn(`Invalid character data for ID ${charId}:`, charData);
           return;
@@ -819,14 +819,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
           let mergedGender = existingChar.gender;
           let mergedConfidence = existingChar.confidence || 0;
-          let mergedEvidences = existingChar.evidences || [];
+          let mergedEvidences = [...(existingChar.evidences || [])];
 
           const newConfidence = parseFloat(charData.confidence) || 0;
           if (newConfidence > mergedConfidence) {
             mergedGender = charData.gender;
             mergedConfidence = newConfidence;
             mergedEvidences = Array.isArray(charData.evidences)
-              ? charData.evidences
+              ? [...charData.evidences]
               : [];
           } else if (
             newConfidence === mergedConfidence &&
@@ -872,8 +872,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             Array.isArray(charData.evidences) &&
             charData.evidences.length > 0
           ) {
-            novelCharacterMaps[novelId].chars[nextId].evidences =
-              charData.evidences.slice(0, 5);
+            novelCharacterMaps[novelId].chars[nextId].evidences = [
+              ...charData.evidences.slice(0, 5)
+            ];
           }
 
           console.log(`Added new character: ${charData.name} (ID: ${nextId})`);
