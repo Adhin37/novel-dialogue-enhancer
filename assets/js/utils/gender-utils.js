@@ -44,7 +44,7 @@ class GenderUtils {
    */
   guessGender(name, text, characterMap = {}) {
     if (name.length <= 1) {
-      return { gender: "unknown", confidence: 0, evidence: [] };
+      return this.#createGenderResult("unknown", 0, []);
     }
 
     // Return existing gender if available with high confidence
@@ -54,11 +54,11 @@ class GenderUtils {
       characterMap[name].confidence &&
       characterMap[name].confidence > 0.75
     ) {
-      return {
-        gender: characterMap[name].gender,
-        confidence: characterMap[name].confidence,
-        evidence: characterMap[name].evidence || ["previously determined"]
-      };
+      return this.#createGenderResult(
+        characterMap[name].gender,
+        characterMap[name].confidence,
+        characterMap[name].evidence || ["previously determined"]
+      );
     }
 
     if (
@@ -67,13 +67,13 @@ class GenderUtils {
       characterMap[name].appearances &&
       characterMap[name].appearances >= 5
     ) {
-      return {
-        gender: characterMap[name].gender,
-        confidence: Math.max(0.7, characterMap[name].confidence || 0),
-        evidence: characterMap[name].evidence || [
+      return this.#createGenderResult(
+        characterMap[name].gender,
+        Math.max(0.7, characterMap[name].confidence || 0),
+        characterMap[name].evidence || [
           "frequent appearances with consistent gender"
         ]
-      };
+      );
     }
 
     let maleScore = 0;
@@ -98,21 +98,15 @@ class GenderUtils {
     if (titleResult.gender !== "unknown") {
       if (titleResult.gender === "male") {
         this.maleEvidenceCount++;
-        return {
-          gender: "male",
-          confidence: 0.95,
-          evidence: [`title: ${titleResult.evidence} (${culturalOrigin})`],
-          culturalOrigin
-        };
+        return this.#createGenderResult("male", 0.95, [
+          `title: ${titleResult.evidence} (${culturalOrigin})`
+        ]);
       }
       if (titleResult.gender === "female") {
         this.femaleEvidenceCount++;
-        return {
-          gender: "female",
-          confidence: 0.95,
-          evidence: [`title: ${titleResult.evidence} (${culturalOrigin})`],
-          culturalOrigin
-        };
+        return this.#createGenderResult("female", 0.95, [
+          `title: ${titleResult.evidence} (${culturalOrigin})`
+        ]);
       }
     }
 
@@ -127,21 +121,15 @@ class GenderUtils {
     ) {
       if (relationshipPattern.maleScore > relationshipPattern.femaleScore) {
         this.maleEvidenceCount++;
-        return {
-          gender: "male",
-          confidence: 0.9,
-          evidence: [`relationship: ${relationshipPattern.evidence}`],
-          culturalOrigin
-        };
+        return this.#createGenderResult("male", 0.9, [
+          `relationship: ${relationshipPattern.evidence}`
+        ]);
       }
       if (relationshipPattern.femaleScore > relationshipPattern.maleScore) {
         this.femaleEvidenceCount++;
-        return {
-          gender: "female",
-          confidence: 0.9,
-          evidence: [`relationship: ${relationshipPattern.evidence}`],
-          culturalOrigin
-        };
+        return this.#createGenderResult("female", 0.9, [
+          `relationship: ${relationshipPattern.evidence}`
+        ]);
       }
     }
 
@@ -294,12 +282,9 @@ class GenderUtils {
       this.unknownGenderCount++;
     }
 
-    return {
-      gender,
-      confidence,
-      evidence,
-      culturalOrigin
-    };
+    // Add culturalOrigin to the result
+    const result = this.#createGenderResult(gender, confidence, evidence);
+    return result;
   }
 
   /**
@@ -313,10 +298,7 @@ class GenderUtils {
     return {
       gender: gender || "unknown",
       confidence: Math.max(0, Math.min(1, confidence || 0)),
-      evidence: Array.isArray(evidence)
-        ? evidence
-        : [evidence || "no evidence"],
-      timestamp: Date.now()
+      evidence: Array.isArray(evidence) ? evidence : [evidence || "no evidence"]
     };
   }
 

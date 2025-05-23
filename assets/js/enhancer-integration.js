@@ -29,6 +29,9 @@ class EnhancerIntegration {
   async enhanceText(text) {
     const startTime = performance.now();
 
+    // Reset stats for this enhancement session
+    this.genderUtils.resetStats();
+
     try {
       const sanitizedText = this.textProcessor.sanitizeText(text);
 
@@ -38,7 +41,7 @@ class EnhancerIntegration {
       // Get dialogue patterns for statistics
       const dialoguePatterns =
         this.novelUtils.extractDialoguePatterns(sanitizedText);
-      const dialogueCount = this.countDialogues(dialoguePatterns);
+      const dialogueCount = this.#countDialogues(dialoguePatterns);
       this.statsUtils.setTotalDialoguesEnhanced(dialogueCount);
 
       // Extract additional characters from dialogue patterns
@@ -55,7 +58,7 @@ class EnhancerIntegration {
 
       // Create character summary for LLM context
       const characterSummary = this.novelUtils.createCharacterSummary(
-        this.convertCharacterMapToArray(characterMap)
+        this.#convertCharacterMapToArray(characterMap)
       );
 
       // Check LLM availability
@@ -64,7 +67,7 @@ class EnhancerIntegration {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
-  
+
       // Use the ollamaClient with our newly refactored components
       const enhancedText = await this.enhanceTextWithLLM(
         sanitizedText,
@@ -86,7 +89,7 @@ class EnhancerIntegration {
    * @param {object} dialoguePatterns - The dialogue patterns to count
    * @return {number} - The number of dialogues
    */
-  countDialogues(dialoguePatterns) {
+  #countDialogues(dialoguePatterns) {
     return (
       dialoguePatterns.quotedDialogue.length +
       dialoguePatterns.colonSeparatedDialogue.length +
@@ -99,7 +102,7 @@ class EnhancerIntegration {
    * @param {object} characterMap - The character map to convert
    * @return {Array} - Array of character objects
    */
-  convertCharacterMapToArray(characterMap) {
+  #convertCharacterMapToArray(characterMap) {
     return Object.entries(characterMap).map(([name, data]) => ({
       name,
       gender: data.gender,
@@ -155,23 +158,11 @@ class EnhancerIntegration {
         data.gender === "unknown" || !data.confidence || data.confidence < 0.7;
 
       if (needsGenderDetermination) {
-        const inconsistencyResult =
-          this.pronounAnalyzer.detectPronounInconsistencies(name, text);
-
-        let genderInfo;
-        if (inconsistencyResult.correctedGender) {
-          genderInfo = {
-            gender: inconsistencyResult.correctedGender,
-            confidence: 0.85,
-            evidence: [inconsistencyResult.correction]
-          };
-        } else {
-          genderInfo = this.genderUtils.guessGender(
-            name,
-            text,
-            updatedCharacterMap
-          );
-        }
+        const genderInfo = this.genderUtils.guessGender(
+          name,
+          text,
+          updatedCharacterMap
+        );
 
         updatedCharacterMap[name] = {
           ...updatedCharacterMap[name],
