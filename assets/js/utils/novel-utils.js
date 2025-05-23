@@ -63,15 +63,18 @@ class NovelUtils {
    * @return {object} - Novel metadata
    */
   extractNovelMetadata(url, title) {
+    const textContent = document.body.textContent || "";
     const metadata = {
       novelId: this.novelId || this.updateNovelId(url, title),
       title: title || document.title,
       platform: this.detectPlatform(url),
-      chapterInfo: this.detectChapterInfo(title, document.body.textContent),
-      wordCount: this.estimateWordCount(document.body.textContent)
+      chapterInfo: this.detectChapterInfo(title, textContent),
+      wordCount: this.estimateWordCount(textContent)
     };
 
-    console.log(`Extracted metadata for novel: ${metadata.title}`);
+    console.log(
+      `Extracted metadata for novel: ${metadata.title} (${metadata.wordCount} words)`
+    );
     return metadata;
   }
 
@@ -655,21 +658,10 @@ class NovelUtils {
       analyzed: true
     };
 
-    if (novelId) {
-      try {
-        chrome.runtime.sendMessage({
-          action: "updateNovelStyle",
-          novelId: novelId,
-          style: styleInfo
-        });
-      } catch (err) {
-        console.warn("Failed to sync novel style:", err);
-      }
-    }
-
     if (novelId === this.novelId) {
       this.novelStyle = styleInfo;
     }
+    this.syncNovelStyle(novelId, styleInfo);
 
     return styleInfo;
   }
@@ -1296,17 +1288,36 @@ class NovelUtils {
 
   /**
    * Sync novel style with background storage
+   * @param {string} novelId - The novel ID to sync
+   * @param {object} styleInfo - The style information to sync
    */
-  syncNovelStyle() {
-    if (!this.novelId || !this.novelStyle) {
+  syncNovelStyle(novelId, styleInfo) {
+    if (!novelId || !styleInfo) {
+      console.warn("Cannot sync novel style: missing novelId or styleInfo");
       return;
     }
 
-    chrome.runtime.sendMessage({
-      action: "updateNovelStyle",
-      novelId: this.novelId,
-      style: this.novelStyle
-    });
+    try {
+      chrome.runtime.sendMessage(
+        {
+          action: "updateNovelStyle",
+          novelId: novelId,
+          style: styleInfo
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "Failed to sync novel style:",
+              chrome.runtime.lastError
+            );
+          } else if (response && response.status === "ok") {
+            console.log(`Novel style synced for ${novelId}`);
+          }
+        }
+      );
+    } catch (error) {
+      console.warn("Error syncing novel style:", error);
+    }
   }
 
   /**

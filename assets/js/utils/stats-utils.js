@@ -9,6 +9,55 @@ class StatsUtils {
     this.totalDialoguesEnhanced = 0;
     this.totalCharactersDetected = 0;
     this.processingTime = 0;
+    this.totalWordsProcessed = 0;
+    this.compressionRatio = 1.0;
+    this.errorCount = 0;
+  }
+
+  /**
+   * Set total number of words processed
+   * @param {number} wordsProcessed - New count value
+   */
+  setTotalWordsProcessed(wordsProcessed) {
+    if (!this.#isNumber(wordsProcessed)) {
+      console.error("Invalid wordsProcessed value");
+      return;
+    }
+    this.totalWordsProcessed += wordsProcessed;
+  }
+
+  /**
+   * Set compression ratio
+   * @param {number} ratio - New compression ratio value
+   */
+  setCompressionRatio(ratio) {
+    if (!this.#isNumber(ratio)) {
+      console.error("Invalid compressionRatio value");
+      return;
+    }
+    this.compressionRatio = ratio;
+  }
+
+  /**
+   * Increment error count
+   */
+  incrementErrorCount() {
+    this.errorCount += 1;
+  }
+
+  /**
+   * Get statistics
+   * @return {object} - Statistics object
+   */
+  getStats() {
+    return {
+      totalDialoguesEnhanced: this.totalDialoguesEnhanced,
+      totalCharactersDetected: this.totalCharactersDetected,
+      processingTime: this.processingTime,
+      totalWordsProcessed: this.totalWordsProcessed,
+      compressionRatio: this.compressionRatio,
+      errorCount: this.errorCount
+    };
   }
 
   /**
@@ -72,18 +121,6 @@ class StatsUtils {
   }
 
   /**
-   * Get all current statistics as an object
-   * @return {Object} Current statistics
-   */
-  getStats() {
-    return {
-      totalDialoguesEnhanced: this.totalDialoguesEnhanced,
-      totalCharactersDetected: this.totalCharactersDetected,
-      processingTime: this.processingTime
-    };
-  }
-
-  /**
    * Set all statistics from an object
    * @param {Object} stats - Statistics object containing:
    *   - totalDialoguesEnhanced
@@ -101,7 +138,7 @@ class StatsUtils {
   }
 
   #isNumber(value) {
-    return typeof value === 'number' && !isNaN(value);
+    return typeof value === "number" && !isNaN(value);
   }
 }
 

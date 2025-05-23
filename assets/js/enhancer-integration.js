@@ -155,11 +155,23 @@ class EnhancerIntegration {
         data.gender === "unknown" || !data.confidence || data.confidence < 0.7;
 
       if (needsGenderDetermination) {
-        const genderInfo = this.genderUtils.guessGender(
-          name,
-          text,
-          updatedCharacterMap
-        );
+        const inconsistencyResult =
+          this.pronounAnalyzer.detectPronounInconsistencies(name, text);
+
+        let genderInfo;
+        if (inconsistencyResult.correctedGender) {
+          genderInfo = {
+            gender: inconsistencyResult.correctedGender,
+            confidence: 0.85,
+            evidence: [inconsistencyResult.correction]
+          };
+        } else {
+          genderInfo = this.genderUtils.guessGender(
+            name,
+            text,
+            updatedCharacterMap
+          );
+        }
 
         updatedCharacterMap[name] = {
           ...updatedCharacterMap[name],
@@ -170,9 +182,7 @@ class EnhancerIntegration {
       }
     }
 
-    // Let novelUtils handle the sync to storage
     this.novelUtils.syncCharacterMap(updatedCharacterMap);
-
     return updatedCharacterMap;
   }
 

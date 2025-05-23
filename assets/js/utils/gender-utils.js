@@ -81,14 +81,20 @@ class GenderUtils {
     const evidence = [];
 
     // Identify likely cultural origin of name
-    const culturalOrigin = this.culturalAnalyzer.detectNameCulturalOrigin(name, text);
+    const culturalOrigin = this.culturalAnalyzer.detectNameCulturalOrigin(
+      name,
+      text
+    );
     console.log(`Cultural origin for ${name}: ${culturalOrigin}`);
-    
+
     // Track cultural origin statistics
     this.culturalOrigins[culturalOrigin]++;
 
     // Check for definitive markers first
-    const titleResult = this.nameAnalyzer.checkTitlesAndHonorifics(name, culturalOrigin);
+    const titleResult = this.nameAnalyzer.checkTitlesAndHonorifics(
+      name,
+      culturalOrigin
+    );
     if (titleResult.gender !== "unknown") {
       if (titleResult.gender === "male") {
         this.maleEvidenceCount++;
@@ -139,7 +145,10 @@ class GenderUtils {
       }
     }
 
-    const namePatternResult = this.nameAnalyzer.checkNamePatterns(name, culturalOrigin);
+    const namePatternResult = this.nameAnalyzer.checkNamePatterns(
+      name,
+      culturalOrigin
+    );
     if (namePatternResult.gender !== "unknown") {
       if (namePatternResult.gender === "male") {
         maleScore += 2;
@@ -154,7 +163,10 @@ class GenderUtils {
       }
     }
 
-    const pronounResult = this.pronounAnalyzer.analyzePronounContext(name, text);
+    const pronounResult = this.pronounAnalyzer.analyzePronounContext(
+      name,
+      text
+    );
     if (pronounResult.maleScore > 0 || pronounResult.femaleScore > 0) {
       maleScore += pronounResult.maleScore;
       femaleScore += pronounResult.femaleScore;
@@ -171,7 +183,8 @@ class GenderUtils {
       }
     }
 
-    const inconsistencyResult = this.pronounAnalyzer.detectPronounInconsistencies(name, text);
+    const inconsistencyResult =
+      this.pronounAnalyzer.detectPronounInconsistencies(name, text);
     if (inconsistencyResult.correction) {
       // If we found an inconsistency correction, trust it highly
       if (inconsistencyResult.correctedGender === "male") {
@@ -187,11 +200,12 @@ class GenderUtils {
       }
     }
 
-    const culturalResult = this.culturalAnalyzer.checkCulturalSpecificIndicators(
-      name,
-      text,
-      culturalOrigin
-    );
+    const culturalResult =
+      this.culturalAnalyzer.checkCulturalSpecificIndicators(
+        name,
+        text,
+        culturalOrigin
+      );
     if (culturalResult.maleScore > 0 || culturalResult.femaleScore > 0) {
       maleScore += culturalResult.maleScore;
       femaleScore += culturalResult.femaleScore;
@@ -203,7 +217,8 @@ class GenderUtils {
       }
     }
 
-    const appearanceResult = this.appearanceAnalyzer.analyzeAppearanceDescriptions(name, text);
+    const appearanceResult =
+      this.appearanceAnalyzer.analyzeAppearanceDescriptions(name, text);
     if (appearanceResult.maleScore > 0 || appearanceResult.femaleScore > 0) {
       maleScore += appearanceResult.maleScore;
       femaleScore += appearanceResult.femaleScore;
@@ -216,7 +231,10 @@ class GenderUtils {
       }
     }
 
-    const descriptionResult = this.appearanceAnalyzer.analyzeDescriptions(name, text);
+    const descriptionResult = this.appearanceAnalyzer.analyzeDescriptions(
+      name,
+      text
+    );
     if (descriptionResult.maleScore > 0 || descriptionResult.femaleScore > 0) {
       maleScore += descriptionResult.maleScore;
       femaleScore += descriptionResult.femaleScore;
@@ -226,7 +244,11 @@ class GenderUtils {
       }
     }
 
-    const roleResult = this.relationshipAnalyzer.analyzeCharacterRole(name, text, culturalOrigin);
+    const roleResult = this.relationshipAnalyzer.analyzeCharacterRole(
+      name,
+      text,
+      culturalOrigin
+    );
     if (roleResult.maleScore > 0 || roleResult.femaleScore > 0) {
       maleScore += roleResult.maleScore;
       femaleScore += roleResult.femaleScore;
@@ -281,6 +303,24 @@ class GenderUtils {
   }
 
   /**
+   * Creates a gender result object with timestamp
+   * @param {string} gender - Gender (male, female, unknown)
+   * @param {number} confidence - Confidence level (0.0 to 1.0)
+   * @param {Array|string} evidence - Evidence for gender determination
+   * @return {object} - Gender result object
+   */
+  #createGenderResult(gender, confidence, evidence) {
+    return {
+      gender: gender || "unknown",
+      confidence: Math.max(0, Math.min(1, confidence || 0)),
+      evidence: Array.isArray(evidence)
+        ? evidence
+        : [evidence || "no evidence"],
+      timestamp: Date.now()
+    };
+  }
+
+  /**
    * Reset gender evidence counters
    */
   resetStats() {
@@ -296,4 +336,3 @@ if (typeof module !== "undefined") {
 } else {
   window.GenderUtils = GenderUtils;
 }
-        
