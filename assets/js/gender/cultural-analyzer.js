@@ -4,8 +4,10 @@
  * Identifies cultural contexts and specific cultural indicators
  */
 class CulturalAnalyzer {
+  /**
+   * Creates a new CulturalAnalyzer instance
+   */
   constructor() {
-    // Common character patterns in different languages
     this.characterPatterns = {
       chinese: /[\u4E00-\u9FFF]/,
       japanese: /[\u3040-\u309F\u30A0-\u30FF]/,

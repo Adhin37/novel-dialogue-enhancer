@@ -56,7 +56,7 @@ class TextProcessor {
           currentChunk = "";
         }
 
-        this.splitLongParagraph(paragraph, chunkSize, chunks);
+        this.#splitLongParagraph(paragraph, chunkSize, chunks);
       }
     }
 
@@ -80,7 +80,7 @@ class TextProcessor {
    * @param {Array<string>} chunks - Array to populate with chunks
    * @private
    */
-  splitLongParagraph(paragraph, maxChunkSize, chunks) {
+  #splitLongParagraph(paragraph, maxChunkSize, chunks) {
     const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
     let currentChunk = "";
 

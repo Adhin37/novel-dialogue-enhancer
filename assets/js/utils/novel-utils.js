@@ -696,6 +696,9 @@ class NovelUtils {
       return this.characterMap;
     }
 
+    // Load existing character data from storage and merge it
+    characterMap = await this.loadExistingCharacterData(characterMap);
+
     // Process text to extract character names - USE RETURNED VALUE
     characterMap = this.#extractNamesFromText(text, characterMap);
 

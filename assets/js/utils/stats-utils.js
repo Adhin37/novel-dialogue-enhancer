@@ -2,6 +2,9 @@
  * Utility class for tracking and managing statistics in the Novel Dialogue Enhancer
  */
 class StatsUtils {
+  /**
+   * Creates a new StatsUtils instance
+   */
   constructor() {
     this.totalDialoguesEnhanced = 0;
     this.totalCharactersDetected = 0;
@@ -21,7 +24,7 @@ class StatsUtils {
    * @param {number} dialoguesEnhanced - New count value
    */
   setTotalDialoguesEnhanced(dialoguesEnhanced) {
-    if (!this.isNumber(dialoguesEnhanced)) {
+    if (!this.#isNumber(dialoguesEnhanced)) {
       console.error("Invalid dialoguesEnhanced value");
       return;
     }
@@ -41,7 +44,7 @@ class StatsUtils {
    * @param {number} charactersDetected - New count value
    */
   setTotalCharactersDetected(charactersDetected) {
-    if (!this.isNumber(charactersDetected)) {
+    if (!this.#isNumber(charactersDetected)) {
       console.error("Invalid charactersDetected value");
       return;
     }
@@ -61,7 +64,7 @@ class StatsUtils {
    * @param {number} processingTime - New processing time in milliseconds
    */
   setProcessingTime(processingTime) {
-    if (!this.isNumber(processingTime)) {
+    if (!this.#isNumber(processingTime)) {
       console.error("Invalid processingTime value");
       return;
     }
@@ -97,7 +100,7 @@ class StatsUtils {
     this.processingTime = stats.processingTime || 0;
   }
 
-  isNumber(value) {
+  #isNumber(value) {
     return typeof value === 'number' && !isNaN(value);
   }
 }

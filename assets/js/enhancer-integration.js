@@ -5,6 +5,9 @@
  * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
  */
 class EnhancerIntegration {
+  /**
+   * Creates a new EnhancerIntegration instance
+   */
   constructor() {
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();

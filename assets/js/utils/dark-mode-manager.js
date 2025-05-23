@@ -4,6 +4,9 @@
  * Dark mode manager class
  */
 class DarkModeManager {
+  /**
+   * Creates a new DarkModeManager instance
+   */
   constructor() {
     this.mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     this.initialized = false;

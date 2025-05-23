@@ -267,14 +267,14 @@ function prepareRequestData(requestData, settings) {
 function processNonStreamingRequest(requestData, timeout, sendResponse) {
   const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
 
-  timeout =
+  const validatedTimeout =
     typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
 
   const controller = new AbortController();
   const requestId = Date.now().toString();
   activeRequestControllers.set(requestId, controller);
 
-  const timeoutId = setTimeout(() => controller.abort(), timeout * 1000);
+  const timeoutId = setTimeout(() => controller.abort(), validatedTimeout * 1000);
 
   const safeRequestData = {
     model: String(requestData.model || ""),
@@ -299,7 +299,7 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
     })
     .then((rawText) => processOllamaResponse(rawText, sendResponse))
     .catch((error) =>
-      handleOllamaError(error, controller, timeout, sendResponse)
+      handleOllamaError(error, controller, validatedTimeout, sendResponse)
     )
     .finally(() => {
       clearTimeout(timeoutId);

@@ -4,6 +4,9 @@
  * Toast notification module for Novel Dialogue Enhancer
  */
 class Toaster {
+  /**
+   * Creates a new Toaster instance
+   */
   constructor() {
     this.toasterId = "novel-enhancer-toaster";
     this.progressId = "novel-enhancer-progress";
@@ -15,8 +18,13 @@ class Toaster {
     this.progressText = null;
     this.timeoutId = null;
     this.isActive = false;
+    this.defaultDuration = 3000;
+    this.maxDuration = 10000;
   }
 
+  /**
+   * Creates the toaster element and appends it to the DOM
+   */
   createToaster() {
     this.removeToaster();
 
@@ -45,7 +53,7 @@ class Toaster {
     this.progressIcon.id = this.iconId;
 
     // Create spinning gear icon for initial loading state
-    this.setIcon("loading");
+    this.#setIcon("loading");
 
     this.progressText = document.createElement("div");
     this.progressText.id = this.textId;
@@ -143,7 +151,11 @@ class Toaster {
     this.isActive = true;
   }
 
-  setIcon(severity) {
+  /**
+   * Sets the icon for the toaster based on severity
+   * @param {string} severity - Severity level (success, error, info, warn)
+   */
+  #setIcon(severity) {
     if (!this.progressIcon) return;
 
     this.progressIcon.innerHTML = "";
@@ -222,10 +234,10 @@ class Toaster {
       case "info": {
         const infoColor = "var(--toaster-info-color) !important";
         svg.setAttribute("stroke", infoColor);
-        
+
         // Add style to ensure color is respected
         svg.setAttribute("style", `stroke: ${infoColor} !important;`);
-        
+
         const infoCircle = document.createElementNS(svgNS, "circle");
         infoCircle.setAttribute("cx", "12");
         infoCircle.setAttribute("cy", "12");
@@ -234,7 +246,7 @@ class Toaster {
         infoCircle.setAttribute("fill", "none");
         // Add inline style to force color
         infoCircle.setAttribute("style", `stroke: ${infoColor} !important;`);
-        
+
         // Use path element instead of lines for better consistency
         const infoSymbol = document.createElementNS(svgNS, "path");
         infoSymbol.setAttribute("d", "M12 16L12 12M12 8L12.01 8");
@@ -244,19 +256,19 @@ class Toaster {
         infoSymbol.setAttribute("fill", "none");
         // Add inline style to force color
         infoSymbol.setAttribute("style", `stroke: ${infoColor} !important;`);
-        
+
         svg.appendChild(infoCircle);
         svg.appendChild(infoSymbol);
         break;
       }
-  
+
       case "warn": {
         const warnColor = "var(--toaster-warn-color) !important";
         svg.setAttribute("stroke", warnColor);
-        
+
         // Add style to ensure color is respected
         svg.setAttribute("style", `stroke: ${warnColor} !important;`);
-        
+
         // Triangle for warning
         const triangle = document.createElementNS(svgNS, "path");
         triangle.setAttribute(
@@ -268,7 +280,7 @@ class Toaster {
         triangle.setAttribute("stroke-width", "2");
         // Add inline style to force color
         triangle.setAttribute("style", `stroke: ${warnColor} !important;`);
-        
+
         // Use path element for exclamation mark instead of separate lines
         const exclamation = document.createElementNS(svgNS, "path");
         exclamation.setAttribute("d", "M12 9L12 13M12 17L12.01 17");
@@ -278,7 +290,7 @@ class Toaster {
         exclamation.setAttribute("fill", "none");
         // Add inline style to force color
         exclamation.setAttribute("style", `stroke: ${warnColor} !important;`);
-        
+
         svg.appendChild(triangle);
         svg.appendChild(exclamation);
         break;
@@ -334,19 +346,30 @@ class Toaster {
     this.progressIcon.appendChild(svg);
   }
 
-  updateProgress(current, total) {
+  /**
+   * Updates the progress bar and text in the toaster
+   * @param {number} current - Current progress value
+   * @param {number} total - Total progress value
+   */
+  updateProgress(currentValue, totalValue) {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
 
-    // Validate inputs
-    current = parseInt(current);
-    total = parseInt(total);
+    // Validate and normalize inputs without mutating parameters
+    const current = Math.max(0, parseInt(currentValue) || 0);
+    const total = Math.max(1, parseInt(totalValue) || 1);
 
-    if (isNaN(current) || isNaN(total) || current < 0 || total <= 0) {
-      console.warn("Invalid progress values:", { current, total });
-      current = 0;
-      total = 1;
+    if (
+      isNaN(parseInt(currentValue)) ||
+      isNaN(parseInt(totalValue)) ||
+      currentValue < 0 ||
+      totalValue <= 0
+    ) {
+      console.warn("Invalid progress values:", {
+        current: currentValue,
+        total: totalValue
+      });
     }
 
     const percent = Math.min(100, Math.round((current / total) * 100));
@@ -368,13 +391,16 @@ class Toaster {
     }
   }
 
+  /**
+   * Finishes the progress bar and text in the toaster
+   */
   finishProgress() {
     if (this.progressBar) {
       this.progressBar.style.width = "100%";
       this.progressBar.style.backgroundColor = "var(--toaster-success-color)";
     }
 
-    this.setIcon("success");
+    this.#setIcon("success");
 
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
@@ -391,7 +417,7 @@ class Toaster {
    * @param {string} severity - Message severity: "info", "success", "error", "warn", "loading"
    * @param {number} duration - Display duration in ms, 0 for persistent
    */
-  showMessage(message, severity = "info", duration = 3000) {
+  showMessage(message, severity = "info", duration = this.defaultDuration) {
     if (!this.toaster || !this.isActive) {
       this.createToaster();
     }
@@ -433,7 +459,7 @@ class Toaster {
     }
 
     // Set the appropriate icon
-    this.setIcon(severity);
+    this.#setIcon(severity);
 
     // Set the message text
     if (this.progressText) {
@@ -444,36 +470,61 @@ class Toaster {
       return;
     }
 
-    // Validate and set duration
-    duration = typeof duration === "number" && duration > 0 ? duration : 3000;
-    duration = Math.min(duration, 10000);
+    const validatedDuration = Math.min(
+      typeof duration === "number" && duration > 0
+        ? duration
+        : this.defaultDuration,
+      this.maxDuration
+    );
 
     this.timeoutId = setTimeout(() => {
       this.removeToaster();
-    }, duration);
+    }, validatedDuration);
   }
 
-  // Convenience methods that use the core showMessage function
+  /**
+   * Convenience method for showing a success message
+   * @param {string} message - Message to display
+   */
   showSuccess(message) {
     this.showMessage(message || "Operation successful!", "success", 3000);
   }
 
+  /**
+   * Convenience method for showing an error message
+   * @param {string} message - Message to display
+   */
   showError(message) {
     this.showMessage(message || "Operation failed", "error", 5000);
   }
 
+  /**
+   * Convenience method for showing a warning message
+   * @param {string} message - Message to display
+   */
   showWarning(message) {
     this.showMessage(message || "Warning", "warn", 4000);
   }
 
+  /**
+   * Convenience method for showing an info message
+   * @param {string} message - Message to display
+   */
   showInfo(message) {
     this.showMessage(message || "Information", "info", 3000);
   }
 
+  /**
+   * Convenience method for showing a loading message
+   * @param {string} message - Message to display
+   */
   showLoading(message) {
     this.showMessage(message || "Loading...", "loading", 0);
   }
 
+  /**
+   * Removes the toaster from the DOM
+   */
   removeToaster() {
     if (this.toaster && this.toaster.parentNode) {
       this.toaster.style.opacity = "0";
