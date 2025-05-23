@@ -64,11 +64,7 @@ class EnhancerIntegration {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
         return text;
       }
-
-      // Analyze novel style and sync it to storage
-      const novelStyle = await this.novelUtils.analyzeNovelStyle(sanitizedText);
-      this.novelUtils.syncNovelStyle();
-
+  
       // Use the ollamaClient with our newly refactored components
       const enhancedText = await this.enhanceTextWithLLM(
         sanitizedText,
