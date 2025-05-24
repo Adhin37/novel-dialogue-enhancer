@@ -25,6 +25,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelAddSiteBtn = document.getElementById("cancel-add-site");
   const closeModalBtn = document.querySelector(".close-modal");
   const novelsTab = document.querySelector('.tab-btn[data-tab="novels"]');
+  const statsTab = document.querySelector('.tab-btn[data-tab="stats"]');
+  const refreshStatsBtn = document.getElementById("refresh-stats");
+  const resetStatsBtn = document.getElementById("reset-stats");
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
@@ -635,6 +638,100 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /**
+   * Loads and displays global statistics
+   */
+  function loadGlobalStats() {
+    chrome.runtime.sendMessage({ action: "getGlobalStats" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error loading stats:", chrome.runtime.lastError);
+        return;
+      }
+
+      if (response && response.status === "ok" && response.stats) {
+        renderGlobalStats(response.stats);
+      }
+    });
+  }
+
+  /**
+   * Renders the global statistics in the UI
+   * @param {Object} stats - The statistics object
+   */
+  function renderGlobalStats(stats) {
+    // Update stat values with animation
+    updateStatValue("stat-paragraphs", stats.totalParagraphsEnhanced || 0);
+    updateStatValue("stat-chapters", stats.totalChaptersEnhanced || 0);
+    updateStatValue("stat-novels", stats.uniqueNovelsProcessed || 0);
+    updateStatValue("stat-characters", stats.totalCharactersDetected || 0);
+    updateStatValue("stat-sessions", stats.enhancementSessions || 0);
+
+    // Format processing time
+    const totalMinutes = Math.round(
+      (stats.totalProcessingTime || 0) / (1000 * 60)
+    );
+    const timeDisplay =
+      totalMinutes >= 60
+        ? `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`
+        : `${totalMinutes}m`;
+    updateStatValue("stat-time", timeDisplay);
+
+    // Update timeline
+    const firstDate = stats.firstEnhancementDate
+      ? new Date(stats.firstEnhancementDate).toLocaleDateString()
+      : "Never";
+    const lastDate = stats.lastEnhancementDate
+      ? new Date(stats.lastEnhancementDate).toLocaleDateString()
+      : "Never";
+
+    document.getElementById("stat-first-date").textContent = firstDate;
+    document.getElementById("stat-last-date").textContent = lastDate;
+  }
+
+  /**
+   * Updates a stat value with animation
+   * @param {string} elementId - The element ID
+   * @param {string|number} value - The new value
+   */
+  function updateStatValue(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    element.classList.add("updating");
+    element.textContent = value;
+
+    setTimeout(() => {
+      element.classList.remove("updating");
+    }, 600);
+  }
+
+  /**
+   * Resets all global statistics
+   */
+  function resetGlobalStats() {
+    if (
+      confirm(
+        "Are you sure you want to reset all statistics? This action cannot be undone."
+      )
+    ) {
+      chrome.runtime.sendMessage({ action: "resetGlobalStats" }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Error resetting stats:", chrome.runtime.lastError);
+          window.feedbackManager.show("Error resetting statistics", "error");
+          return;
+        }
+
+        if (response && response.status === "ok") {
+          window.feedbackManager.show(
+            "Statistics reset successfully!",
+            "success"
+          );
+          loadGlobalStats();
+        }
+      });
+    }
+  }
+
+  /**
    * Initialize all functionality
    */
   function init() {
@@ -741,6 +838,20 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     });
 
+    if (statsTab) {
+      statsTab.addEventListener("click", () => {
+        loadGlobalStats();
+      });
+    }
+
+    if (refreshStatsBtn) {
+      refreshStatsBtn.addEventListener("click", loadGlobalStats);
+    }
+
+    if (resetStatsBtn) {
+      resetStatsBtn.addEventListener("click", resetGlobalStats);
+    }
+
     testOllamaButton.addEventListener("click", () => {
       ollamaStatus.textContent = "Testing Ollama connection...";
       ollamaStatus.className = "status-message pending";
@@ -777,6 +888,9 @@ document.addEventListener("DOMContentLoaded", () => {
         ollamaStatus.className = "status-message error";
       }
     });
+    if (document.getElementById("stats-tab").classList.contains("active")) {
+      loadGlobalStats();
+    }
   }
 
   // Initialize everything

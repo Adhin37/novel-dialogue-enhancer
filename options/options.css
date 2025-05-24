@@ -927,3 +927,114 @@ input[type="range"]::-moz-range-thumb:hover {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   }
 }
+
+/* Statistics Tab Styles */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.stat-card {
+  background-color: rgba(58, 110, 165, 0.05);
+  border: 1px solid rgba(58, 110, 165, 0.1);
+  border-radius: 8px;
+  padding: 1.25rem;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(58, 110, 165, 0.15);
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  margin-bottom: 0.5rem;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.stats-timeline {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  padding: 1rem;
+  margin: 1.5rem 0;
+}
+
+[data-theme="dark"] .stats-timeline {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.timeline-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-label {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.timeline-value {
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.stats-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  justify-content: center;
+}
+
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+  
+  .stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .stats-actions {
+    flex-direction: column;
+  }
+  
+  .stats-actions button {
+    width: 100%;
+  }
+  
+  .timeline-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+/* Animate statistics when they update */
+.stat-value.updating {
+  animation: statUpdate 0.6s ease;
+}
+
+@keyframes statUpdate {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); color: var(--success-color); }
+  100% { transform: scale(1); }
+}

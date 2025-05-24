@@ -10,7 +10,7 @@ class NovelUtils {
    */
   constructor(url, title) {
     this.url = url;
-    this.title = title;
+    this.title = title || document.title || "";
     this.novelId = "";
     this.novelStyle = null;
     this.novelGenre = null;
@@ -29,17 +29,33 @@ class NovelUtils {
    */
   updateNovelId(url, title) {
     const domain = new URL(url).hostname.replace(/^www\./, "");
+
+    // Ensure we have a valid title to work with
+    const workingTitle = title || document.title || "";
+
+    if (!workingTitle || workingTitle.trim().length === 0) {
+      console.warn("No valid title found for novel ID generation");
+      return null; // Or handle this case appropriately
+    }
+
     let novelName = "";
 
-    if (title) {
-      const titleParts = title.split(/[|\-–—:]/);
-      if (titleParts.length > 0) {
-        novelName = titleParts[0].trim();
-      }
+    const titleParts = workingTitle.split(/[|\-–—:]/);
+    if (titleParts.length > 0) {
+      novelName = titleParts[0].trim();
     }
 
     if (!novelName) {
-      novelName = title.replace(/[^\w\s]/g, "").trim();
+      novelName = workingTitle.replace(/[^\w\s]/g, "").trim();
+    }
+
+    // If we still don't have a valid novel name after processing
+    if (!novelName || novelName.length === 0) {
+      console.warn(
+        "Could not extract valid novel name from title:",
+        workingTitle
+      );
+      return null;
     }
 
     const novelId = `${domain}__${novelName}`
@@ -64,11 +80,14 @@ class NovelUtils {
    */
   extractNovelMetadata(url, title) {
     const textContent = document.body.textContent || "";
+    const workingTitle = title || document.title;
+    const generatedNovelId = this.updateNovelId(url, workingTitle);
+
     const metadata = {
-      novelId: this.novelId || this.updateNovelId(url, title),
-      title: title || document.title,
+      novelId: this.novelId || generatedNovelId || "unknown_novel",
+      title: workingTitle,
       platform: this.detectPlatform(url),
-      chapterInfo: this.detectChapterInfo(title, textContent),
+      chapterInfo: this.detectChapterInfo(workingTitle, textContent),
       wordCount: this.estimateWordCount(textContent)
     };
 
@@ -702,19 +721,72 @@ class NovelUtils {
 
   /**
    * Initialize novel ID and chapter info if not already set
+   * @return {boolean} - Whether initialization was successful
    * @private
    */
   #initializeNovelContext() {
     if (!this.novelId) {
-      this.updateNovelId(window.location.href, document.title);
+      const currentTitle = this.title || document.title || "";
+      if (!currentTitle.trim()) {
+        console.warn("No valid title available for novel ID generation");
+        // Try to extract title from URL or page content as fallback
+        const urlTitle = this.#extractTitleFromUrl(window.location.href);
+        if (urlTitle) {
+          this.title = urlTitle;
+          this.updateNovelId(window.location.href, urlTitle);
+        } else {
+          console.error("Could not generate novel ID - no valid title found");
+          return false;
+        }
+      } else {
+        this.updateNovelId(window.location.href, currentTitle);
+      }
     }
 
     // Get chapter information if not already set
     if (!this.chapterInfo) {
       this.chapterInfo = this.detectChapterInfo(
-        document.title,
+        this.title || document.title,
         document.body.textContent
       );
+    }
+
+    return true;
+  }
+
+  /**
+   * Extract a potential title from URL as fallback
+   * @param {string} url - The URL to extract from
+   * @return {string|null} - Extracted title or null
+   * @private
+   */
+  #extractTitleFromUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      const pathname = urlObj.pathname;
+
+      // Look for novel/chapter patterns in URL
+      const segments = pathname
+        .split("/")
+        .filter((segment) => segment.length > 0);
+
+      // Find the longest segment that might be a novel title
+      let potentialTitle = null;
+      let maxLength = 0;
+
+      segments.forEach((segment) => {
+        // Decode URL encoding and replace hyphens/underscores with spaces
+        const decoded = decodeURIComponent(segment).replace(/[-_]/g, " ");
+        if (decoded.length > maxLength && decoded.length > 3) {
+          potentialTitle = decoded;
+          maxLength = decoded.length;
+        }
+      });
+
+      return potentialTitle;
+    } catch (error) {
+      console.warn("Failed to extract title from URL:", error);
+      return null;
     }
   }
 

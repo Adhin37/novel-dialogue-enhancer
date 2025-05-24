@@ -438,16 +438,13 @@ async function processSingleContentBlock() {
   try {
     const enhancedText = await enhancerIntegration.enhanceText(originalText);
 
-    // Use enhancedText parameter with validation
     if (!enhancedText || typeof enhancedText !== "string") {
       console.warn("Invalid enhanced text received:", typeof enhancedText);
-      enhancerIntegration.statsUtils.incrementErrorCount();
       throw new Error("Invalid enhanced text format");
     }
 
     if (enhancedText.trim() === "") {
       console.warn("Empty enhanced text received");
-      enhancerIntegration.statsUtils.incrementErrorCount();
       throw new Error("Enhancement produced empty result");
     }
 
@@ -460,9 +457,18 @@ async function processSingleContentBlock() {
     contentElement.innerHTML = window.DOMPurify.sanitize(enhancedText);
     console.log(`Content updated with ${enhancedText.length} characters`);
     toaster.updateProgress(1, 1);
+
+    // Report paragraph statistics
+    const paragraphCount = (enhancedText.match(/\n\n/g) || []).length + 1;
+    const stats = enhancerIntegration.statsUtils.getStats();
+
+    chrome.runtime.sendMessage({
+      action: "updateParagraphStats",
+      paragraphCount: paragraphCount,
+      processingTime: stats.processingTime || 0
+    });
   } catch (error) {
     console.error("Failed to enhance content block:", error);
-    enhancerIntegration.statsUtils.incrementErrorCount();
     throw error;
   }
 }
@@ -564,15 +570,18 @@ async function processParagraphBatch(
       Math.min(startIndex + batch.length, totalParagraphs),
       totalParagraphs
     );
+
+    // Report paragraph statistics for this batch
+    chrome.runtime.sendMessage({
+      action: "updateParagraphStats",
+      paragraphCount: batch.length,
+      processingTime: 0
+    });
   } catch (error) {
     console.error(
       `Enhancement failed for batch ${startIndex}-${startIndex + chunkSize}:`,
       error
     );
-
-    // Increment error count for batch failures
-    enhancerIntegration.statsUtils.incrementErrorCount();
-
     toaster.showMessage(
       `Batch ${startIndex}-${
         startIndex + batch.length

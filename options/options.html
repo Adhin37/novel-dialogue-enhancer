@@ -42,6 +42,7 @@
           <button class="tab-btn" data-tab="advanced">Advanced</button>
           <button class="tab-btn" data-tab="novels">My Novels</button>
           <button class="tab-btn" data-tab="sites">Whitelisted Sites</button>
+          <button class="tab-btn" data-tab="stats">Statistics</button>
           <button class="tab-btn" data-tab="about">About</button>
         </div>
 
@@ -237,6 +238,69 @@
               <button id="clear-all" class="button button-danger">
                 <span class="button-icon">🗑️</span> Clear All Sites
               </button>
+            </div>
+          </div>
+
+          <!-- Stats Tab -->
+          <div class="tab-pane" id="stats-tab">
+            <div class="card">
+              <h3>Enhancement Statistics</h3>
+              <div class="hint">
+                Track your usage of the Novel Dialogue Enhancer across all
+                novels and sessions.
+              </div>
+
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-paragraphs">0</div>
+                  <div class="stat-label">Paragraphs Enhanced</div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-chapters">0</div>
+                  <div class="stat-label">Chapters Enhanced</div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-novels">0</div>
+                  <div class="stat-label">Unique Novels</div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-characters">0</div>
+                  <div class="stat-label">Characters Detected</div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-sessions">0</div>
+                  <div class="stat-label">Enhancement Sessions</div>
+                </div>
+
+                <div class="stat-card">
+                  <div class="stat-value" id="stat-time">0m</div>
+                  <div class="stat-label">Total Processing Time</div>
+                </div>
+              </div>
+
+              <div class="stats-timeline">
+                <div class="timeline-item">
+                  <span class="timeline-label">First Enhancement:</span>
+                  <span id="stat-first-date" class="timeline-value">Never</span>
+                </div>
+                <div class="timeline-item">
+                  <span class="timeline-label">Last Enhancement:</span>
+                  <span id="stat-last-date" class="timeline-value">Never</span>
+                </div>
+              </div>
+
+              <div class="stats-actions">
+                <button id="refresh-stats" class="button button-secondary">
+                  <span class="button-icon">🔄</span> Refresh Statistics
+                </button>
+                <button id="reset-stats" class="button button-danger">
+                  <span class="button-icon">🗑️</span> Reset Statistics
+                </button>
+              </div>
             </div>
           </div>
 

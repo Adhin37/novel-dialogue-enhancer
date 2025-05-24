@@ -1,6 +1,62 @@
 const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
+// Add this to background/background.js after the existing variables
+let globalStats = {
+  totalParagraphsEnhanced: 0,
+  totalChaptersEnhanced: 0,
+  uniqueNovelsProcessed: 0,
+  totalProcessingTime: 0,
+  totalCharactersDetected: 0,
+  enhancementSessions: 0,
+  lastEnhancementDate: null,
+  firstEnhancementDate: null
+};
+
+// Add this function after the existing helper functions
+function updateGlobalStats(statsUpdate) {
+  const now = Date.now();
+
+  if (statsUpdate.paragraphsEnhanced) {
+    globalStats.totalParagraphsEnhanced += statsUpdate.paragraphsEnhanced;
+  }
+
+  if (statsUpdate.chaptersEnhanced) {
+    globalStats.totalChaptersEnhanced += statsUpdate.chaptersEnhanced;
+  }
+
+  if (statsUpdate.charactersDetected) {
+    globalStats.totalCharactersDetected += statsUpdate.charactersDetected;
+  }
+
+  if (statsUpdate.processingTime) {
+    globalStats.totalProcessingTime += statsUpdate.processingTime;
+  }
+
+  if (statsUpdate.enhancementSession) {
+    globalStats.enhancementSessions += 1;
+    globalStats.lastEnhancementDate = now;
+
+    if (!globalStats.firstEnhancementDate) {
+      globalStats.firstEnhancementDate = now;
+    }
+  }
+
+  // Calculate unique novels
+  const uniqueNovels = new Set();
+  Object.keys(novelCharacterMaps).forEach((novelId) => {
+    if (
+      novelCharacterMaps[novelId].chaps &&
+      novelCharacterMaps[novelId].chaps.length > 0
+    ) {
+      uniqueNovels.add(novelId);
+    }
+  });
+  globalStats.uniqueNovelsProcessed = uniqueNovels.size;
+
+  // Store updated stats
+  chrome.storage.local.set({ globalStats: globalStats });
+}
 
 function compressGender(gender) {
   if (!gender || typeof gender !== "string") return "u";
@@ -274,7 +330,10 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
   const requestId = Date.now().toString();
   activeRequestControllers.set(requestId, controller);
 
-  const timeoutId = setTimeout(() => controller.abort(), validatedTimeout * 1000);
+  const timeoutId = setTimeout(
+    () => controller.abort(),
+    validatedTimeout * 1000
+  );
 
   const safeRequestData = {
     model: String(requestData.model || ""),
@@ -666,6 +725,11 @@ function sendWhitelistStatus(tabId, isWhitelisted) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get("globalStats", (data) => {
+    if (data.globalStats) {
+      globalStats = { ...globalStats, ...data.globalStats };
+    }
+  });
   chrome.storage.local.get("novelCharacterMaps", (data) => {
     if (data.novelCharacterMaps) {
       const convertedMaps = {};
@@ -884,6 +948,66 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     storeNovelCharacterMaps(novelCharacterMaps);
 
+    // Add stats tracking
+    const statsUpdate = {
+      enhancementSession: true
+    };
+
+    if (request.chapterNumber) {
+      const chapterNum = parseInt(request.chapterNumber, 10);
+      if (
+        !isNaN(chapterNum) &&
+        !novelCharacterMaps[novelId].chaps.includes(chapterNum)
+      ) {
+        statsUpdate.chaptersEnhanced = 1;
+      }
+    }
+
+    if (request.chars) {
+      statsUpdate.charactersDetected = Object.keys(request.chars).length;
+    }
+
+    updateGlobalStats(statsUpdate);
+
+    sendResponse({ status: "ok" });
+    return false;
+  } else if (request.action === "getGlobalStats") {
+    const uniqueNovels = new Set();
+    Object.keys(novelCharacterMaps).forEach((novelId) => {
+      if (
+        novelCharacterMaps[novelId].chaps &&
+        novelCharacterMaps[novelId].chaps.length > 0
+      ) {
+        uniqueNovels.add(novelId);
+      }
+    });
+    globalStats.uniqueNovelsProcessed = uniqueNovels.size;
+
+    sendResponse({ status: "ok", stats: globalStats });
+    return false;
+  } else if (request.action === "updateParagraphStats") {
+    const statsUpdate = {
+      paragraphsEnhanced: request.paragraphCount || 0,
+      processingTime: request.processingTime || 0
+    };
+
+    updateGlobalStats(statsUpdate);
+
+    sendResponse({ status: "ok" });
+    return false;
+  } else if (request.action === "resetGlobalStats") {
+    globalStats = {
+      totalParagraphsEnhanced: 0,
+      totalChaptersEnhanced: 0,
+      uniqueNovelsProcessed: 0,
+      totalProcessingTime: 0,
+      totalCharactersDetected: 0,
+      enhancementSessions: 0,
+      lastEnhancementDate: null,
+      firstEnhancementDate: null
+    };
+
+    chrome.storage.local.set({ globalStats: globalStats });
     sendResponse({ status: "ok" });
     return false;
   } else if (request.action === "getNovelData") {
