@@ -9,24 +9,29 @@ class NovelUtils {
    * @param {string} url - URL of the novel page
    * @param {string} title - Title of the novel page
    */
+  // Fix 1: Initialize novelId in constructor
   constructor(url, title) {
     this.url = url;
     this.title = title || document.title || "";
-    this.novelId = "";
-    this.novelStyle = null;
-    this.novelGenre = null;
-    this.characterMap = {};
-    this.chapterInfo = null;
-    this.enhancedChapters = [];
-    this.isCurrentChapterEnhanced = false;
 
-    // Initialize specialized modules
+    // Initialize specialized modules first
     this.idGenerator = new NovelIdGenerator();
     this.chapterDetector = new NovelChapterDetector();
     this.platformDetector = new NovelPlatformDetector();
     this.characterExtractor = new NovelCharacterExtractor();
     this.styleAnalyzer = new NovelStyleAnalyzer();
     this.storageManager = new NovelStorageManager();
+
+    // Generate initial novel ID
+    this.novelId = this.updateNovelId(url, this.title);
+
+    // Initialize other properties
+    this.novelStyle = null;
+    this.novelGenre = null;
+    this.characterMap = {};
+    this.chapterInfo = null;
+    this.enhancedChapters = [];
+    this.isCurrentChapterEnhanced = false;
 
     console.debug("Novel Dialogue Enhancer: Novel Utils initialized");
   }
@@ -39,14 +44,14 @@ class NovelUtils {
    */
   updateNovelId(url, title) {
     const novelId = this.idGenerator.generateNovelId(url, title);
-    
+
     if (novelId !== this.novelId) {
       console.log(`Generated novel ID: ${novelId}`);
       this.novelId = novelId;
       this.storageManager.setNovelId(novelId);
     }
-    
-    return novelId;
+
+    return this.novelId;
   }
 
   /**
@@ -122,7 +127,6 @@ class NovelUtils {
    * @return {Promise<object>} - Novel style information
    */
   async analyzeNovelStyle(text, novelId = this.novelId) {
-    // If we already have style data and explicitly analyzing the same novel, return it
     if (
       this.novelStyle &&
       this.novelStyle.analyzed &&
@@ -165,7 +169,7 @@ class NovelUtils {
     if (novelId === this.novelId) {
       this.novelStyle = styleInfo;
     }
-    
+
     this.syncNovelStyle(novelId, styleInfo);
     return styleInfo;
   }
@@ -188,7 +192,9 @@ class NovelUtils {
     }
 
     // Check if chapter was already enhanced and get existing data
-    const alreadyEnhanced = await this.#checkChapterEnhancementStatus(characterMap);
+    const alreadyEnhanced = await this.#checkChapterEnhancementStatus(
+      characterMap
+    );
     if (alreadyEnhanced) {
       return this.characterMap;
     }
@@ -197,7 +203,8 @@ class NovelUtils {
     characterMap = await this.loadExistingCharacterData(characterMap);
 
     // Extract character names using the character extractor
-    const extractedCharacters = this.characterExtractor.extractCharacterNames(text);
+    const extractedCharacters =
+      this.characterExtractor.extractCharacterNames(text);
 
     // Merge extracted characters with existing character map
     Object.entries(extractedCharacters).forEach(([name, data]) => {
@@ -234,21 +241,19 @@ class NovelUtils {
       const currentTitle = this.title || document.title || "";
       if (!currentTitle.trim()) {
         console.warn("No valid title available for novel ID generation");
-        // Try to extract title from URL as fallback
-        const urlTitle = this.#extractTitleFromUrl(window.location.href);
+        const urlTitle = this.#extractTitleFromUrl(this.url);
         if (urlTitle) {
           this.title = urlTitle;
-          this.updateNovelId(window.location.href, urlTitle);
+          this.updateNovelId(this.url, urlTitle);
         } else {
           console.error("Could not generate novel ID - no valid title found");
           return false;
         }
       } else {
-        this.updateNovelId(window.location.href, currentTitle);
+        this.updateNovelId(this.url, currentTitle);
       }
     }
 
-    // Get chapter information if not already set
     if (!this.chapterInfo) {
       this.chapterInfo = this.detectChapterInfo(
         this.title || document.title,
@@ -327,7 +332,9 @@ class NovelUtils {
 
       if (!this.isCurrentChapterEnhanced) {
         this.isCurrentChapterEnhanced =
-          await this.storageManager.verifyChapterEnhancementStatus(currentChapter);
+          await this.storageManager.verifyChapterEnhancementStatus(
+            currentChapter
+          );
       }
 
       if (this.isCurrentChapterEnhanced) {
@@ -442,7 +449,9 @@ class NovelUtils {
    * @return {Set} - Set of character names
    */
   extractCharactersFromDialogue(dialoguePatterns) {
-    return this.characterExtractor.extractCharactersFromDialogue(dialoguePatterns);
+    return this.characterExtractor.extractCharactersFromDialogue(
+      dialoguePatterns
+    );
   }
 
   /**

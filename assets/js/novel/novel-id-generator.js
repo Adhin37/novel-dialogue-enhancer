@@ -2,9 +2,9 @@
  * Simple novel ID generator utility
  */
 class NovelIdGenerator {
-    constructor() {
-        this.novelId = "";
-    }
+  constructor() {
+    this.novelId = "";
+  }
   /**
    * Generate a unique novel ID from URL and title
    * @param {string} url - Current page URL
@@ -26,7 +26,20 @@ class NovelIdGenerator {
 
       if (!novelName) {
         console.warn("Could not extract novel name from title or URL");
-        return null;
+        // Use domain and path as fallback
+        const pathSegment =
+          urlObj.pathname.split("/").filter((s) => s.length > 0)[0] ||
+          "unknown";
+        const fallbackNovelId = `${domain}__${pathSegment}`
+          .toLowerCase()
+          .replace(/[^\w]/g, "_")
+          .replace(/_+/g, "_")
+          .replace(/^_|_$/g, "")
+          .substring(0, 50);
+
+        console.warn(`Using fallback novel ID: ${fallbackNovelId}`);
+        this.novelId = fallbackNovelId;
+        return fallbackNovelId;
       }
 
       // Create clean novel ID
