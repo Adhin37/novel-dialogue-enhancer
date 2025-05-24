@@ -20,7 +20,7 @@ class NovelUtils {
     this.platformDetector = new NovelPlatformDetector();
     this.characterExtractor = new NovelCharacterExtractor();
     this.styleAnalyzer = new NovelStyleAnalyzer();
-    this.storageManager = new NovelStorageManager();
+    this.storageManager = new StorageManager();
 
     // Generate initial novel ID
     this.novelId = this.updateNovelId(url, this.title);
@@ -373,7 +373,9 @@ class NovelUtils {
    */
   syncCharacterMap(characterMap) {
     const chapterNumber = this.chapterInfo?.chapterNumber;
-    this.storageManager.syncCharacterMap(characterMap, chapterNumber);
+    if (SharedUtils.validateObject(characterMap) && Object.keys(characterMap).length > 0) {
+      this.storageManager.syncCharacterMap(characterMap, chapterNumber);
+    }
   }
 
   /**
@@ -452,20 +454,6 @@ class NovelUtils {
     return this.characterExtractor.extractCharactersFromDialogue(
       dialoguePatterns
     );
-  }
-
-  /**
-   * Compress gender string to single character code
-   * @param {string} gender - The gender string to compress
-   * @return {string} - Single character gender code
-   */
-  compressGender(gender) {
-    if (!gender || typeof gender !== "string") return "u";
-
-    const genderLower = gender.toLowerCase();
-    if (genderLower === "male") return "m";
-    if (genderLower === "female") return "f";
-    return "u"; // unknown or other
   }
 }
 

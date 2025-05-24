@@ -3,15 +3,17 @@
  * Specialized module for cultural origin detection and analysis
  * Identifies cultural contexts and specific cultural indicators
  */
-class CulturalAnalyzer {
+class CulturalAnalyzer extends BaseGenderAnalyzer {
   /**
    * Creates a new CulturalAnalyzer instance
    */
   constructor() {
+    super();
     this.characterPatterns = {
       chinese: /[\u4E00-\u9FFF]/,
       japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
-      korean: /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/
+      korean:
+        /[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F\uA960-\uA97F\uD7B0-\uD7FF]/
     };
   }
 
@@ -35,7 +37,7 @@ class CulturalAnalyzer {
 
     // Enhanced name pattern recognition for romanized East Asian names
     const namePatterns = this.#getNamePatterns();
-    
+
     for (const pattern of namePatterns.chinese) {
       if (pattern.test(name)) {
         return "chinese";
@@ -93,115 +95,86 @@ class CulturalAnalyzer {
    * @return {object} - Gender scores with evidence
    */
   checkCulturalSpecificIndicators(name, text, culturalOrigin) {
-    let maleScore = 0;
-    let femaleScore = 0;
-    let evidence = null;
-
     const culturalIndicators = this.#getCulturalIndicators();
-
     const exactIndicators = this.#getExactIndicators(name);
-
     const specificCultureIndicators =
       exactIndicators[culturalOrigin] || exactIndicators.western;
 
+    // Check for exact indicators first
     for (const indicator of specificCultureIndicators.male) {
       if (text.toLowerCase().includes(indicator.toLowerCase())) {
-        maleScore += 3;
-        evidence = indicator;
-        break;
+        return this._createResult(3, 0, indicator);
       }
     }
 
     for (const indicator of specificCultureIndicators.female) {
       if (text.toLowerCase().includes(indicator.toLowerCase())) {
-        femaleScore += 3;
-        evidence = indicator;
-        break;
+        return this._createResult(0, 3, indicator);
       }
     }
 
-    if (!evidence) {
-      const nameProximityRegex = new RegExp(
-        `[^.!?]{0,50}\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,50}`,
-        "gi"
+    // Get proximity text using base class method
+    const proximityText = this._getProximityText(name, text, 50);
+    const combinedProximityText = proximityText.join(" ");
+
+    // Check cultural specific indicators in proximity
+    const cultureSpecific =
+      culturalIndicators[culturalOrigin] || culturalIndicators.western;
+
+    const proximityResult = this._analyzePatterns(
+      [combinedProximityText],
+      cultureSpecific.male,
+      cultureSpecific.female
+    );
+
+    if (proximityResult.evidence) {
+      return this._createResult(
+        proximityResult.maleScore,
+        proximityResult.femaleScore,
+        `near term '${proximityResult.evidence}'`
       );
-      const proximityMatches = Array.from(text.matchAll(nameProximityRegex));
-      let proximityText = "";
-
-      proximityMatches.forEach((match) => {
-        proximityText += match[0] + " ";
-      });
-
-      const cultureSpecific =
-        culturalIndicators[culturalOrigin] || culturalIndicators.western;
-
-      for (const indicator of cultureSpecific.male) {
-        const indicatorRegex = new RegExp(
-          `\\b${this.#escapeRegExp(indicator)}\\b`,
-          "i"
-        );
-        if (indicatorRegex.test(proximityText)) {
-          maleScore += 1;
-          evidence = `near term '${indicator}'`;
-          break;
-        }
-      }
-
-      for (const indicator of cultureSpecific.female) {
-        const indicatorRegex = new RegExp(
-          `\\b${this.#escapeRegExp(indicator)}\\b`,
-          "i"
-        );
-        if (indicatorRegex.test(proximityText)) {
-          femaleScore += 1;
-          evidence = `near term '${indicator}'`;
-          break;
-        }
-      }
-
-      if (
-        !evidence &&
-        (culturalOrigin === "chinese" ||
-          culturalOrigin === "japanese" ||
-          culturalOrigin === "korean")
-      ) {
-        const asianSpecificPatterns = this.#getAsianSpecificPatterns(name);
-
-        for (const pattern of asianSpecificPatterns.male) {
-          if (pattern.test(proximityText)) {
-            maleScore += 2;
-            evidence = `cultural pattern: ${pattern.toString().slice(1, -2)}`;
-            break;
-          }
-        }
-
-        if (!evidence) {
-          for (const pattern of asianSpecificPatterns.female) {
-            if (pattern.test(proximityText)) {
-              femaleScore += 2;
-              evidence = `cultural pattern: ${pattern.toString().slice(1, -2)}`;
-              break;
-            }
-          }
-        }
-      }
     }
 
-    if (
-      !evidence &&
-      (culturalOrigin === "chinese" ||
-        culturalOrigin === "japanese" ||
-        culturalOrigin === "korean")
-    ) {
-      const dialogResult = this.#checkDialogueAddressTerms(name, text, culturalOrigin);
+    // Check Asian specific patterns for East Asian cultures
+    if (["chinese", "japanese", "korean"].includes(culturalOrigin)) {
+      const asianSpecificPatterns = this.#getAsianSpecificPatterns(name);
+
+      for (const pattern of asianSpecificPatterns.male) {
+        if (pattern.test(combinedProximityText)) {
+          return this._createResult(
+            2,
+            0,
+            `cultural pattern: ${pattern.toString().slice(1, -2)}`
+          );
+        }
+      }
+
+      for (const pattern of asianSpecificPatterns.female) {
+        if (pattern.test(combinedProximityText)) {
+          return this._createResult(
+            0,
+            2,
+            `cultural pattern: ${pattern.toString().slice(1, -2)}`
+          );
+        }
+      }
+
+      // Check dialogue address terms for East Asian cultures
+      const dialogResult = this.#checkDialogueAddressTerms(
+        name,
+        text,
+        culturalOrigin
+      );
       if (dialogResult.evidence) {
-        maleScore += dialogResult.maleScore;
-        femaleScore += dialogResult.femaleScore;
-        evidence = dialogResult.evidence;
+        return this._createResult(
+          dialogResult.maleScore,
+          dialogResult.femaleScore,
+          dialogResult.evidence
+        );
       }
     }
 
-    return { maleScore, femaleScore, evidence };
+    return this._createResult(0, 0, null);
   }
 
   /**
@@ -583,9 +556,9 @@ class CulturalAnalyzer {
         /\bsenior brother\b/i,
         /\bjunior brother\b/i,
         /\bdisciple brother\b/i,
-        new RegExp(`\\b${this.#escapeRegExp(name)}-sama\\b`, "i"),
-        new RegExp(`\\b${this.#escapeRegExp(name)}-san\\b`, "i"),
-        new RegExp(`\\b${this.#escapeRegExp(name)}-kun\\b`, "i"),
+        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-sama\\b`, "i"),
+        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-san\\b`, "i"),
+        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-kun\\b`, "i"),
 
         // Common positional references
         /\bhe cultivated\b/i,
@@ -607,7 +580,7 @@ class CulturalAnalyzer {
         /\bsenior sister\b/i,
         /\bjunior sister\b/i,
         /\bdisciple sister\b/i,
-        new RegExp(`\\b${this.#escapeRegExp(name)}-chan\\b`, "i"),
+        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-chan\\b`, "i"),
 
         // Common positional references
         /\bher fairy\b/i,
@@ -632,7 +605,7 @@ class CulturalAnalyzer {
     let maleScore = 0;
     let femaleScore = 0;
     let evidence = null;
-    
+
     const dialogPatterns = [new RegExp(`"[^"]*\\b(${name})\\b[^"]*"`, "gi")];
 
     let dialogText = "";
@@ -645,22 +618,8 @@ class CulturalAnalyzer {
 
     if (dialogText) {
       const maleAddressTerms = {
-        chinese: [
-          "gege",
-          "dage",
-          "xiongzhang",
-          "shixiong",
-          "shidi",
-          "shizun"
-        ],
-        japanese: [
-          "oniisan",
-          "nii-san",
-          "onii-chan",
-          "aniki",
-          "otouto",
-          "kun"
-        ],
+        chinese: ["gege", "dage", "xiongzhang", "shixiong", "shidi", "shizun"],
+        japanese: ["oniisan", "nii-san", "onii-chan", "aniki", "otouto", "kun"],
         korean: ["oppa", "hyung", "orabeoni"]
       };
 
@@ -692,9 +651,7 @@ class CulturalAnalyzer {
 
       if (!evidence) {
         for (const term of addressTerms.female) {
-          if (
-            dialogText.match(new RegExp(`"[^"]*\\b${term}\\b[^"]*"`, "i"))
-          ) {
+          if (dialogText.match(new RegExp(`"[^"]*\\b${term}\\b[^"]*"`, "i"))) {
             femaleScore += 2;
             evidence = `addressed as '${term}' in dialog`;
             break;
@@ -704,16 +661,6 @@ class CulturalAnalyzer {
     }
 
     return { maleScore, femaleScore, evidence };
-  }
-
-  /**
-   * Helper function to escape regex special characters
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   * @private
-   */
-  #escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

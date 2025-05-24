@@ -32,7 +32,11 @@ export default defineConfig([
         NovelCharacterExtractor: "readonly",
         NovelChapterDetector: "readonly",
         NovelStorageManager: "readonly",
-        NovelIdGenerator: "readonly"
+        NovelIdGenerator: "readonly",
+        SharedUtils: "readonly",
+        Constants: "readonly",
+        StorageManager: "readonly",
+        BaseGenderAnalyzer: "readonly"
       }
     },
     rules: {

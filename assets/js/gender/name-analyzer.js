@@ -23,14 +23,14 @@ class NameAnalyzer {
     for (const culture of culturesToCheck) {
       // Check if name starts with a title
       for (const title of maleTitles[culture]) {
-        const titleRegex = new RegExp(`^${this.#escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(`^${SharedUtils.escapeRegExp(title)}\\s+`, "i");
         if (titleRegex.test(name) || name === title) {
           return { gender: "male", evidence: `${title} (${culture})` };
         }
       }
 
       for (const title of femaleTitles[culture]) {
-        const titleRegex = new RegExp(`^${this.#escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(`^${SharedUtils.escapeRegExp(title)}\\s+`, "i");
         if (titleRegex.test(name) || name === title) {
           return { gender: "female", evidence: `${title} (${culture})` };
         }
@@ -38,14 +38,14 @@ class NameAnalyzer {
 
       // Check if name ends with a title
       for (const title of maleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${this.#escapeRegExp(title)}$`, "i");
+        const titleRegex = new RegExp(`\\s+${SharedUtils.escapeRegExp(title)}$`, "i");
         if (titleRegex.test(name)) {
           return { gender: "male", evidence: `${title} (${culture})` };
         }
       }
 
       for (const title of femaleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${this.#escapeRegExp(title)}$`, "i");
+        const titleRegex = new RegExp(`\\s+${SharedUtils.escapeRegExp(title)}$`, "i");
         if (titleRegex.test(name)) {
           return { gender: "female", evidence: `${title} (${culture})` };
         }
@@ -54,7 +54,7 @@ class NameAnalyzer {
       // Check if name contains a title
       for (const title of maleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${this.#escapeRegExp(title)}\\s+`,
+          `\\s+${SharedUtils.escapeRegExp(title)}\\s+`,
           "i"
         );
         if (titleRegex.test(name)) {
@@ -64,7 +64,7 @@ class NameAnalyzer {
 
       for (const title of femaleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${this.#escapeRegExp(title)}\\s+`,
+          `\\s+${SharedUtils.escapeRegExp(title)}\\s+`,
           "i"
         );
         if (titleRegex.test(name)) {
@@ -622,16 +622,6 @@ class NameAnalyzer {
         "Agassi"
       ]
     };
-  }
-
-  /**
-   * Helper function to escape regex special characters
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   * @private
-   */
-  #escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

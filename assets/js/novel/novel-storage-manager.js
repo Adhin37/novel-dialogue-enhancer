@@ -44,7 +44,7 @@ class NovelStorageManager {
         // Create optimized character entry
         optimizedChars[index] = {
           name: name,
-          gender: this.#compressGender(data.gender),
+          gender: SharedUtils.compressGender(data.gender),
           confidence: parseFloat(data.confidence) || 0,
           appearances: parseInt(data.appearances) || 1
         };
@@ -230,21 +230,6 @@ class NovelStorageManager {
           }
         );
       }).catch(() => false);
-    }
-  
-    /**
-     * Compress gender string to single character code
-     * @param {string} gender - The gender string to compress
-     * @return {string} - Single character gender code
-     * @private
-     */
-    #compressGender(gender) {
-      if (!gender || typeof gender !== "string") return "u";
-  
-      const genderLower = gender.toLowerCase();
-      if (genderLower === "male") return "m";
-      if (genderLower === "female") return "f";
-      return "u"; // unknown or other
     }
   }
   

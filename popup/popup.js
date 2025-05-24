@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const pauseButton = document.getElementById("pause-button");
   const whitelistButton = document.getElementById("whitelist-button");
   const whitelistText = document.getElementById("whitelist-text");
@@ -12,6 +12,27 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentTabHostname = "";
   let whitelistedSites = [];
   let isExtensionPaused = false;
+  const storage = new StorageManager();
+  
+  // Load all settings at once
+  const settings = await storage.getMultiple(
+    ['whitelistedSites', 'isExtensionPaused', 'preserveNames', 'fixPronouns'],
+    Constants.DEFAULTS
+  );
+
+  whitelistedSites = settings.whitelistedSites || [];
+  isExtensionPaused = settings.isExtensionPaused;
+  preserveNamesToggle.checked = settings.preserveNames;
+  fixPronounsToggle.checked = settings.fixPronouns;
+
+  // Update settings
+  preserveNamesToggle.addEventListener("change", async function () {
+    await storage.set('preserveNames', this.checked);
+  });
+
+  fixPronounsToggle.addEventListener("change", async function () {
+    await storage.set('fixPronouns', this.checked);
+  });
 
   if (window.darkModeManager) {
     window.darkModeManager.init();
@@ -186,32 +207,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     updatePauseButton();
     updateStatus();
-  });
-
-  preserveNamesToggle.addEventListener("change", function () {
-    const isChecked = Boolean(this.checked);
-    console.log(`Preserve names setting changed: ${isChecked}`);
-    chrome.storage.sync.set({ preserveNames: isChecked }, () => {
-      if (chrome.runtime.lastError) {
-        console.error(
-          "Failed to save preserve names setting:",
-          chrome.runtime.lastError
-        );
-      }
-    });
-  });
-
-  fixPronounsToggle.addEventListener("change", function () {
-    const isChecked = Boolean(this.checked);
-    console.log(`Fix pronouns setting changed: ${isChecked}`);
-    chrome.storage.sync.set({ fixPronouns: isChecked }, () => {
-      if (chrome.runtime.lastError) {
-        console.error(
-          "Failed to save fix pronouns setting:",
-          chrome.runtime.lastError
-        );
-      }
-    });
   });
 
   whitelistButton.addEventListener("click", handleWhitelistButtonClick);

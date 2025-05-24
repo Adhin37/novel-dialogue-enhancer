@@ -1,7 +1,6 @@
 const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
-// Add this to background/background.js after the existing variables
 let globalStats = {
   totalParagraphsEnhanced: 0,
   totalChaptersEnhanced: 0,
@@ -58,23 +57,6 @@ function updateGlobalStats(statsUpdate) {
   chrome.storage.local.set({ globalStats: globalStats });
 }
 
-function compressGender(gender) {
-  if (!gender || typeof gender !== "string") return "u";
-
-  const genderLower = gender.toLowerCase();
-  if (genderLower === "male") return "m";
-  if (genderLower === "female") return "f";
-  return "u";
-}
-
-function expandGender(code) {
-  if (!code || typeof code !== "string") return "unknown";
-
-  if (code === "m") return "male";
-  if (code === "f") return "female";
-  return "unknown";
-}
-
 function getNextCharacterId(charMap) {
   if (!charMap || typeof charMap !== "object") return 0;
 
@@ -103,7 +85,7 @@ function migrateToNewFormat(oldMap) {
     Object.entries(oldMap.characters).forEach(([name, data], index) => {
       newMap.chars[index] = {
         name: name,
-        gender: compressGender(data.gender),
+        gender: SharedUtils.compressGender(data.gender),
         confidence: parseFloat(data.confidence) || 0,
         appearances: parseInt(data.appearances) || 1
       };
@@ -126,7 +108,7 @@ function migrateToNewFormat(oldMap) {
     Object.entries(oldMap).forEach(([name, data], index) => {
       newMap.chars[index] = {
         name: name,
-        gender: compressGender(data.gender),
+        gender: SharedUtils.compressGender(data.gender),
         confidence: parseFloat(data.confidence) || 0,
         appearances: parseInt(data.appearances) || 1
       };
@@ -747,7 +729,7 @@ chrome.runtime.onInstalled.addListener(() => {
               if (name && typeof name === "string") {
                 convertedMaps[novelId].chars[index] = {
                   name: name,
-                  gender: compressGender(data.gender),
+                  gender: SharedUtils.compressGender(data.gender),
                   confidence: parseFloat(data.confidence) || 0,
                   appearances: parseInt(data.appearances) || 1
                 };
@@ -769,7 +751,7 @@ chrome.runtime.onInstalled.addListener(() => {
               ([name, data], index) => {
                 convertedMaps[novelId].chars[index] = {
                   name: name,
-                  gender: compressGender(data.gender),
+                  gender: SharedUtils.compressGender(data.gender),
                   confidence: parseFloat(data.confidence) || 0,
                   appearances: parseInt(data.appearances) || 1
                 };
@@ -1051,7 +1033,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       ([charId, charData]) => {
         const characterName = charData.name;
         response.characterMap[characterName] = {
-          gender: expandGender(charData.gender),
+          gender: SharedUtils.expandGender(charData.gender),
           confidence: charData.confidence,
           appearances: charData.appearances,
           evidence: charData.evidences || []

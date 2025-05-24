@@ -33,7 +33,7 @@ class EnhancerIntegration {
     this.genderUtils.resetStats();
 
     try {
-      const sanitizedText = this.textProcessor.sanitizeText(text);
+      const sanitizedText = SharedUtils.sanitizeText(text);
 
       // Track word count for statistics
       const originalWordCount = this.#countWords(sanitizedText);
@@ -307,7 +307,7 @@ class EnhancerIntegration {
       );
 
       // Create a cache key for the background service
-      const cacheKey = this.textProcessor.createHash(chunk + contextInfo);
+      const cacheKey = SharedUtils.createHash(chunk + contextInfo);
 
       try {
         // Process with LLM via the Ollama client

@@ -96,7 +96,7 @@ class RelationshipAnalyzer {
 
     // Check role mentions in proximity to name
     const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,100}`,
+      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
       "gi"
     );
     const proximityMatches = Array.from(text.matchAll(nameProximityRegex));
@@ -124,9 +124,9 @@ class RelationshipAnalyzer {
     for (const role of cultureRoles.male) {
       if (
         new RegExp(
-          `\\b${this.#escapeRegExp(
+          `\\b${SharedUtils.escapeRegExp(
             name
-          )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${this.#escapeRegExp(
+          )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
             name
           )}\\b`,
           "i"
@@ -142,9 +142,9 @@ class RelationshipAnalyzer {
       for (const role of cultureRoles.female) {
         if (
           new RegExp(
-            `\\b${this.#escapeRegExp(
+            `\\b${SharedUtils.escapeRegExp(
               name
-            )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${this.#escapeRegExp(
+            )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
               name
             )}\\b`,
             "i"
@@ -201,7 +201,7 @@ class RelationshipAnalyzer {
             const regex = new RegExp(
               femaleSidePattern.replace(
                 /\(NAME\)/g,
-                this.#escapeRegExp(charName)
+                SharedUtils.escapeRegExp(charName)
               ),
               "i"
             );
@@ -220,7 +220,7 @@ class RelationshipAnalyzer {
             const regex = new RegExp(
               maleSidePattern.replace(
                 /\(NAME\)/g,
-                this.#escapeRegExp(charName)
+                SharedUtils.escapeRegExp(charName)
               ),
               "i"
             );
@@ -274,7 +274,7 @@ class RelationshipAnalyzer {
 
     // Look for group scenes containing multiple characters
     const groupScenePattern = new RegExp(
-      `[^.!?]*\\b${this.#escapeRegExp(
+      `[^.!?]*\\b${SharedUtils.escapeRegExp(
         name
       )}\\b[^.!?]*(?:\\b(and|with|alongside)\\b|,)[^.!?]*`,
       "gi"
@@ -334,13 +334,13 @@ class RelationshipAnalyzer {
     // Patterns like "X was the emperor" or "the princess X"
     const explicitRolePatterns = [
       new RegExp(
-        `\\b${this.#escapeRegExp(
+        `\\b${SharedUtils.escapeRegExp(
           name
         )}\\b[^.!?]{0,20}\\b(was|is)\\b[^.!?]{0,20}\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b`,
         "i"
       ),
       new RegExp(
-        `\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b[^.!?]{0,20}\\b${this.#escapeRegExp(
+        `\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
           name
         )}\\b`,
         "i"
@@ -552,16 +552,6 @@ class RelationshipAnalyzer {
         relationship: "sibling relationship"
       }
     ];
-  }
-
-  /**
-   * Helper function to escape regex special characters
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   * @private
-   */
-  #escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

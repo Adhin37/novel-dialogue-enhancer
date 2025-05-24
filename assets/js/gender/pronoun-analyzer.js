@@ -16,12 +16,12 @@ class PronounAnalyzer {
     let inconsistencies = 0;
 
     const nameSentenceRegex = new RegExp(
-      `[^.!?]{0,100}\\b${this.#escapeRegExp(name)}\\b[^.!?]*[.!?]`,
+      `[^.!?]{0,100}\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]*[.!?]`,
       "gi"
     );
 
     const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,200}`,
+      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,200}`,
       "gi"
     );
 
@@ -48,14 +48,14 @@ class PronounAnalyzer {
 
       const directMaleConnection = followingText.match(
         new RegExp(
-          `\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,30}\\b(he|him|his)\\b`,
+          `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,30}\\b(he|him|his)\\b`,
           "i"
         )
       );
 
       const directFemaleConnection = followingText.match(
         new RegExp(
-          `\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,30}\\b(she|her|hers)\\b`,
+          `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,30}\\b(she|her|hers)\\b`,
           "i"
         )
       );
@@ -109,7 +109,7 @@ class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${this.#escapeRegExp(
+            `\\b${SharedUtils.escapeRegExp(
               name
             )}'s\\b[^.!?]*\\b(wife|girlfriend|daughter|sister|mother)\\b`,
             "i"
@@ -122,7 +122,7 @@ class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${this.#escapeRegExp(
+            `\\b${SharedUtils.escapeRegExp(
               name
             )}'s\\b[^.!?]*\\b(husband|boyfriend|son|brother|father)\\b`,
             "i"
@@ -135,7 +135,7 @@ class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `"[^"]*"\\s*,?\\s*${this.#escapeRegExp(
+            `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
               name
             )}\\s+said,?\\s+(he|his)\\b`,
             "i"
@@ -148,7 +148,7 @@ class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `"[^"]*"\\s*,?\\s*${this.#escapeRegExp(
+            `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
               name
             )}\\s+said,?\\s+(she|her)\\b`,
             "i"
@@ -169,19 +169,19 @@ class PronounAnalyzer {
    */
   #checkArchetypes(name, text, scores) {
     const maleArchetypes = [
-      `\\b${this.#escapeRegExp(
+      `\\b${SharedUtils.escapeRegExp(
         name
       )}\\b[^.!?]*\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b`,
-      `\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b[^.!?]*\\b${this.#escapeRegExp(
+      `\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
         name
       )}\\b`
     ];
 
     const femaleArchetypes = [
-      `\\b${this.#escapeRegExp(
+      `\\b${SharedUtils.escapeRegExp(
         name
       )}\\b[^.!?]*\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b`,
-      `\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b[^.!?]*\\b${this.#escapeRegExp(
+      `\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
         name
       )}\\b`
     ];
@@ -279,9 +279,9 @@ class PronounAnalyzer {
       // Check for machine translation errors with alternating pronouns
       {
         pattern: new RegExp(
-          `\\b${this.#escapeRegExp(
+          `\\b${SharedUtils.escapeRegExp(
             name
-          )}\\b[^.!?]{0,20}\\bhe\\b[^.!?]{0,50}\\b${this.#escapeRegExp(
+          )}\\b[^.!?]{0,20}\\bhe\\b[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(
             name
           )}\\b[^.!?]{0,20}\\bshe\\b`,
           "i"
@@ -291,9 +291,9 @@ class PronounAnalyzer {
       },
       {
         pattern: new RegExp(
-          `\\b${this.#escapeRegExp(
+          `\\b${SharedUtils.escapeRegExp(
             name
-          )}\\b[^.!?]{0,20}\\bshe\\b[^.!?]{0,50}\\b${this.#escapeRegExp(
+          )}\\b[^.!?]{0,20}\\bshe\\b[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(
             name
           )}\\b[^.!?]{0,20}\\bhe\\b`,
           "i"
@@ -304,7 +304,7 @@ class PronounAnalyzer {
       // Check for dialogue attribution patterns
       {
         pattern: new RegExp(
-          `"[^"]+", (he|his)\\b[^.!?]{0,20}\\b${this.#escapeRegExp(
+          `"[^"]+", (he|his)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
             name
           )}\\b[^.!?]*\\bshe\\b`,
           "i"
@@ -314,7 +314,7 @@ class PronounAnalyzer {
       },
       {
         pattern: new RegExp(
-          `"[^"]+", (she|her)\\b[^.!?]{0,20}\\b${this.#escapeRegExp(
+          `"[^"]+", (she|her)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
             name
           )}\\b[^.!?]*\\bhe\\b`,
           "i"
@@ -335,16 +335,6 @@ class PronounAnalyzer {
     }
 
     return { correction: null };
-  }
-
-  /**
-   * Helper function to escape regex special characters
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   * @private
-   */
-  #escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

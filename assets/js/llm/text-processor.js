@@ -9,7 +9,7 @@ class TextProcessor {
    * @param {number} options.maxChunkSize - Maximum chunk size in characters (default: 4000)
    */
   constructor(options = {}) {
-    this.maxChunkSize = options.maxChunkSize || 4000;
+    this.maxChunkSize = options.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
     console.debug(
       `Novel Dialogue Enhancer: Text Processor initialized (max chunk size: ${this.maxChunkSize})`
     );
@@ -161,36 +161,6 @@ class TextProcessor {
     );
 
     return cleanedText.trim();
-  }
-
-  /**
-   * Create a hash string for caching purposes
-   * @param {string} input - String to hash
-   * @return {string} - Hash string
-   */
-  createHash(input) {
-    if (!input) return "";
-
-    let hash = 0;
-    for (let i = 0; i < input.length; i++) {
-      const char = input.charCodeAt(i);
-      hash = (hash << 5) - hash + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return hash.toString(16);
-  }
-
-  /**
-   * Sanitize text to prevent injection issues
-   * @param {string} text - Text to sanitize
-   * @return {string} - Sanitized text
-   */
-  sanitizeText(text) {
-    if (!text || typeof text !== "string") return "";
-
-    const container = document.createElement("div");
-    container.textContent = text;
-    return container.innerHTML;
   }
 }
 

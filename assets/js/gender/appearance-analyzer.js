@@ -3,7 +3,7 @@
  * Specialized module for analyzing character appearance descriptions
  * Identifies physical descriptions and features that indicate gender
  */
-class AppearanceAnalyzer {
+class AppearanceAnalyzer extends BaseGenderAnalyzer {
   /**
    * Analyze physical or character descriptions for gender clues
    * @param {string} name - Character name
@@ -17,7 +17,7 @@ class AppearanceAnalyzer {
 
     // Get text segments containing character name
     const nameContext = new RegExp(
-      `\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,100}`,
+      `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
       "gi"
     );
     const contextMatches = Array.from(text.matchAll(nameContext));
@@ -33,11 +33,13 @@ class AppearanceAnalyzer {
     // Check for male descriptors
     for (const word of maleWords) {
       const regex = new RegExp(
-        `\\b${this.#escapeRegExp(name)}[^.!?]*\\b${this.#escapeRegExp(
-          word
-        )}\\b|\\b${this.#escapeRegExp(word)}\\b[^.!?]*\\b${this.#escapeRegExp(
+        `\\b${SharedUtils.escapeRegExp(
           name
-        )}\\b`,
+        )}[^.!?]*\\b${SharedUtils.escapeRegExp(
+          word
+        )}\\b|\\b${SharedUtils.escapeRegExp(
+          word
+        )}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -50,11 +52,13 @@ class AppearanceAnalyzer {
     // Check for female descriptors
     for (const word of femaleWords) {
       const regex = new RegExp(
-        `\\b${this.#escapeRegExp(name)}[^.!?]*\\b${this.#escapeRegExp(
-          word
-        )}\\b|\\b${this.#escapeRegExp(word)}\\b[^.!?]*\\b${this.#escapeRegExp(
+        `\\b${SharedUtils.escapeRegExp(
           name
-        )}\\b`,
+        )}[^.!?]*\\b${SharedUtils.escapeRegExp(
+          word
+        )}\\b|\\b${SharedUtils.escapeRegExp(
+          word
+        )}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -74,13 +78,9 @@ class AppearanceAnalyzer {
    * @return {object} - Gender scores with evidence
    */
   analyzeAppearanceDescriptions(name, text) {
-    let maleScore = 0;
-    let femaleScore = 0;
-    let evidence = null;
-
-    // Find appearance descriptions
+    // Find appearance descriptions using regex
     const appearanceRegex = new RegExp(
-      `\\b${this.#escapeRegExp(
+      `\\b${SharedUtils.escapeRegExp(
         name
       )}(?:'s)?\\b[^.!?]*(\\bappearance\\b|\\blooked\\b|\\bdressed\\b|\\bwore\\b|\\bfigure\\b|\\bface\\b|\\bhair\\b|\\bfeatures\\b)[^.!?]*[.!?]`,
       "gi"
@@ -93,7 +93,7 @@ class AppearanceAnalyzer {
       appearanceText += match[0] + " ";
     });
 
-    // Define appearance indicators
+    // Get appearance indicators
     const maleAppearance = this.#getMaleAppearanceIndicators();
     const femaleAppearance = this.#getFemaleAppearanceIndicators();
 
@@ -102,35 +102,54 @@ class AppearanceAnalyzer {
       // Check for male appearance descriptors
       for (const indicator of maleAppearance) {
         if (appearanceText.toLowerCase().includes(indicator)) {
-          maleScore += 2;
-          evidence = indicator;
-          break;
+          return this._createResult(2, 0, indicator);
         }
       }
 
       // Check for female appearance descriptors
-      if (!evidence) {
-        for (const indicator of femaleAppearance) {
-          if (appearanceText.toLowerCase().includes(indicator)) {
-            femaleScore += 2;
-            evidence = indicator;
-            break;
-          }
+      for (const indicator of femaleAppearance) {
+        if (appearanceText.toLowerCase().includes(indicator)) {
+          return this._createResult(0, 2, indicator);
         }
       }
     }
 
-    // If no specific appearance description is found, search more broadly for proximity descriptions
-    if (!evidence) {
-      const proximityResult = this.#analyzeProximityDescriptions(name, text, maleAppearance, femaleAppearance);
-      if (proximityResult.evidence) {
-        maleScore += proximityResult.maleScore;
-        femaleScore += proximityResult.femaleScore;
-        evidence = proximityResult.evidence;
+    // If no specific appearance description found, search more broadly for proximity descriptions
+    const proximityText = this._getProximityText(name, text, 30);
+    const combinedProximityText = proximityText.join(" ");
+
+    // Cultural specific appearance patterns
+    const culturalAppearance = this.#getCulturalAppearancePatterns();
+
+    // First check general patterns
+    for (const indicator of maleAppearance) {
+      if (combinedProximityText.toLowerCase().includes(indicator)) {
+        return this._createResult(1, 0, indicator);
       }
     }
 
-    return { maleScore, femaleScore, evidence };
+    for (const indicator of femaleAppearance) {
+      if (combinedProximityText.toLowerCase().includes(indicator)) {
+        return this._createResult(0, 1, indicator);
+      }
+    }
+
+    // Then check cultural specific patterns
+    for (const culture in culturalAppearance) {
+      for (const indicator of culturalAppearance[culture].male) {
+        if (combinedProximityText.toLowerCase().includes(indicator)) {
+          return this._createResult(1, 0, `${culture} style: ${indicator}`);
+        }
+      }
+
+      for (const indicator of culturalAppearance[culture].female) {
+        if (combinedProximityText.toLowerCase().includes(indicator)) {
+          return this._createResult(0, 1, `${culture} style: ${indicator}`);
+        }
+      }
+    }
+
+    return this._createResult(0, 0, null);
   }
 
   /**
@@ -146,9 +165,9 @@ class AppearanceAnalyzer {
     let maleScore = 0;
     let femaleScore = 0;
     let evidence = null;
-    
+
     const proximityRegex = new RegExp(
-      `[^.!?]{0,30}\\b${this.#escapeRegExp(name)}\\b[^.!?]{0,100}`,
+      `[^.!?]{0,30}\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
       "gi"
     );
     const proximityMatches = Array.from(text.matchAll(proximityRegex));
@@ -497,16 +516,6 @@ class AppearanceAnalyzer {
         ]
       }
     };
-  }
-
-  /**
-   * Helper function to escape regex special characters
-   * @param {string} string - String to escape
-   * @return {string} - Escaped string
-   * @private
-   */
-  #escapeRegExp(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

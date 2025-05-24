@@ -32,7 +32,7 @@ class NovelCharacterExtractor {
   
           if (!name || name.length > 30) continue;
   
-          const sanitizedName = this.#sanitizeText(name);
+          const sanitizedName = SharedUtils.sanitizeText(name);
           const extractedName = this.extractCharacterName(sanitizedName);
   
           if (extractedName) {
@@ -342,20 +342,6 @@ class NovelCharacterExtractor {
         "Accordingly", "Meanwhile", "Afterwards", "Beforehand", "In", "As", "But",
         "Or", "And", "So", "Yet", "For", "Nor", "If", "From", "At", "Old", "Well", "Sister"
       ];
-    }
-  
-    /**
-     * Sanitize text to prevent injection issues
-     * @param {string} text - Text to sanitize
-     * @return {string} - Sanitized text
-     * @private
-     */
-    #sanitizeText(text) {
-      if (!text || typeof text !== "string") return "";
-  
-      const container = document.createElement("div");
-      container.textContent = text;
-      return container.innerHTML;
     }
   }
   
