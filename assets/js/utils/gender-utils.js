@@ -9,7 +9,7 @@ class GenderUtils {
    * Initializes all specialized analyzers
    */
   constructor() {
-    console.log(
+    console.debug(
       "Novel Dialogue Enhancer: Gender Utils initialized (LLM-optimized version)"
     );
 
@@ -80,33 +80,25 @@ class GenderUtils {
     let femaleScore = 0;
     const evidence = [];
 
-    // Identify likely cultural origin of name
     const culturalOrigin = this.culturalAnalyzer.detectNameCulturalOrigin(
       name,
       text
     );
     console.log(`Cultural origin for ${name}: ${culturalOrigin}`);
 
-    // Track cultural origin statistics
     this.culturalOrigins[culturalOrigin]++;
 
-    // Check for definitive markers first
     const titleResult = this.nameAnalyzer.checkTitlesAndHonorifics(
       name,
       culturalOrigin
     );
     if (titleResult.gender !== "unknown") {
       if (titleResult.gender === "male") {
-        this.maleEvidenceCount++;
-        return this.#createGenderResult("male", 0.95, [
-          `title: ${titleResult.evidence} (${culturalOrigin})`
-        ]);
-      }
-      if (titleResult.gender === "female") {
-        this.femaleEvidenceCount++;
-        return this.#createGenderResult("female", 0.95, [
-          `title: ${titleResult.evidence} (${culturalOrigin})`
-        ]);
+        maleScore += 5; // High confidence for titles
+        evidence.push(`title: ${titleResult.evidence} (${culturalOrigin})`);
+      } else if (titleResult.gender === "female") {
+        femaleScore += 5; // High confidence for titles
+        evidence.push(`title: ${titleResult.evidence} (${culturalOrigin})`);
       }
     }
 
@@ -116,20 +108,13 @@ class GenderUtils {
       culturalOrigin
     );
     if (
-      relationshipPattern.maleScore >= 3 ||
-      relationshipPattern.femaleScore >= 3
+      relationshipPattern.maleScore > 0 ||
+      relationshipPattern.femaleScore > 0
     ) {
-      if (relationshipPattern.maleScore > relationshipPattern.femaleScore) {
-        this.maleEvidenceCount++;
-        return this.#createGenderResult("male", 0.9, [
-          `relationship: ${relationshipPattern.evidence}`
-        ]);
-      }
-      if (relationshipPattern.femaleScore > relationshipPattern.maleScore) {
-        this.femaleEvidenceCount++;
-        return this.#createGenderResult("female", 0.9, [
-          `relationship: ${relationshipPattern.evidence}`
-        ]);
+      maleScore += relationshipPattern.maleScore;
+      femaleScore += relationshipPattern.femaleScore;
+      if (relationshipPattern.evidence) {
+        evidence.push(`relationship: ${relationshipPattern.evidence}`);
       }
     }
 
@@ -174,7 +159,6 @@ class GenderUtils {
     const inconsistencyResult =
       this.pronounAnalyzer.detectPronounInconsistencies(name, text);
     if (inconsistencyResult.correction) {
-      // If we found an inconsistency correction, trust it highly
       if (inconsistencyResult.correctedGender === "male") {
         maleScore += 4;
         evidence.push(
@@ -211,10 +195,7 @@ class GenderUtils {
       maleScore += appearanceResult.maleScore;
       femaleScore += appearanceResult.femaleScore;
 
-      if (appearanceResult.maleScore > 0 && appearanceResult.evidence) {
-        evidence.push(`appearance: ${appearanceResult.evidence}`);
-      }
-      if (appearanceResult.femaleScore > 0 && appearanceResult.evidence) {
+      if (appearanceResult.evidence) {
         evidence.push(`appearance: ${appearanceResult.evidence}`);
       }
     }
@@ -282,9 +263,7 @@ class GenderUtils {
       this.unknownGenderCount++;
     }
 
-    // Add culturalOrigin to the result
-    const result = this.#createGenderResult(gender, confidence, evidence);
-    return result;
+    return this.#createGenderResult(gender, confidence, evidence);
   }
 
   /**

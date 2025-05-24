@@ -16,7 +16,7 @@ class EnhancerIntegration {
     this.textProcessor = new TextProcessor();
     this.promptGenerator = new PromptGenerator();
 
-    console.log(
+    console.debug(
       "Novel Dialogue Enhancer: Integration module initialized with LLM support"
     );
   }

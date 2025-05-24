@@ -11,7 +11,7 @@ class OllamaClient {
     this.lastAvailabilityCheckTime = null;
     this.cachedAvailabilityStatus = null;
 
-    console.log(
+    console.debug(
       "Novel Dialogue Enhancer: Ollama Client initialized"
     );
   }
@@ -161,7 +161,7 @@ class OllamaClient {
 
     // Set checking flag and clear it in case of errors
     this.isCheckingAvailability = true;
-    console.log("Checking Ollama availability...");
+    console.debug("Checking Ollama availability...");
 
     try {
       // Create a timeout promise

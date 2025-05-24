@@ -195,7 +195,7 @@ function checkSitePermissions() {
  * @return {Promise<boolean>}
  */
 async function checkOllamaStatus() {
-  console.log("Checking Ollama status...");
+  console.debug("Checking Ollama status...");
   let retries = 0;
   let status = null;
 

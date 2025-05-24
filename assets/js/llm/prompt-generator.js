@@ -7,7 +7,7 @@ class PromptGenerator {
    * Creates a new PromptGenerator instance
    */
   constructor() {
-    console.log("Novel Dialogue Enhancer: Prompt Generator initialized");
+    console.debug("Novel Dialogue Enhancer: Prompt Generator initialized");
   }
 
   /**

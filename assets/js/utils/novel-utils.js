@@ -18,7 +18,7 @@ class NovelUtils {
     this.chapterInfo = null;
     this.enhancedChapters = [];
     this.isCurrentChapterEnhanced = false;
-    console.log("Novel Dialogue Enhancer: Novel Utils initialized");
+    console.debug("Novel Dialogue Enhancer: Novel Utils initialized");
   }
 
   /**

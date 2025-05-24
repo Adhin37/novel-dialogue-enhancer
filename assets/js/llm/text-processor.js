@@ -10,7 +10,7 @@ class TextProcessor {
    */
   constructor(options = {}) {
     this.maxChunkSize = options.maxChunkSize || 4000;
-    console.log(
+    console.debug(
       `Novel Dialogue Enhancer: Text Processor initialized (max chunk size: ${this.maxChunkSize})`
     );
   }
