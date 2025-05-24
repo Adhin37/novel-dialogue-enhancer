@@ -2,13 +2,16 @@
  * Simple novel ID generator utility
  */
 class NovelIdGenerator {
+    constructor() {
+        this.novelId = "";
+    }
   /**
    * Generate a unique novel ID from URL and title
    * @param {string} url - Current page URL
    * @param {string} title - Page title
    * @return {string} - Unique novel identifier
    */
-  static generateNovelId(url, title) {
+  generateNovelId(url, title) {
     if (!url || typeof url !== "string") {
       console.warn("Invalid URL provided for novel ID generation");
       return null;
@@ -27,14 +30,14 @@ class NovelIdGenerator {
       }
 
       // Create clean novel ID
-      const novelId = `${domain}__${novelName}`
+      this.novelId = `${domain}__${novelName}`
         .toLowerCase()
         .replace(/[^\w]/g, "_")
         .replace(/_+/g, "_")
         .replace(/^_|_$/g, "")
         .substring(0, 50);
 
-      return novelId;
+      return this.novelId;
     } catch (error) {
       console.error("Error generating novel ID:", error);
       return null;
@@ -48,7 +51,7 @@ class NovelIdGenerator {
    * @return {string|null} - Extracted novel name
    * @private
    */
-  static #extractNovelName(title, urlObj) {
+  #extractNovelName(title, urlObj) {
     // Try to extract from title first
     if (title && typeof title === "string" && title.trim()) {
       const novelName = this.#cleanTitleForNovelName(title);
@@ -67,7 +70,7 @@ class NovelIdGenerator {
    * @return {string|null} - Cleaned novel name
    * @private
    */
-  static #cleanTitleForNovelName(title) {
+  #cleanTitleForNovelName(title) {
     // Remove common chapter indicators and separators
     let cleaned = title
       .replace(/\s*[-–—|:]\s*(chapter|ch\.?|episode|part)\s*\d+.*$/i, "")
@@ -100,7 +103,7 @@ class NovelIdGenerator {
    * @return {string|null} - Extracted name from URL
    * @private
    */
-  static #extractFromUrlPath(urlObj) {
+  #extractFromUrlPath(urlObj) {
     const pathSegments = urlObj.pathname
       .split("/")
       .filter((segment) => segment.length > 3 && !segment.match(/^\d+$/));
@@ -126,7 +129,7 @@ class NovelIdGenerator {
    * @param {string} storedNovelId - Previously stored novel ID
    * @return {boolean} - Whether this appears to be a different novel
    */
-  static isDifferentNovel(currentNovelId, storedNovelId) {
+  isDifferentNovel(currentNovelId, storedNovelId) {
     if (!currentNovelId || !storedNovelId) {
       return true;
     }
@@ -141,6 +144,10 @@ class NovelIdGenerator {
 
     // If novel names are different, different novels
     return currentNovelId !== storedNovelId;
+  }
+
+  getNovelId() {
+    return this.novelId;
   }
 }
 

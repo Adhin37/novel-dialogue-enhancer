@@ -26,7 +26,13 @@ export default defineConfig([
         NameAnalyzer: "readonly",
         PronounAnalyzer: "readonly",
         RelationshipAnalyzer: "readonly",
-        AppearanceAnalyzer: "readonly"
+        AppearanceAnalyzer: "readonly",
+        NovelStyleAnalyzer: "readonly",
+        NovelPlatformDetector: "readonly",
+        NovelCharacterExtractor: "readonly",
+        NovelChapterDetector: "readonly",
+        NovelStorageManager: "readonly",
+        NovelIdGenerator: "readonly"
       }
     },
     rules: {
