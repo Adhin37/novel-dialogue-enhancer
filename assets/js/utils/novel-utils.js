@@ -85,7 +85,7 @@ class NovelUtils {
    */
   detectPlatform(url) {
     if (!url) return "unknown";
-    
+
     try {
       const hostname = new URL(url).hostname.toLowerCase();
       return hostname.replace(/^www\./, "").split(".")[0];
@@ -380,7 +380,10 @@ class NovelUtils {
    */
   syncCharacterMap(characterMap) {
     const chapterNumber = this.chapterInfo?.chapterNumber;
-    if (SharedUtils.validateObject(characterMap) && Object.keys(characterMap).length > 0) {
+    if (
+      SharedUtils.validateObject(characterMap) &&
+      Object.keys(characterMap).length > 0
+    ) {
       this.storageManager.syncCharacterMap(characterMap, chapterNumber);
     }
   }
@@ -396,13 +399,13 @@ class NovelUtils {
 
   /**
    * Optimized character map conversion
-   * @param {object} rawCharacterMap - Raw character data
+   * @param {object} characterMap - Raw character data
    * @return {object} - Optimized character map
    */
-  #optimizeCharacterMap(rawCharacterMap) {
+  #optimizeCharacterMap(characterMap) {
     const optimized = {};
-    
-    Object.entries(rawCharacterMap).forEach(([name, data]) => {
+
+    Object.entries(SharedUtils.deepClone(characterMap) || {}).forEach(([name, data]) => {
       if (SharedUtils.validateCharacterName(name)) {
         optimized[name] = SharedUtils.createCharacterData(
           name,
@@ -413,7 +416,7 @@ class NovelUtils {
         );
       }
     });
-    
+
     return optimized;
   }
 

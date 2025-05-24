@@ -69,64 +69,12 @@ function getNextCharacterId(charMap) {
   return Math.max(...existingIds) + 1;
 }
 
-function migrateToNewFormat(oldMap) {
-  if (!oldMap || typeof oldMap !== "object")
-    return { chars: {}, chaps: [], lastAccess: Date.now() };
-
-  if (oldMap.chars) return oldMap;
-
-  const newMap = {
-    chars: {},
-    chaps: [],
-    lastAccess: Date.now()
-  };
-
-  if (oldMap.characters && typeof oldMap.characters === "object") {
-    Object.entries(oldMap.characters).forEach(([name, data], index) => {
-      newMap.chars[index] = {
-        name: name,
-        gender: SharedUtils.compressGender(data.gender),
-        confidence: parseFloat(data.confidence) || 0,
-        appearances: parseInt(data.appearances) || 1
-      };
-
-      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-        newMap.chars[index].evidences = data.evidence.slice(0, 5);
-      }
-    });
-
-    if (Array.isArray(oldMap.enhancedChapters)) {
-      newMap.chaps = oldMap.enhancedChapters
-        .map((chapter) => chapter.chapterNumber)
-        .filter((num) => typeof num === "number");
-    }
-
-    if (oldMap.style) {
-      newMap.style = oldMap.style;
-    }
-  } else {
-    Object.entries(oldMap).forEach(([name, data], index) => {
-      newMap.chars[index] = {
-        name: name,
-        gender: SharedUtils.compressGender(data.gender),
-        confidence: parseFloat(data.confidence) || 0,
-        appearances: parseInt(data.appearances) || 1
-      };
-
-      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-        newMap.chars[index].evidences = data.evidence.slice(0, 5);
-      }
-    });
-  }
-
-  return newMap;
-}
-
 function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
   if (!maps || typeof maps !== "object") return {};
 
   const now = Date.now();
-  const purgedMaps = { ...maps };
+  // Use deepClone to avoid mutating the input parameter
+  const purgedMaps = SharedUtils.deepClone(maps);
   let purgedCount = 0;
 
   Object.entries(purgedMaps).forEach(([novelId, data]) => {
@@ -147,18 +95,13 @@ function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
   return purgedMaps;
 }
 
+/**
+ * Stores novel character maps with purging old entries
+ * @param {object} novelCharacterMaps - Character maps to store
+ */
 function storeNovelCharacterMaps(novelCharacterMaps) {
   try {
-    // USE RETURNED VALUE from purgeOldNovels
     const purgedMaps = purgeOldNovels(novelCharacterMaps);
-
-    Object.entries(purgedMaps).forEach(([novelId, data]) => {
-      if (!novelId || !data) {
-        console.warn(`Invalid novel entry: ${novelId}`);
-        return;
-      }
-      purgedMaps[novelId] = migrateToNewFormat(data);
-    });
 
     const serialized = JSON.stringify(purgedMaps);
     const sizeInBytes = new Blob([serialized]).size;
@@ -175,14 +118,12 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
 
       const novelEntries = Object.entries(purgedMaps);
 
-      // Validate novelEntries before sorting
       if (!Array.isArray(novelEntries) || novelEntries.length === 0) {
         console.warn("No valid novel entries found for pruning");
         return;
       }
 
       novelEntries.sort((a, b) => {
-        // Use entry data for validation
         if (!a[1] || !b[1]) {
           console.warn("Invalid entry data during sorting:", a[0], b[0]);
           return 0;
@@ -227,6 +168,11 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
   }
 }
 
+/**
+ * Handles Ollama requests for text generation
+ * @param {object} request - Request object containing data
+ * @param {function} sendResponse - Function to send response
+ */
 function handleOllamaRequest(request, sendResponse) {
   if (!request || !request.data) {
     sendResponse({ error: "Invalid request data" });
@@ -294,6 +240,12 @@ function handleOllamaRequest(request, sendResponse) {
   );
 }
 
+/**
+ * Prepares request data for Ollama
+ * @param {object} requestData - Request data
+ * @param {object} settings - Settings object
+ * @return {object} - Prepared request data
+ */
 function prepareRequestData(requestData, settings) {
   return {
     ...requestData,
@@ -348,6 +300,11 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
     });
 }
 
+/**
+ * Processes Ollama response
+ * @param {string} rawText - Raw response text
+ * @param {function} sendResponse - Function to send response
+ */
 function processOllamaResponse(rawText, sendResponse) {
   console.log(
     "Raw Ollama response (first 100 chars):",
@@ -397,6 +354,13 @@ function processOllamaResponse(rawText, sendResponse) {
   }
 }
 
+/**
+ * Handles Ollama request errors
+ * @param {Error} error - Error object
+ * @param {AbortController} controller - Abort controller
+ * @param {number} timeout - Request timeout
+ * @param {function} sendResponse - Function to send response
+ */
 function handleOllamaError(error, controller, timeout, sendResponse) {
   if (error.name === "AbortError") {
     const isUserTerminated = controller.signal.reason === "USER_TERMINATED";
@@ -416,6 +380,10 @@ function handleOllamaError(error, controller, timeout, sendResponse) {
   }
 }
 
+/**
+ * Checks Ollama availability
+ * @param {function} sendResponse - Function to send response
+ */
 function checkOllamaAvailability(sendResponse) {
   console.log(
     `Checking Ollama availability at ${DEFAULT_OLLAMA_URL}/api/version`
@@ -545,6 +513,11 @@ function checkOllamaAvailability(sendResponse) {
     .finally(() => clearTimeout(timeoutId));
 }
 
+/**
+ * Checks if a site is whitelisted
+ * @param {string} url - URL to check
+ * @return {Promise<boolean>} - Whether the site is whitelisted
+ */
 function isSiteWhitelisted(url) {
   try {
     if (!url || typeof url !== "string" || !url.startsWith("http")) {
@@ -602,6 +575,11 @@ function isSiteWhitelisted(url) {
   }
 }
 
+/**
+ * Checks site permission
+ * @param {string} url - URL to check
+ * @return {Promise<boolean>} - Whether the site is whitelisted
+ */
 async function checkSitePermission(url) {
   if (!url || typeof url !== "string") {
     return false;
@@ -629,6 +607,11 @@ async function checkSitePermission(url) {
   }
 }
 
+/**
+ * Requests permission for a domain
+ * @param {string} domain - Domain to request permission for
+ * @return {Promise<boolean>} - Whether permission was granted
+ */
 async function requestPermission(domain) {
   const origin = `*://*.${domain}/*`;
 
@@ -697,6 +680,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+/**
+ * Sends whitelist status to a tab
+ * @param {number} tabId - Tab ID
+ * @param {boolean} isWhitelisted - Whether the site is whitelisted
+ */
 function sendWhitelistStatus(tabId, isWhitelisted) {
   chrome.tabs
     .sendMessage(tabId, {
@@ -714,78 +702,7 @@ chrome.runtime.onInstalled.addListener(() => {
   });
   chrome.storage.local.get("novelCharacterMaps", (data) => {
     if (data.novelCharacterMaps) {
-      const convertedMaps = {};
-
-      Object.entries(data.novelCharacterMaps).forEach(
-        ([novelId, novelData]) => {
-          if (!novelData.chars && !novelData.characters) {
-            convertedMaps[novelId] = {
-              chars: {},
-              chaps: [],
-              lastAccess: Date.now()
-            };
-
-            Object.entries(novelData).forEach(([name, data], index) => {
-              if (name && typeof name === "string") {
-                convertedMaps[novelId].chars[index] = {
-                  name: name,
-                  gender: SharedUtils.compressGender(data.gender),
-                  confidence: parseFloat(data.confidence) || 0,
-                  appearances: parseInt(data.appearances) || 1
-                };
-
-                if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-                  convertedMaps[novelId].chars[index].evidences =
-                    data.evidence.slice(0, 5);
-                }
-              }
-            });
-          } else if (novelData.characters && !novelData.chars) {
-            convertedMaps[novelId] = {
-              chars: {},
-              chaps: [],
-              lastAccess: Date.now()
-            };
-
-            Object.entries(novelData.characters).forEach(
-              ([name, data], index) => {
-                convertedMaps[novelId].chars[index] = {
-                  name: name,
-                  gender: SharedUtils.compressGender(data.gender),
-                  confidence: parseFloat(data.confidence) || 0,
-                  appearances: parseInt(data.appearances) || 1
-                };
-
-                if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-                  convertedMaps[novelId].chars[index].evidences =
-                    data.evidence.slice(0, 5);
-                }
-              }
-            );
-
-            if (Array.isArray(novelData.enhancedChapters)) {
-              convertedMaps[novelId].chaps = novelData.enhancedChapters
-                .map((chapter) => chapter.chapterNumber)
-                .filter((num) => typeof num === "number");
-            }
-
-            if (novelData.style) {
-              convertedMaps[novelId].style = novelData.style;
-            }
-          } else if (novelData.chars) {
-            convertedMaps[novelId] = novelData;
-
-            if (!convertedMaps[novelId].lastAccess) {
-              convertedMaps[novelId].lastAccess = Date.now();
-            }
-          }
-        }
-      );
-
-      novelCharacterMaps = convertedMaps;
-
-      chrome.storage.local.set({ novelCharacterMaps: convertedMaps });
-      console.log("Character data converted to optimized format");
+      novelCharacterMaps = data.novelCharacterMaps;
     }
   });
 });
@@ -1202,21 +1119,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
-    // Synchronous operation - return false immediately
     const novelData = novelCharacterMaps[novelId] || {};
+    novelData.lastAccess = Date.now();
+    novelCharacterMaps[novelId] = novelData;
 
-    const migratedData = migrateToNewFormat(novelData);
-
-    migratedData.lastAccess = Date.now();
-    novelCharacterMaps[novelId] = migratedData;
-
-    if (migratedData.style) {
-      sendResponse({ status: "ok", style: migratedData.style });
+    if (novelData.style) {
+      sendResponse({ status: "ok", style: novelData.style });
     } else {
       sendResponse({ status: "ok", style: null });
     }
 
-    return false; // Synchronous operation
+    return false;
   } else if (request.action === "updateNovelStyle") {
     const novelId = request.novelId;
     const style = request.style;
@@ -1229,7 +1142,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
-    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -1238,16 +1150,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         lastAccess: Date.now()
       };
     } else {
-      const migratedData = migrateToNewFormat(novelCharacterMaps[novelId]);
-      migratedData.style = style;
-      migratedData.lastAccess = Date.now();
-      novelCharacterMaps[novelId] = migratedData;
+      novelCharacterMaps[novelId].style = style;
+      novelCharacterMaps[novelId].lastAccess = Date.now();
     }
 
     storeNovelCharacterMaps(novelCharacterMaps);
 
     sendResponse({ status: "ok" });
-    return false; // Synchronous operation
+    return false;
   }
 
   return false;

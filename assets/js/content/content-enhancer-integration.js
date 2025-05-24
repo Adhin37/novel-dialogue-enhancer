@@ -133,7 +133,7 @@ class ContentEnhancerIntegration {
    * @return {Array} - Array of character objects
    */
   #convertCharacterMapToArray(characterMap) {
-    return Object.entries(characterMap).map(([name, data]) => ({
+    return Object.entries(SharedUtils.deepClone(characterMap) || {}).map(([name, data]) => ({
       name,
       gender: data.gender,
       appearances: data.appearances

@@ -29,6 +29,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const refreshStatsBtn = document.getElementById("refresh-stats");
   const resetStatsBtn = document.getElementById("reset-stats");
 
+  // Initialize StorageManager for consistent data handling
+  const storage = new StorageManager();
+
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
   });
@@ -96,7 +99,6 @@ document.addEventListener("DOMContentLoaded", () => {
         url: "https://" + domain
       },
       (response) => {
-        // Handle potential runtime errors
         if (chrome.runtime.lastError) {
           console.error("Runtime error:", chrome.runtime.lastError);
           window.feedbackManager.show(
@@ -109,7 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (response && response.success) {
-          // Hide modal
           siteModal.style.display = "none";
           siteUrlInput.value = "";
 
@@ -138,7 +139,6 @@ document.addEventListener("DOMContentLoaded", () => {
         hostname: site
       },
       (response) => {
-        // Handle potential runtime errors
         if (chrome.runtime.lastError) {
           console.error("Runtime error:", chrome.runtime.lastError);
           window.feedbackManager.show(
@@ -172,7 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ollamaStatus.className = "status-message pending";
     ollamaStatus.style.display = "block";
 
-    // Add timeout for the request
     const timeoutId = setTimeout(() => {
       ollamaStatus.textContent = "Connection test timed out";
       ollamaStatus.className = "status-message error";
@@ -223,7 +222,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Update the event listener in the init function
   testOllamaButton.addEventListener("click", testOllamaConnection);
 
   /**
@@ -243,10 +241,15 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  themeSwitch.addEventListener("change", () => {
-    chrome.storage.sync.set({ darkMode: themeSwitch.checked });
-    darkModeManager.setTheme(themeSwitch.checked);
-    updateAllSliderBackgrounds();
+  themeSwitch.addEventListener("change", async () => {
+    try {
+      await storage.set("darkMode", themeSwitch.checked);
+      darkModeManager.setTheme(themeSwitch.checked);
+      updateAllSliderBackgrounds();
+      console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+    } catch (error) {
+      console.error("Error saving dark mode setting:", error);
+    }
   });
 
   /**
@@ -259,13 +262,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window
     .matchMedia("(prefers-color-scheme: dark)")
-    .addEventListener("change", (e) => {
-      chrome.storage.sync.get("darkMode", (data) => {
-        if (data.darkMode === undefined) {
+    .addEventListener("change", async (e) => {
+      try {
+        const darkModeData = await storage.get("darkMode");
+        if (darkModeData === undefined || darkModeData === null) {
           themeSwitch.checked = e.matches;
           updateAllSliderBackgrounds();
         }
-      });
+      } catch (error) {
+        console.error("Error checking dark mode setting:", error);
+      }
     });
 
   document.addEventListener("themeChanged", () => {
@@ -306,13 +312,16 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Loads the whitelist data from storage and renders it
    */
-  function loadWhitelist() {
-    chrome.storage.sync.get("whitelistedSites", (data) => {
-      const whitelistedSites = data.whitelistedSites || [];
+  async function loadWhitelist() {
+    try {
+      const whitelistedSites = await storage.get("whitelistedSites", []);
       renderWhitelistedSites(whitelistedSites);
-
       clearAllBtn.disabled = whitelistedSites.length === 0;
-    });
+    } catch (error) {
+      console.error("Error loading whitelist:", error);
+      renderWhitelistedSites([]);
+      clearAllBtn.disabled = true;
+    }
   }
 
   /**
@@ -321,7 +330,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderWhitelistedSites(sites) {
     whitelistItemsContainer.innerHTML = "";
 
-    if (sites.length === 0) {
+    if (!Array.isArray(sites) || sites.length === 0) {
       whitelistItemsContainer.innerHTML =
         '<div class="empty-list">No sites in whitelist</div>';
       return;
@@ -333,7 +342,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const siteNameElement = document.createElement("span");
       siteNameElement.textContent = site;
-      siteNameElement.title = site; // Add tooltip for long domain names
+      siteNameElement.title = site;
 
       const removeButton = document.createElement("button");
       removeButton.className = "remove-btn";
@@ -400,19 +409,21 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Reset settings to defaults
    */
-  function resetSettings() {
+  async function resetSettings() {
     if (
       confirm("Are you sure you want to reset all settings to default values?")
     ) {
       const defaultSettings = {
-        modelName: "qwen3:8b",
-        maxChunkSize: 8000,
-        timeout: 120,
-        temperature: 0.4,
-        topP: 0.9
+        modelName: Constants.DEFAULTS.MODEL_NAME,
+        maxChunkSize: Constants.DEFAULTS.MAX_CHUNK_SIZE,
+        timeout: Constants.DEFAULTS.TIMEOUT,
+        temperature: Constants.DEFAULTS.TEMPERATURE,
+        topP: Constants.DEFAULTS.TOP_P
       };
 
-      chrome.storage.sync.set(defaultSettings, () => {
+      try {
+        await storage.setMultiple(defaultSettings);
+
         modelNameInput.value = defaultSettings.modelName;
         maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
         maxChunkSizeValue.textContent = defaultSettings.maxChunkSize;
@@ -426,7 +437,11 @@ document.addEventListener("DOMContentLoaded", () => {
         updateAllSliderBackgrounds();
 
         window.feedbackManager.show("Settings Reset to Defaults!", "success");
-      });
+        console.log("Settings reset to defaults successfully");
+      } catch (error) {
+        console.error("Error resetting settings:", error);
+        window.feedbackManager.show("Error resetting settings", "error");
+      }
     }
   }
 
@@ -456,7 +471,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Sort novels by last access time (most recent first)
     novelIds.sort((a, b) => {
       const timeA = novelMaps[a].lastAccess || 0;
       const timeB = novelMaps[b].lastAccess || 0;
@@ -466,7 +480,6 @@ document.addEventListener("DOMContentLoaded", () => {
     novelIds.forEach((novelId) => {
       const novelData = novelMaps[novelId];
 
-      // Skip if no characters or invalid data
       if (!novelData.chars || Object.keys(novelData.chars).length === 0) {
         return;
       }
@@ -499,7 +512,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       novelElement.appendChild(novelItem);
 
-      // Create details container (hidden by default)
       const detailsContainer = document.createElement("div");
       detailsContainer.className = "novel-details";
       detailsContainer.style.display = "none";
@@ -507,10 +519,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       novelsContainer.appendChild(novelElement);
 
-      // Add click event to toggle details
       novelItem.addEventListener("click", () => {
         if (detailsContainer.style.display === "none") {
-          // Close any other open details first
           document.querySelectorAll(".novel-details").forEach((el) => {
             if (el !== detailsContainer) {
               el.style.display = "none";
@@ -536,7 +546,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const characters = Object.values(novelData.chars);
 
-    // Sort characters by appearance count (highest first)
     characters.sort((a, b) => (b.appearances || 0) - (a.appearances || 0));
 
     let html = '<div class="character-list">';
@@ -658,14 +667,12 @@ document.addEventListener("DOMContentLoaded", () => {
    * @param {Object} stats - The statistics object
    */
   function renderGlobalStats(stats) {
-    // Update stat values with animation
     updateStatValue("stat-paragraphs", stats.totalParagraphsEnhanced || 0);
     updateStatValue("stat-chapters", stats.totalChaptersEnhanced || 0);
     updateStatValue("stat-novels", stats.uniqueNovelsProcessed || 0);
     updateStatValue("stat-characters", stats.totalCharactersDetected || 0);
     updateStatValue("stat-sessions", stats.enhancementSessions || 0);
 
-    // Format processing time
     const totalMinutes = Math.round(
       (stats.totalProcessingTime || 0) / (1000 * 60)
     );
@@ -675,7 +682,6 @@ document.addEventListener("DOMContentLoaded", () => {
         : `${totalMinutes}m`;
     updateStatValue("stat-time", timeDisplay);
 
-    // Update timeline
     const firstDate = stats.firstEnhancementDate
       ? new Date(stats.firstEnhancementDate).toLocaleDateString()
       : "Never";
@@ -734,7 +740,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Initialize all functionality
    */
-  function init() {
+  async function init() {
     initTabs();
     loadNovelCharacterMaps();
     setupNovelSearch();
@@ -743,19 +749,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     window
       .matchMedia("(prefers-color-scheme: dark)")
-      .addEventListener("change", (e) => {
-        chrome.storage.sync.get("darkMode", (data) => {
-          if (data.darkMode === undefined) {
+      .addEventListener("change", async (e) => {
+        try {
+          const darkModeData = await storage.get("darkMode");
+          if (darkModeData === undefined || darkModeData === null) {
             themeSwitch.checked = e.matches;
             updateAllSliderBackgrounds();
           }
-        });
+        } catch (error) {
+          console.error("Error checking dark mode setting:", error);
+        }
       });
 
     loadWhitelist();
 
     modelSuggestions.forEach((suggestion) => {
-      suggestion.addEventListener("click", () => {
+      suggestion.addEventListener("click", function () {
         modelNameInput.value = this.dataset.model;
         this.style.transform = "scale(0.95)";
         setTimeout(() => {
@@ -769,18 +778,22 @@ document.addEventListener("DOMContentLoaded", () => {
     setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
     setupSlider(timeoutSlider, timeoutValue);
 
-    clearAllBtn.addEventListener("click", () => {
+    clearAllBtn.addEventListener("click", async () => {
       if (
         confirm("Are you sure you want to remove all sites from the whitelist?")
       ) {
-        chrome.storage.sync.set({ whitelistedSites: [] }, () => {
+        try {
+          await storage.set("whitelistedSites", []);
           loadWhitelist();
-
           window.feedbackManager.show(
             "All sites removed from whitelist",
             "success"
           );
-        });
+          console.log("Whitelist cleared successfully");
+        } catch (error) {
+          console.error("Error clearing whitelist:", error);
+          window.feedbackManager.show("Error clearing whitelist", "error");
+        }
       }
     });
 
@@ -792,50 +805,69 @@ document.addEventListener("DOMContentLoaded", () => {
 
     resetButton.addEventListener("click", resetSettings);
 
-    chrome.storage.sync.get(
-      {
-        modelName: "qwen3:8b",
-        maxChunkSize: 8000,
-        timeout: 120,
-        temperature: 0.4,
-        topP: 0.9
-      },
-      (data) => {
-        modelNameInput.value = data.modelName;
-        maxChunkSizeSlider.value = data.maxChunkSize;
-        maxChunkSizeValue.textContent = data.maxChunkSize;
-        timeoutSlider.value = data.timeout;
-        timeoutValue.textContent = data.timeout;
-        temperatureSlider.value = data.temperature;
-        temperatureValue.textContent = data.temperature;
-        topPSlider.value = data.topP;
-        topPValue.textContent = data.topP;
+    try {
+      // Load initial settings using StorageManager
+      const initialSettings = await storage.getMultiple(
+        ["modelName", "maxChunkSize", "timeout", "temperature", "topP"],
+        {
+          modelName: Constants.DEFAULTS.MODEL_NAME,
+          maxChunkSize: Constants.DEFAULTS.MAX_CHUNK_SIZE,
+          timeout: Constants.DEFAULTS.TIMEOUT,
+          temperature: Constants.DEFAULTS.TEMPERATURE,
+          topP: Constants.DEFAULTS.TOP_P
+        }
+      );
 
-        updateAllSliderBackgrounds();
-      }
-    );
+      modelNameInput.value = initialSettings.modelName;
+      maxChunkSizeSlider.value = initialSettings.maxChunkSize;
+      maxChunkSizeValue.textContent = initialSettings.maxChunkSize;
+      timeoutSlider.value = initialSettings.timeout;
+      timeoutValue.textContent = initialSettings.timeout;
+      temperatureSlider.value = initialSettings.temperature;
+      temperatureValue.textContent = initialSettings.temperature;
+      topPSlider.value = initialSettings.topP;
+      topPValue.textContent = initialSettings.topP;
 
-    saveButton.addEventListener("click", () => {
+      updateAllSliderBackgrounds();
+      console.log("Initial settings loaded successfully:", initialSettings);
+    } catch (error) {
+      console.error("Error loading initial settings:", error);
+      // Use fallback values from Constants if available
+      modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
+      maxChunkSizeSlider.value = Constants.DEFAULTS.MAX_CHUNK_SIZE;
+      maxChunkSizeValue.textContent = Constants.DEFAULTS.MAX_CHUNK_SIZE;
+      timeoutSlider.value = Constants.DEFAULTS.TIMEOUT;
+      timeoutValue.textContent = Constants.DEFAULTS.TIMEOUT;
+      temperatureSlider.value = Constants.DEFAULTS.TEMPERATURE;
+      temperatureValue.textContent = Constants.DEFAULTS.TEMPERATURE;
+      topPSlider.value = Constants.DEFAULTS.TOP_P;
+      topPValue.textContent = Constants.DEFAULTS.TOP_P;
+
+      updateAllSliderBackgrounds();
+    }
+
+    saveButton.addEventListener("click", async () => {
       const maxChunkSize = parseInt(maxChunkSizeSlider.value);
       const timeout = parseInt(timeoutSlider.value);
       const temperature = parseFloat(temperatureSlider.value);
       const topP = parseFloat(topPSlider.value);
 
-      chrome.storage.sync.set(
-        {
-          modelName: modelNameInput.value.trim() || "qwen3:8b",
-          maxChunkSize: maxChunkSize,
-          timeout: timeout,
-          temperature: temperature,
-          topP: topP
-        },
-        () => {
-          window.feedbackManager.show(
-            "Settings Saved Successfully!",
-            "success"
-          );
-        }
-      );
+      const settingsToSave = {
+        modelName: modelNameInput.value.trim() || Constants.DEFAULTS.MODEL_NAME,
+        maxChunkSize: maxChunkSize,
+        timeout: timeout,
+        temperature: temperature,
+        topP: topP
+      };
+
+      try {
+        await storage.setMultiple(settingsToSave);
+        window.feedbackManager.show("Settings Saved Successfully!", "success");
+        console.log("Settings saved successfully:", settingsToSave);
+      } catch (error) {
+        console.error("Error saving settings:", error);
+        window.feedbackManager.show("Error saving settings", "error");
+      }
     });
 
     if (statsTab) {
@@ -852,42 +884,8 @@ document.addEventListener("DOMContentLoaded", () => {
       resetStatsBtn.addEventListener("click", resetGlobalStats);
     }
 
-    testOllamaButton.addEventListener("click", () => {
-      ollamaStatus.textContent = "Testing Ollama connection...";
-      ollamaStatus.className = "status-message pending";
-      ollamaStatus.style.display = "block";
+    testOllamaButton.addEventListener("click", testOllamaConnection);
 
-      try {
-        chrome.runtime.sendMessage(
-          {
-            action: "checkOllamaAvailability"
-          },
-          (response) => {
-            if (chrome.runtime.lastError) {
-              ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
-              ollamaStatus.className = "status-message error";
-              return;
-            }
-
-            if (response.available) {
-              ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
-              if (response.models && response.models.length > 0) {
-                ollamaStatus.textContent += `\nAvailable models: ${response.models.join(
-                  ", "
-                )}`;
-              }
-              ollamaStatus.className = "status-message success";
-            } else {
-              ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
-              ollamaStatus.className = "status-message error";
-            }
-          }
-        );
-      } catch (err) {
-        ollamaStatus.textContent = `Error: ${err.message}`;
-        ollamaStatus.className = "status-message error";
-      }
-    });
     if (document.getElementById("stats-tab").classList.contains("active")) {
       loadGlobalStats();
     }

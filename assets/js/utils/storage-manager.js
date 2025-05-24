@@ -17,7 +17,8 @@ class StorageManager {
    */
   async get(key, defaultValue = null, useCache = true) {
     if (useCache && this._isCacheValid(key)) {
-      return this.cache.get(key);
+      // Return a deep clone to prevent mutations to cached data
+      return SharedUtils.deepClone(this.cache.get(key));
     }
 
     return new Promise((resolve) => {
@@ -37,7 +38,8 @@ class StorageManager {
           this._setCache(key, value);
         }
 
-        resolve(value);
+        // Return a deep clone to prevent mutations
+        resolve(SharedUtils.deepClone(value));
       });
     });
   }
@@ -151,7 +153,7 @@ class StorageManager {
    * @private
    */
   _setCache(key, value) {
-    this.cache.set(key, value);
+    this.cache.set(key, SharedUtils.deepClone(value));
     this.cacheExpiry.set(key, Date.now() + Constants.STORAGE.CACHE_TTL_MS);
   }
 }

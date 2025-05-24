@@ -13,141 +13,110 @@ document.addEventListener("DOMContentLoaded", async () => {
   let whitelistedSites = [];
   let isExtensionPaused = false;
   const storage = new StorageManager();
-  
-  // Load all settings at once
-  const settings = await storage.getMultiple(
-    ['whitelistedSites', 'isExtensionPaused', 'preserveNames', 'fixPronouns'],
-    Constants.DEFAULTS
-  );
 
-  whitelistedSites = settings.whitelistedSites || [];
-  isExtensionPaused = settings.isExtensionPaused;
-  preserveNamesToggle.checked = settings.preserveNames;
-  fixPronounsToggle.checked = settings.fixPronouns;
-
-  // Update settings
-  preserveNamesToggle.addEventListener("change", async function () {
-    await storage.set('preserveNames', this.checked);
-  });
-
-  fixPronounsToggle.addEventListener("change", async function () {
-    await storage.set('fixPronouns', this.checked);
-  });
-
+  // Initialize dark mode manager if available
   if (window.darkModeManager) {
     window.darkModeManager.init();
   }
 
-  // First, load the whitelist data from storage
-  chrome.storage.sync.get(
-    {
-      whitelistedSites: [],
-      isExtensionPaused: false,
-      preserveNames: true,
-      fixPronouns: true
-    },
-    (items) => {
-      // Use items parameter with validation
-      if (!items || typeof items !== "object") {
-        console.warn("Invalid storage items received:", items);
-        // Use defaults
-        whitelistedSites = [];
-        isExtensionPaused = false;
-        preserveNamesToggle.checked = true;
-        fixPronounsToggle.checked = true;
-      } else {
-        // Store loaded data with validation
-        whitelistedSites = Array.isArray(items.whitelistedSites)
-          ? items.whitelistedSites
-          : [];
-        isExtensionPaused = Boolean(items.isExtensionPaused);
-        preserveNamesToggle.checked = Boolean(items.preserveNames);
-        fixPronounsToggle.checked = Boolean(items.fixPronouns);
-
-        console.log("Loaded settings:", {
-          whitelistedSites: whitelistedSites.length,
-          isExtensionPaused,
-          preserveNames: preserveNamesToggle.checked,
-          fixPronouns: fixPronounsToggle.checked
-        });
+  try {
+    // Load all settings at once using StorageManager
+    const settings = await storage.getMultiple(
+      ["whitelistedSites", "isExtensionPaused", "preserveNames", "fixPronouns"],
+      {
+        whitelistedSites: [],
+        isExtensionPaused: false,
+        preserveNames: true,
+        fixPronouns: true
       }
+    );
 
-      processCurrentTab();
-      updatePauseButton();
-    }
-  );
+    whitelistedSites = Array.isArray(settings.whitelistedSites)
+      ? settings.whitelistedSites
+      : [];
+    isExtensionPaused = Boolean(settings.isExtensionPaused);
+    preserveNamesToggle.checked = Boolean(settings.preserveNames);
+    fixPronounsToggle.checked = Boolean(settings.fixPronouns);
 
-  document.getElementById("whitelist-button").addEventListener("click", () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      // Use tabs parameter with validation
-      if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-        console.error("No active tabs found:", tabs);
-        statusMessage.textContent = "No active tab found";
-        return;
-      }
-
-      const activeTab = tabs[0];
-      if (!activeTab || !activeTab.url) {
-        console.error("Invalid active tab:", activeTab);
-        statusMessage.textContent = "Invalid tab URL";
-        return;
-      }
-
-      const url = activeTab.url;
-      console.log(`Processing whitelist request for: ${url}`);
-
-      chrome.runtime.sendMessage(
-        { action: "addSiteToWhitelist", url: url },
-        (response) => {
-          // Use response parameter with validation
-          if (!response || typeof response !== "object") {
-            console.warn("Invalid whitelist response:", response);
-            window.feedbackManager.show(
-              "Invalid response from extension",
-              "warning"
-            );
-            return;
-          }
-
-          if (response.success) {
-            console.log(
-              "Site successfully added to whitelist:",
-              response.message
-            );
-            window.feedbackManager.show(response.message, "success");
-          } else {
-            console.warn("Failed to add site to whitelist:", response.message);
-            window.feedbackManager.show(
-              response.message || "Failed to add site",
-              "warning"
-            );
-          }
-        }
-      );
+    console.log("Loaded settings:", {
+      whitelistedSites: whitelistedSites.length,
+      isExtensionPaused,
+      preserveNames: preserveNamesToggle.checked,
+      fixPronouns: fixPronounsToggle.checked
     });
+
+    processCurrentTab();
+    updatePauseButton();
+  } catch (error) {
+    console.error("Error loading initial settings:", error);
+    // Use defaults on error
+    whitelistedSites = [];
+    isExtensionPaused = false;
+    preserveNamesToggle.checked = true;
+    fixPronounsToggle.checked = true;
+
+    processCurrentTab();
+    updatePauseButton();
+  }
+
+  // Update settings using StorageManager
+  preserveNamesToggle.addEventListener("change", async function () {
+    try {
+      await storage.set("preserveNames", this.checked);
+      console.log(`Preserve names setting updated: ${this.checked}`);
+    } catch (error) {
+      console.error("Error saving preserve names setting:", error);
+    }
   });
 
-  // Handle pause/resume button with combined functionality
-  pauseButton.addEventListener("click", () => {
+  fixPronounsToggle.addEventListener("change", async function () {
+    try {
+      await storage.set("fixPronouns", this.checked);
+      console.log(`Fix pronouns setting updated: ${this.checked}`);
+    } catch (error) {
+      console.error("Error saving fix pronouns setting:", error);
+    }
+  });
+
+  // Handle whitelist button click
+  whitelistButton.addEventListener("click", handleWhitelistButtonClick);
+
+  // Handle pause/resume button
+  pauseButton.addEventListener("click", async () => {
     // Toggle paused CSS class for visual feedback
     document.getElementById("header").classList.toggle("paused");
 
     isExtensionPaused = !isExtensionPaused;
 
-    chrome.storage.sync.set({ isExtensionPaused: isExtensionPaused }, () => {
-      if (chrome.runtime.lastError) {
-        console.error("Failed to save pause state:", chrome.runtime.lastError);
-      } else {
-        console.log(`Extension paused state set to: ${isExtensionPaused}`);
-      }
-    });
+    try {
+      await storage.set("isExtensionPaused", isExtensionPaused);
+      console.log(`Extension paused state set to: ${isExtensionPaused}`);
 
-    if (isExtensionPaused) {
+      if (isExtensionPaused) {
+        await terminateActiveOperations();
+      }
+
+      updatePauseButton();
+      updateStatus();
+    } catch (error) {
+      console.error("Failed to save pause state:", error);
+      statusMessage.textContent = "Error saving pause state";
+      setTimeout(() => updateStatus(), 2000);
+    }
+  });
+
+  enhanceNowBtn.addEventListener("click", handleEnhanceNowClick);
+
+  /**
+   * Terminate active operations when pausing extension
+   */
+  async function terminateActiveOperations() {
+    return new Promise((resolve) => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        // Use tabs parameter with validation
         if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
           console.error("No active tabs found for termination:", tabs);
           statusMessage.textContent = "Extension paused (no active tab)";
+          resolve();
           return;
         }
 
@@ -155,17 +124,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!activeTab || !activeTab.id) {
           console.error("Invalid active tab for termination:", activeTab);
           statusMessage.textContent = "Extension paused (invalid tab)";
+          resolve();
           return;
         }
 
         try {
           chrome.tabs.sendMessage(
             activeTab.id,
-            {
-              action: "terminateOperations"
-            },
+            { action: "terminateOperations" },
             (terminateResponse) => {
-              // Use terminateResponse parameter
               if (chrome.runtime.lastError) {
                 console.error(
                   "Failed to send termination signal:",
@@ -177,6 +144,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   terminateResponse
                 );
               }
+              resolve();
             }
           );
 
@@ -184,15 +152,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (error) {
           console.error("Failed to send termination signal:", error);
           statusMessage.textContent = "Extension paused (termination failed)";
+          resolve();
         }
       });
 
+      // Also terminate background requests
       chrome.runtime.sendMessage(
-        {
-          action: "terminateAllRequests"
-        },
+        { action: "terminateAllRequests" },
         (terminateResponse) => {
-          // Use terminateResponse parameter
           if (chrome.runtime.lastError) {
             console.error(
               "Failed to terminate background requests:",
@@ -203,14 +170,8 @@ document.addEventListener("DOMContentLoaded", async () => {
           }
         }
       );
-    }
-
-    updatePauseButton();
-    updateStatus();
-  });
-
-  whitelistButton.addEventListener("click", handleWhitelistButtonClick);
-  enhanceNowBtn.addEventListener("click", handleEnhanceNowClick);
+    });
+  }
 
   /**
    * Handle whitelist button click with proper error handling
@@ -227,103 +188,124 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
 
     if (isCurrentlyWhitelisted) {
-      chrome.runtime.sendMessage(
-        {
-          action: "removeSiteFromWhitelist",
-          hostname: currentTabHostname
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("Runtime error:", chrome.runtime.lastError);
-            statusMessage.textContent = "Error communicating with extension";
-            setTimeout(() => updateStatus(), 2000);
-            return;
-          }
-
-          // Use response parameter with validation
-          if (!response || typeof response !== "object") {
-            console.warn("Invalid remove whitelist response:", response);
-            statusMessage.textContent = "Invalid response format";
-            setTimeout(() => updateStatus(), 2000);
-            return;
-          }
-
-          if (response.success) {
-            console.log(
-              `Successfully removed ${currentTabHostname} from whitelist`
-            );
-
-            // Update the local whitelist array
-            const originalLength = whitelistedSites.length;
-            whitelistedSites = whitelistedSites.filter(
-              (site) => site !== currentTabHostname
-            );
-
-            if (whitelistedSites.length < originalLength) {
-              console.log(`Whitelist updated: removed ${currentTabHostname}`);
-            }
-
-            updateWhitelistButton(false);
-            updateEnhanceButton(false);
-            statusMessage.textContent = `${currentTabHostname} removed from whitelist`;
-            setTimeout(() => updateStatus(), 2000);
-            sendPageStatusUpdate(false);
-          } else {
-            console.warn("Failed to remove from whitelist:", response.message);
-            statusMessage.textContent =
-              response.message || "Failed to remove site";
-            setTimeout(() => updateStatus(), 2000);
-          }
-        }
-      );
+      removeFromWhitelist();
     } else {
-      chrome.runtime.sendMessage(
-        {
-          action: "addSiteToWhitelist",
-          url: currentTabUrl
-        },
-        (response) => {
-          if (chrome.runtime.lastError) {
-            console.error("Runtime error:", chrome.runtime.lastError);
-            statusMessage.textContent = "Error communicating with extension";
-            setTimeout(() => updateStatus(), 2000);
-            return;
-          }
-
-          // Use response parameter with validation
-          if (!response || typeof response !== "object") {
-            console.warn("Invalid add whitelist response:", response);
-            statusMessage.textContent = "Invalid response format";
-            setTimeout(() => updateStatus(), 2000);
-            return;
-          }
-
-          if (response.success) {
-            console.log(
-              `Successfully added ${currentTabHostname} to whitelist`
-            );
-
-            // Update the local whitelist array
-            if (!whitelistedSites.includes(currentTabHostname)) {
-              whitelistedSites.push(currentTabHostname);
-              console.log(`Whitelist updated: added ${currentTabHostname}`);
-            }
-
-            updateWhitelistButton(true);
-            updateEnhanceButton(true);
-            statusMessage.textContent =
-              response.message || `${currentTabHostname} added to whitelist`;
-            setTimeout(() => updateStatus(), 2000);
-            sendPageStatusUpdate(true);
-          } else {
-            console.warn("Failed to add to whitelist:", response.message);
-            statusMessage.textContent =
-              response.message || "Failed to add site to whitelist";
-            setTimeout(() => updateStatus(), 2000);
-          }
-        }
-      );
+      addToWhitelist();
     }
+  }
+
+  /**
+   * Add current site to whitelist
+   */
+  function addToWhitelist() {
+    chrome.runtime.sendMessage(
+      {
+        action: "addSiteToWhitelist",
+        url: currentTabUrl
+      },
+      async (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Runtime error:", chrome.runtime.lastError);
+          statusMessage.textContent = "Error communicating with extension";
+          setTimeout(() => updateStatus(), 2000);
+          return;
+        }
+
+        if (!response || typeof response !== "object") {
+          console.warn("Invalid add whitelist response:", response);
+          statusMessage.textContent = "Invalid response format";
+          setTimeout(() => updateStatus(), 2000);
+          return;
+        }
+
+        if (response.success) {
+          console.log(`Successfully added ${currentTabHostname} to whitelist`);
+
+          // Update local whitelist array and storage
+          if (!whitelistedSites.includes(currentTabHostname)) {
+            whitelistedSites.push(currentTabHostname);
+
+            try {
+              await storage.set("whitelistedSites", whitelistedSites);
+              console.log(`Whitelist updated: added ${currentTabHostname}`);
+            } catch (error) {
+              console.error("Error updating local whitelist storage:", error);
+            }
+          }
+
+          updateWhitelistButton(true);
+          updateEnhanceButton(true);
+          statusMessage.textContent =
+            response.message || `${currentTabHostname} added to whitelist`;
+          setTimeout(() => updateStatus(), 2000);
+          sendPageStatusUpdate(true);
+        } else {
+          console.warn("Failed to add to whitelist:", response.message);
+          statusMessage.textContent =
+            response.message || "Failed to add site to whitelist";
+          setTimeout(() => updateStatus(), 2000);
+        }
+      }
+    );
+  }
+
+  /**
+   * Remove current site from whitelist
+   */
+  function removeFromWhitelist() {
+    chrome.runtime.sendMessage(
+      {
+        action: "removeSiteFromWhitelist",
+        hostname: currentTabHostname
+      },
+      async (response) => {
+        if (chrome.runtime.lastError) {
+          console.error("Runtime error:", chrome.runtime.lastError);
+          statusMessage.textContent = "Error communicating with extension";
+          setTimeout(() => updateStatus(), 2000);
+          return;
+        }
+
+        if (!response || typeof response !== "object") {
+          console.warn("Invalid remove whitelist response:", response);
+          statusMessage.textContent = "Invalid response format";
+          setTimeout(() => updateStatus(), 2000);
+          return;
+        }
+
+        if (response.success) {
+          console.log(
+            `Successfully removed ${currentTabHostname} from whitelist`
+          );
+
+          // Update local whitelist array and storage
+          const originalLength = whitelistedSites.length;
+          whitelistedSites = whitelistedSites.filter(
+            (site) => site !== currentTabHostname
+          );
+
+          if (whitelistedSites.length < originalLength) {
+            try {
+              await storage.set("whitelistedSites", whitelistedSites);
+              console.log(`Whitelist updated: removed ${currentTabHostname}`);
+            } catch (error) {
+              console.error("Error updating local whitelist storage:", error);
+            }
+          }
+
+          updateWhitelistButton(false);
+          updateEnhanceButton(false);
+          statusMessage.textContent = `${currentTabHostname} removed from whitelist`;
+          setTimeout(() => updateStatus(), 2000);
+          sendPageStatusUpdate(false);
+        } else {
+          console.warn("Failed to remove from whitelist:", response.message);
+          statusMessage.textContent =
+            response.message || "Failed to remove site";
+          setTimeout(() => updateStatus(), 2000);
+        }
+      }
+    );
   }
 
   /**
@@ -331,7 +313,6 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   function handleEnhanceNowClick() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      // Use tabs parameter with validation
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
         console.error("No active tabs found for enhancement:", tabs);
         statusMessage.textContent = "Error: No active tab found";
@@ -362,7 +343,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               return;
             }
 
-            // Use response parameter with validation
             if (!response || typeof response !== "object") {
               console.warn("Invalid ping response:", response);
               statusMessage.textContent = "Invalid extension response";
@@ -399,7 +379,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                   return;
                 }
 
-                // Use enhanceResponse parameter with validation
                 if (!enhanceResponse || typeof enhanceResponse !== "object") {
                   console.warn(
                     "Invalid enhancement response:",
@@ -459,7 +438,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
 
-        // Use response parameter with validation
         if (!response || typeof response !== "object") {
           console.warn("Invalid permission check response:", response);
           updateStatus();
@@ -488,7 +466,6 @@ document.addEventListener("DOMContentLoaded", async () => {
    */
   function processCurrentTab() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      // Use tabs parameter with validation
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
         console.error("No active tabs found:", tabs);
         statusMessage.textContent = "No active tab found";
@@ -534,7 +511,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               return;
             }
 
-            // Use response parameter with validation
             if (!response || typeof response !== "object") {
               console.warn("Invalid content script response:", response);
               checkWhitelistWithBackground();
@@ -556,7 +532,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Helper function to check if a site is whitelisted
+  /**
+   * Helper function to check if a site is whitelisted
+   * @param {string} hostname - The hostname to check
+   * @param {Array} whitelistedSites - Array of whitelisted sites
+   * @return {boolean} - Whether the site is whitelisted
+   */
   function isSiteWhitelisted(hostname, whitelistedSites) {
     if (!hostname || !Array.isArray(whitelistedSites)) {
       return false;
