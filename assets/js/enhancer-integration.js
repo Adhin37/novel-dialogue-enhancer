@@ -35,6 +35,10 @@ class EnhancerIntegration {
     try {
       const sanitizedText = this.textProcessor.sanitizeText(text);
 
+      // Track word count for statistics
+      const originalWordCount = this.#countWords(sanitizedText);
+      this.statsUtils.setTotalWordsProcessed(originalWordCount);
+
       // Extract character information using novelUtils
       const characterMap = await this.extractCharacterInfo(sanitizedText);
 
@@ -65,6 +69,7 @@ class EnhancerIntegration {
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
         console.error(`LLM not available: ${ollamaStatus.reason}`);
+        this.statsUtils.incrementErrorCount();
         return text;
       }
 
@@ -74,14 +79,39 @@ class EnhancerIntegration {
         characterSummary
       );
 
+      // Calculate compression ratio
+      const enhancedWordCount = this.#countWords(enhancedText);
+      if (originalWordCount > 0) {
+        const compressionRatio = enhancedWordCount / originalWordCount;
+        this.statsUtils.setCompressionRatio(compressionRatio);
+      }
+
       return enhancedText;
     } catch (error) {
       console.error("Error enhancing text:", error);
+      this.statsUtils.incrementErrorCount();
       return text;
     } finally {
       const endTime = performance.now();
       this.statsUtils.setProcessingTime(endTime - startTime);
     }
+  }
+
+  /**
+   * Count words in text
+   * @param {string} text - Text to count words in
+   * @return {number} - Number of words
+   * @private
+   */
+  #countWords(text) {
+    if (!text || typeof text !== "string") {
+      return 0;
+    }
+
+    return text
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0).length;
   }
 
   /**
@@ -223,7 +253,7 @@ class EnhancerIntegration {
       );
 
       // Process each chunk
-      const enhancedChunks = await this.processChunks(
+      const enhancedChunks = await this.#processChunks(
         textChunks,
         characterSummary,
         novelInfo,
@@ -247,10 +277,12 @@ class EnhancerIntegration {
    * @param {object} novelInfo - Novel style information
    * @param {object} settings - LLM settings
    * @return {Promise<Array<string>>} - Array of enhanced text chunks
+   * @private
    */
-  async processChunks(chunks, characterContext, novelInfo, settings) {
+  async #processChunks(chunks, characterContext, novelInfo, settings) {
     const enhancedChunks = [];
     const BATCH_DELAY = 800;
+    let errorCount = 0;
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -295,12 +327,18 @@ class EnhancerIntegration {
       } catch (chunkError) {
         console.warn("Failed to enhance chunk, using original:", chunkError);
         enhancedChunks.push(chunk);
+        errorCount++;
+        this.statsUtils.incrementErrorCount();
       }
 
       // Add delay between chunks to avoid overwhelming the LLM
       if (i < chunks.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
       }
+    }
+
+    if (errorCount > 0) {
+      console.warn(`Processing completed with ${errorCount} chunk errors`);
     }
 
     return enhancedChunks;

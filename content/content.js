@@ -42,44 +42,47 @@ function init() {
 
       console.log("Site is whitelisted, activating extension features");
 
-      return loadSettings()
-        .then((loadedSettings) => {
-          // Use loadedSettings parameter
-          if (!loadedSettings || typeof loadedSettings !== "object") {
-            console.warn("Invalid settings loaded:", loadedSettings);
-          } else {
-            console.log("Using loaded settings:", loadedSettings);
-          }
+      return loadSettings().then((loadedSettings) => {
+        // Use loadedSettings parameter
+        if (!loadedSettings || typeof loadedSettings !== "object") {
+          console.warn("Invalid settings loaded:", loadedSettings);
+        } else {
+          console.log("Using loaded settings:", loadedSettings);
+        }
 
-          setTimeout(async () => {
-            if (!settings.isExtensionPaused) {
-              console.log("Extension is enabled, checking Ollama availability");
-              try {
-                const isAvailable = await checkOllamaStatus();
-                // Use isAvailable parameter
-                if (typeof isAvailable !== "boolean") {
-                  console.warn("Invalid Ollama status result:", isAvailable);
-                } else if (isAvailable) {
-                  console.log("Ollama is available, starting page enhancement");
-                  const enhanceResult = await enhancePage();
-                  // Use enhanceResult parameter
-                  if (enhanceResult) {
-                    console.log("Initial page enhancement completed successfully");
-                  } else {
-                    console.log("Initial page enhancement failed");
-                  }
+        setTimeout(async () => {
+          if (!settings.isExtensionPaused) {
+            console.log("Extension is enabled, checking Ollama availability");
+            try {
+              const isAvailable = await checkOllamaStatus();
+              // Use isAvailable parameter
+              if (typeof isAvailable !== "boolean") {
+                console.warn("Invalid Ollama status result:", isAvailable);
+              } else if (isAvailable) {
+                console.log("Ollama is available, starting page enhancement");
+                const enhanceResult = await enhancePage();
+                // Use enhanceResult parameter
+                if (enhanceResult) {
+                  console.log(
+                    "Initial page enhancement completed successfully"
+                  );
                 } else {
-                  console.log("Ollama is not available, page enhancement skipped");
+                  console.log("Initial page enhancement failed");
                 }
-              } catch (error) {
-                console.error("Error checking Ollama status:", error);
-                toaster.showError(`Ollama check failed: ${error.message}`);
+              } else {
+                console.log(
+                  "Ollama is not available, page enhancement skipped"
+                );
               }
-            } else {
-              console.log("Extension is paused in settings");
+            } catch (error) {
+              console.error("Error checking Ollama status:", error);
+              toaster.showError(`Ollama check failed: ${error.message}`);
             }
-          }, 800);
-        });
+          } else {
+            console.log("Extension is paused in settings");
+          }
+        }, 800);
+      });
     })
     .catch((error) => {
       // Use error parameter with validation
@@ -177,7 +180,10 @@ function checkSitePermissions() {
 
         // Use response parameter with validation
         if (!response || typeof response !== "object") {
-          console.warn("Invalid response from site permission check:", response);
+          console.warn(
+            "Invalid response from site permission check:",
+            response
+          );
           resolve(false);
           return;
         }
@@ -363,12 +369,16 @@ async function enhancePage() {
 
     toaster.showLoading("Analyzing characters...");
     const contextResult = await enhancerIntegration.setupCharacterContext();
-    
+
     // Use contextResult parameter
     if (!contextResult || typeof contextResult !== "object") {
       console.warn("Invalid character context result:", contextResult);
     } else {
-      console.log(`Character context established: ${Object.keys(contextResult).length} characters`);
+      console.log(
+        `Character context established: ${
+          Object.keys(contextResult).length
+        } characters`
+      );
     }
 
     const paragraphs = contentElement.querySelectorAll("p");
@@ -431,11 +441,13 @@ async function processSingleContentBlock() {
     // Use enhancedText parameter with validation
     if (!enhancedText || typeof enhancedText !== "string") {
       console.warn("Invalid enhanced text received:", typeof enhancedText);
+      enhancerIntegration.statsUtils.incrementErrorCount();
       throw new Error("Invalid enhanced text format");
     }
 
     if (enhancedText.trim() === "") {
       console.warn("Empty enhanced text received");
+      enhancerIntegration.statsUtils.incrementErrorCount();
       throw new Error("Enhancement produced empty result");
     }
 
@@ -450,6 +462,7 @@ async function processSingleContentBlock() {
     toaster.updateProgress(1, 1);
   } catch (error) {
     console.error("Failed to enhance content block:", error);
+    enhancerIntegration.statsUtils.incrementErrorCount();
     throw error;
   }
 }
@@ -556,6 +569,10 @@ async function processParagraphBatch(
       `Enhancement failed for batch ${startIndex}-${startIndex + chunkSize}:`,
       error
     );
+
+    // Increment error count for batch failures
+    enhancerIntegration.statsUtils.incrementErrorCount();
+
     toaster.showMessage(
       `Batch ${startIndex}-${
         startIndex + batch.length
@@ -715,9 +732,13 @@ const observer = new MutationObserver((mutations) => {
         return;
       }
 
-      if (mutation.type === "childList" && mutation.addedNodes && mutation.addedNodes.length > 0) {
+      if (
+        mutation.type === "childList" &&
+        mutation.addedNodes &&
+        mutation.addedNodes.length > 0
+      ) {
         let hasRealContent = false;
-        
+
         // Convert NodeList to Array and use addedNodes
         const addedNodesArray = Array.from(mutation.addedNodes);
         addedNodesArray.forEach((node) => {
