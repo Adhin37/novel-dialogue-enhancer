@@ -1,23 +1,33 @@
 # Novel Dialogue Enhancer
 
-A Chrome extension that improves the quality of translated web novels by enhancing dialogues to sound more natural in English.
+A Chrome extension that improves the quality of translated web novels by enhancing dialogues to sound more natural in English using local AI models.
 
 ## Features
 
-- **Natural Dialogue Enhancement**: Automatically converts stiff, literally-translated dialogue into more natural English
-- **Character Name Preservation**: Keeps original character names intact
-- **Pronoun Correction**: Fixes common pronoun mistakes by tracking character genders
-- **Dynamic Content Detection**: Works with various novel websites by intelligently finding the content area
-- **Customizable Settings**: Toggle features on/off according to your preferences
-- **Optimized Data Storage**: Efficiently manages character data across multiple novels
+- **Natural Dialogue Enhancement**: Automatically converts stiff, literally-translated dialogue into more natural English using AI
+- **Character Name Preservation**: Keeps original character names intact while fixing gender consistency
+- **Advanced Gender Detection**: Multi-analyzer system that detects character genders from cultural context, name patterns, pronouns, relationships, and descriptions
+- **Pronoun Correction**: Fixes common pronoun mistakes by tracking character genders and detecting translation errors
+- **Cultural Awareness**: Adapts analysis to different cultural contexts (Western, Chinese, Japanese, Korean)
+- **Whitelist-Based Security**: Only operates on user-approved domains for privacy and security
+- **Optimized Storage**: Efficiently manages character data across multiple novels with automatic data purging
+- **Real-time Processing**: Processes content in chunks with progress feedback and context preservation
 
 ## Installation
 
-### From Chrome Web Store
+### Prerequisites
+
+1. **Install Ollama**: Download and install [Ollama](https://ollama.com) on your computer
+2. **Pull an AI Model**: Run `ollama pull qwen3:8b` (or another supported model)
+3. **Start Ollama Server**: Run `ollama serve` to make the AI model available
+
+### Extension Installation
+
+#### From Chrome Web Store
 
 (Coming soon)
 
-### Manual Installation
+#### Manual Installation
 
 1. Download this repository as a ZIP file and extract it
 2. Open Chrome and navigate to `chrome://extensions/`
@@ -27,145 +37,197 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 
 ## Usage
 
-1. Navigate to any supported novel website
-2. The extension will automatically enhance the dialogue on the page
-3. Click the extension icon in your browser toolbar to:
-   - Toggle enhancement on/off
-   - Enable/disable specific features
-   - Manually trigger enhancement on the current page
+### Initial Setup
 
-## Supported Websites
+1. Click the extension icon in your browser toolbar
+2. Add your favorite novel sites to the whitelist
+3. Configure your preferences in the options page (right-click extension icon → Options)
 
-The extension currently supports many popular novel translation sites including:
+### Using the Extension
 
-- FanMTL.com
-- NovelUpdates.com
-- WuxiaWorld.com
-- WebNovel.com
-- And many others with similar layouts
+1. Navigate to any whitelisted novel website
+2. The extension will automatically detect and enhance dialogue on the page
+3. Character genders are detected and tracked across chapters for consistent pronoun usage
+4. Use the popup to manually trigger enhancement or adjust settings
+
+### Supported Websites
+
+- fanmtl.com
+- novelupdates.com  
+- wuxiaworld.com
+- webnovel.com
+- Any other novel sites you add to the whitelist
 
 ## How It Works
 
-The extension:
+### AI-Powered Enhancement Process
 
-1. Identifies the main content area of the novel page
-2. Analyzes the text to detect character names and their likely genders
-3. Processes the dialogue to make it sound more natural
-4. Fixes common translation issues like awkward phrasing and incorrect pronouns
-5. Replaces the original content with the enhanced version
+1. **Content Detection**: Identifies the main content area of novel pages
+2. **Character Analysis**: Multi-analyzer system detects character names and genders using:
+   - Cultural origin detection (Western/Chinese/Japanese/Korean)
+   - Name pattern analysis (titles, honorifics, endings)
+   - Pronoun usage analysis with inconsistency detection
+   - Relationship pattern analysis
+   - Physical description analysis
+3. **Text Processing**: Breaks content into manageable chunks while preserving context
+4. **AI Enhancement**: Uses local Ollama models to improve dialogue naturalness
+5. **Storage & Memory**: Optimized character data storage with automatic purging
 
-## Technical Details
+### Privacy & Security
 
-This document describes the optimized character map implementation for the Novel Dialogue Enhancer Chrome extension.
+- **Local Processing**: All AI processing happens on your local machine via Ollama
+- **No Data Collection**: No browsing history, personal data, or text is sent to external servers
+- **Whitelist Control**: Extension only operates on user-approved domains
+- **Offline Capable**: Works entirely offline once Ollama is set up
 
-### Overview
+## Technical Architecture
 
-The extension tracks character data and enhanced chapters for novels across various websites. The implementation is optimized for:
+### Core Components
 
-1. Efficient data structure
-2. Purging old/unused novels
-3. Minimal data storage
-4. Size management for evidence data
+- **Background Script**: Manages whitelist, API communication, and optimized data storage
+- **Content Script**: Orchestrates enhancement on web pages with progress feedback  
+- **Gender Analysis System**: 5 specialized analyzers for accurate character gender detection
+- **LLM Integration**: Handles chunked processing with context preservation and caching
+- **Novel Processing**: Character extraction, chapter detection, and style analysis
+- **UI Components**: Popup for quick controls and comprehensive options page
 
-### Data Schema
+### Data Storage Format
 
-The character data is stored in an optimized format:
+Character data uses an optimized compressed format (30-40% size reduction):
 
 ```javascript
 {
   [novelId]: {
-    chars: {                      // Character data
-      [characterId]: {            // Numeric ID instead of full name
-        name: string,             // Character name
-        gender: string,           // "m", "f", "u" for "male", "female", "unknown"
-        confidence: number,       // Confidence score (0-1)
-        appearances: number,      // Number of appearances
-        evidences: string[]       // Supporting evidence (limited to 5 entries)
+    chars: {
+      [numericId]: {
+        name: string,
+        gender: "m"|"f"|"u",  // compressed codes
+        confidence: number,
+        appearances: number,
+        evidences: string[]   // max 5 items
       }
     },
-    chaps: [                      // Enhanced chapters
-      number                      // Chapter numbers
-    ],
-    style: {                      // Style info
-      style: string,
-      tone: string,
-      confidence: number,
-      analyzed: boolean
-    },
-    lastAccess: number            // Timestamp for data purging
+    chaps: [number],          // enhanced chapter numbers
+    style: {...},            // detected novel style/genre
+    lastAccess: number       // for automatic purging
   }
 }
 ```
 
-### Key Optimizations
+### Performance Optimizations
 
-#### 1. Numeric Character IDs
+- **Element Caching**: DOM queries cached with TTL
+- **Chunked Processing**: Large texts split while preserving context
+- **Request Caching**: LLM responses cached by content hash
+- **Data Compression**: Optimized storage format with automatic cleanup
+- **Lazy Loading**: Components initialized only when needed
 
-- Uses numeric IDs as keys rather than character names
-- Reduces duplication of character names in the data structure
+## Configuration
 
-#### 2. Compressed Gender Representation
+### Model Settings
 
-- Uses "m" for "male"
-- Uses "f" for "female"
-- Uses "u" for "unknown"
+- **Model Name**: Specify which Ollama model to use (default: qwen3:8b)
+- **Temperature**: Control creativity vs consistency (0.1-1.0)
+- **Top P**: Control language diversity (0.1-1.0)
 
-#### 3. Simplified Chapter Storage
+### Performance Settings
 
-- Stores just chapter numbers instead of objects
-- Significantly reduces size for novels with many chapters
+- **Chunk Size**: Maximum text chunk size for processing (2K-16K characters)
+- **Timeout**: Maximum wait time for AI responses (30-300 seconds)
 
-#### 4. Limited Evidence Storage
+### Advanced Features
 
-- Caps evidence array at 5 entries per character
-- Prevents excessive storage growth from redundant evidence
+- **Statistics Tracking**: Monitor usage across novels and sessions
+- **Novel Management**: View detected characters and their analysis data
+- **Whitelist Management**: Control which sites can be enhanced
+- **Dark Mode**: Full dark theme support
 
-#### 5. Data Purging
+## Supported AI Models
 
-- Timestamp-based data purging mechanism
-- Automatically removes novel data not accessed in 30+ days
-- Implements size-based pruning when storage exceeds thresholds
+The extension works with any Ollama-compatible model. Recommended models:
 
-### Clean Implementation
+- **qwen3:8b** (default) - Balanced performance and quality
+- **llama3:8b** - Alternative high-quality option
+- **phi3:medium** - Faster processing, good quality
+- **mistral** - Lightweight option for older hardware
 
-The system uses a streamlined approach:
+## Development
 
-1. Simple and clear property names
-2. Consistent format across the extension
-3. Simplified codebase that's easier to maintain and extend
+### Project Structure
 
-### Performance Gains
-
-- ~30-40% reduction in storage size for typical use
-- Improved performance for large datasets
-- More efficient memory usage
-
-### Usage
-
-The optimization is implemented in:
-
-1. `background.js` - For storage and retrieval
-2. `novelUtils.js` - For handling character data in content scripts
-
-### Testing
-
-A test suite is available in `/tests/characterMap.test.js` to verify:
-
-1. Gender compression/expansion
-2. Data format consistency
-3. Data purging functionality
-4. Storage size comparison
-
-Run the tests with Node.js:
-
-``` bash
-node tests/characterMap.test.js
+```markdown
+├── manifest.json              # Extension manifest
+├── background/                 # Background service worker
+├── content/                   # Content script coordination
+├── popup/                     # Quick controls interface
+├── options/                   # Comprehensive settings page
+├── assets/js/
+│   ├── gender/               # Gender analysis system
+│   ├── llm/                  # AI integration
+│   ├── novel/                # Novel processing modules
+│   └── utils/                # Shared utilities
+└── docs/                     # Documentation
 ```
+
+### Key Design Patterns
+
+- **Modular Architecture**: Specialized classes for different concerns
+- **Base Class Inheritance**: Common functionality in base classes
+- **Progressive Enhancement**: Graceful degradation when AI unavailable
+- **Message Passing**: Chrome extension communication patterns
+- **Optimized Storage**: Compressed data with automatic purging
+
+### Development Workflow
+
+1. Load extension: `chrome://extensions/` → "Load unpacked"
+2. Make changes to code
+3. Refresh extension in Chrome
+4. Refresh target web page for content script changes
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
+### Adding New Gender Analysis
+
+1. Extend `BaseGenderAnalyzer` class
+2. Add patterns to appropriate analyzer (cultural, name, pronoun, etc.)
+3. Update confidence scoring in `GenderUtils.guessGender()`
+4. Test with diverse character names and contexts
+
+### Extending Novel Support
+
+1. Add domain to whitelist (user-controlled)
+2. Update content selectors in `Constants.SELECTORS` if needed
+3. Test character extraction on new site layouts
+
+## Privacy Policy
+
+This extension operates entirely locally and does not collect any personal data. See [Privacy Policy](docs/privacy-policy.md) for full details.
+
 ## License
 
-This project is licensed under APACHE 2.0 License - see the LICENSE file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+
+## Requirements
+
+- **Chrome Browser**: Version 88 or higher
+- **Ollama**: Must be installed and running locally
+- **AI Model**: At least one Ollama-compatible model downloaded
+- **Hardware**: Sufficient RAM for your chosen AI model
+
+## Troubleshooting
+
+### Common Issues
+
+- **"Ollama not available"**: Ensure Ollama is installed and `ollama serve` is running
+- **"Site not whitelisted"**: Add the current site to your whitelist via the popup
+- **Extension not working**: Check that the site is whitelisted and Ollama is running
+- **Slow processing**: Try a smaller model or reduce chunk size in settings
+
+### Getting Help
+
+- Check the extension options page for connection testing
+- Verify Ollama installation: `ollama --version`
+- Review browser console for error messages
+- Ensure sufficient system resources for your AI model
