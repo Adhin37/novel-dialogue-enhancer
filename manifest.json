@@ -45,7 +45,8 @@
       "js": [
         "assets/js/lib/purify.min.js",
         "assets/js/utils/gender-utils.js",
-        "assets/js/utils/novel-utils.js",
+        "assets/js/novel/novel-id-generator.js",
+        "assets/js/novel/novel-utils.js",
         "assets/js/utils/stats-utils.js",
         "assets/js/gender/pronoun-analyzer.js",
         "assets/js/gender/cultural-analyzer.js",
