@@ -105,6 +105,72 @@ class SharedUtils {
       return clonedObj;
     }
   }
+
+  /**
+   * Validate character name
+   * @param {string} name - Name to validate
+   * @return {boolean} - Whether name is valid
+   */
+  static validateCharacterName(name) {
+    return typeof name === "string" && name.length > 1 && name.length <= 50;
+  }
+
+  /**
+   * Validate confidence score
+   * @param {number} confidence - Confidence to validate
+   * @return {boolean} - Whether confidence is valid
+   */
+  static validateConfidence(confidence) {
+    return typeof confidence === "number" && confidence >= 0 && confidence <= 1;
+  }
+
+  /**
+   * Validate gender string
+   * @param {string} gender - Gender to validate
+   * @return {boolean} - Whether gender is valid
+   */
+  static validateGender(gender) {
+    return (
+      typeof gender === "string" &&
+      ["male", "female", "unknown", "m", "f", "u"].includes(
+        gender.toLowerCase()
+      )
+    );
+  }
+
+  /**
+   * Validate appearances count
+   * @param {number} appearances - Appearances to validate
+   * @return {boolean} - Whether appearances is valid
+   */
+  static validateAppearances(appearances) {
+    return Number.isInteger(appearances) && appearances > 0;
+  }
+
+  /**
+   * Create a standardized character data object
+   * @param {string} name - Character name
+   * @param {string} gender - Character gender
+   * @param {number} confidence - Confidence score
+   * @param {number} appearances - Number of appearances
+   * @param {Array} evidence - Evidence array
+   * @return {object} - Standardized character object
+   */
+  static createCharacterData(
+    name,
+    gender,
+    confidence,
+    appearances,
+    evidence = []
+  ) {
+    return {
+      name: String(name || ""),
+      gender: this.validateGender(gender) ? gender : "unknown",
+      confidence: this.validateConfidence(confidence) ? confidence : 0,
+      appearances: this.validateAppearances(appearances) ? appearances : 1,
+      evidence: Array.isArray(evidence) ? evidence.slice(0, 5) : []
+    };
+  }
 }
 
 if (typeof module !== "undefined") {

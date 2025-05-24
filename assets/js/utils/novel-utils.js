@@ -17,7 +17,6 @@ class NovelUtils {
     // Initialize specialized modules first
     this.idGenerator = new NovelIdGenerator();
     this.chapterDetector = new NovelChapterDetector();
-    this.platformDetector = new NovelPlatformDetector();
     this.characterExtractor = new NovelCharacterExtractor();
     this.styleAnalyzer = new NovelStyleAnalyzer();
     this.storageManager = new StorageManager();
@@ -80,12 +79,20 @@ class NovelUtils {
   }
 
   /**
-   * Detect the platform hosting the novel
+   * Extract simple platform info from URL
    * @param {string} url - URL of the novel page
-   * @return {string} - Platform name
+   * @return {string} - Simple domain name
    */
   detectPlatform(url) {
-    return this.platformDetector.detectPlatform(url);
+    if (!url) return "unknown";
+    
+    try {
+      const hostname = new URL(url).hostname.toLowerCase();
+      return hostname.replace(/^www\./, "").split(".")[0];
+    } catch (error) {
+      console.error("Error detecting platform:", error);
+      return "unknown";
+    }
   }
 
   /**
@@ -182,7 +189,7 @@ class NovelUtils {
    */
   async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
-    let characterMap = { ...existingCharacterMap };
+    let characterMap = this.#optimizeCharacterMap(existingCharacterMap);
     const startCharCount = Object.keys(characterMap).length;
 
     // Initialize novel ID and chapter info
@@ -385,6 +392,29 @@ class NovelUtils {
    */
   syncNovelStyle(novelId, styleInfo) {
     this.storageManager.syncNovelStyle(styleInfo);
+  }
+
+  /**
+   * Optimized character map conversion
+   * @param {object} rawCharacterMap - Raw character data
+   * @return {object} - Optimized character map
+   */
+  #optimizeCharacterMap(rawCharacterMap) {
+    const optimized = {};
+    
+    Object.entries(rawCharacterMap).forEach(([name, data]) => {
+      if (SharedUtils.validateCharacterName(name)) {
+        optimized[name] = SharedUtils.createCharacterData(
+          name,
+          data.gender,
+          data.confidence,
+          data.appearances,
+          data.evidence
+        );
+      }
+    });
+    
+    return optimized;
   }
 
   /**

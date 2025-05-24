@@ -52,7 +52,6 @@
         "assets/js/utils/storage-manager.js",
         "assets/js/novel/novel-id-generator.js",
         "assets/js/novel/novel-style-analyzer.js",
-        "assets/js/novel/novel-platform-detector.js",
         "assets/js/novel/novel-character-extractor.js",
         "assets/js/novel/novel-chapter-detector.js",
         "assets/js/novel/novel-storage-manager.js",
@@ -65,7 +64,8 @@
         "assets/js/llm/text-processor.js",
         "assets/js/llm/prompt-generator.js",
         "assets/js/llm/ollama-client.js",
-        "assets/js/enhancer-integration.js",
+        "assets/js/content/content-enhancer-integration.js",
+        "assets/js/content/content-element-cache.js",
         "assets/js/toaster.js",
         "content/content.js"
       ],

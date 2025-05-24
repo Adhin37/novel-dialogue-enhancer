@@ -47,35 +47,6 @@ class GenderUtils {
       return this.#createGenderResult("unknown", 0, []);
     }
 
-    // Return existing gender if available with high confidence
-    if (
-      characterMap[name] &&
-      characterMap[name].gender !== "unknown" &&
-      characterMap[name].confidence &&
-      characterMap[name].confidence > 0.75
-    ) {
-      return this.#createGenderResult(
-        characterMap[name].gender,
-        characterMap[name].confidence,
-        characterMap[name].evidence || ["previously determined"]
-      );
-    }
-
-    if (
-      characterMap[name] &&
-      characterMap[name].gender !== "unknown" &&
-      characterMap[name].appearances &&
-      characterMap[name].appearances >= 5
-    ) {
-      return this.#createGenderResult(
-        characterMap[name].gender,
-        Math.max(0.7, characterMap[name].confidence || 0),
-        characterMap[name].evidence || [
-          "frequent appearances with consistent gender"
-        ]
-      );
-    }
-
     let maleScore = 0;
     let femaleScore = 0;
     const evidence = [];

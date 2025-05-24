@@ -17,7 +17,7 @@ export default defineConfig([
         NovelUtils: "readonly",
         StatsUtils: "readonly",
         OllamaClient: "readonly",
-        EnhancerIntegration: "readonly",
+        ContentEnhancerIntegration: "readonly",
         Toaster: "readonly",
         TextProcessor: "readonly",
         PromptGenerator: "readonly",
@@ -28,7 +28,6 @@ export default defineConfig([
         RelationshipAnalyzer: "readonly",
         AppearanceAnalyzer: "readonly",
         NovelStyleAnalyzer: "readonly",
-        NovelPlatformDetector: "readonly",
         NovelCharacterExtractor: "readonly",
         NovelChapterDetector: "readonly",
         NovelStorageManager: "readonly",
@@ -36,7 +35,8 @@ export default defineConfig([
         SharedUtils: "readonly",
         Constants: "readonly",
         StorageManager: "readonly",
-        BaseGenderAnalyzer: "readonly"
+        BaseGenderAnalyzer: "readonly",
+        ContentElementCache: "readonly"
       }
     },
     rules: {

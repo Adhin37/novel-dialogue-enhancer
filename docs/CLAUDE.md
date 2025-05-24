@@ -4,112 +4,95 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Novel Dialogue Enhancer - Chrome Extension Architecture
 
-Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online novels using LLM technology (Ollama).
+Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online novels using LLM technology (Ollama). The architecture has been optimized for performance and maintainability.
+
+### Core Architecture Principles
+
+1. **Whitelist-Based Operation**: Extension only operates on user-approved domains
+2. **Modular Component Design**: Specialized classes for different concerns with single responsibility
+3. **Base Class Inheritance**: Common functionality extracted to base classes (BaseGenderAnalyzer, StorageManager)
+4. **Shared Utilities**: Centralized validation, gender compression, and common operations
+5. **Progressive Enhancement**: Graceful degradation when Ollama is unavailable
+6. **Optimized Storage**: Compressed data format with automatic purging
 
 ### Key Components
 
 1. **Background Script** (`background/background.js`)
-   - Manages whitelist of allowed sites
-   - Handles permission requests
-   - Manages character data storage
-   - Processes Ollama API requests
+   - Manages whitelist of allowed sites with 5-minute cache
+   - Handles Ollama API communication (bypasses CORS)
+   - Manages optimized character data storage with compression
+   - Implements data purging (30+ day old novels)
+   - Tracks global statistics across all novels
 
 2. **Content Script** (`content/content.js`)
-   - Runs on whitelisted web pages
-   - Finds and enhances novel text
+   - Checks whitelist status before activation
+   - Orchestrates enhancement process on whitelisted pages
+   - Uses ElementCache for DOM query optimization
+   - Handles chunked text processing with progress feedback
    - Communicates with Background script for LLM processing
 
 3. **UI Components**
-   - Popup (`popup/`) - Controls for enabling/disabling and site whitelisting
-   - Options page (`options/`) - Configuration for LLM settings and whitelist management
+   - **Popup** (`popup/`) - Whitelist management, enhancement controls
+   - **Options** (`options/`) - Comprehensive settings, whitelist admin, novel statistics
 
-4. **Utility Modules** (`assets/js/utils/`)
-   - `novelUtils.js` - Core novel processing functionality
-   - `genderUtils.js` - Character gender detection
-   - `statsUtils.js` - Statistics tracking
+4. **Core Modules**
+   - `EnhancerIntegration` - Main orchestrator combining all utilities
+   - `NovelUtils` - Novel processing and metadata extraction
+   - `GenderUtils` - Character gender detection coordinator
 
-5. **Gender Analysis Modules** (`assets/js/gender/`)
-   - `cultural-analyzer.js` - Cultural origin detection and analysis
-   - `name-analyzer.js` - Name pattern analysis (titles, honorifics, endings)
-   - `pronoun-analyzer.js` - Pronoun usage and inconsistency detection
-   - `relationship-analyzer.js` - Character relationship and role analysis
-   - `appearance-analyzer.js` - Physical description analysis
+5. **Gender Analysis System** (`assets/js/gender/`)
+   - `BaseGenderAnalyzer` - Common analysis methods and patterns
+   - `CulturalAnalyzer` - Cultural origin detection (western/chinese/japanese/korean)
+   - `NameAnalyzer` - Name pattern analysis (titles, honorifics, endings)
+   - `PronounAnalyzer` - Pronoun usage and inconsistency detection
+   - `RelationshipAnalyzer` - Character relationship and role analysis
+   - `AppearanceAnalyzer` - Physical description analysis
 
 6. **LLM Integration** (`assets/js/llm/`)
-   - `ollama-client.js` - Communication with Ollama LLM API
-   - `prompt-generator.js` - Consistent prompt generation
-   - `text-processor.js` - Text chunking and processing utilities
+   - `OllamaClient` - API communication with caching and timeout handling
+   - `PromptGenerator` - Consistent prompt generation with character context
+   - `TextProcessor` - Text chunking and response cleaning
 
-7. **Integration**
-   - `enhancerIntegration.js` - Combines utilities for complete enhancement
-   - `toaster.js` - User notification system
+7. **Novel Processing Modules** (`assets/js/novel/`)
+   - `NovelCharacterExtractor` - Character name extraction from text
+   - `NovelChapterDetector` - Chapter information detection
+   - `NovelIdGenerator` - Unique novel identification
+   - `NovelStorageManager` - Extends StorageManager for novel-specific operations
+   - `NovelStyleAnalyzer` - Genre and style detection
 
-### Architecture Patterns
+8. **Shared Utilities** (`assets/js/utils/`)
+   - `SharedUtils` - Common validation, sanitization, gender compression
+   - `Constants` - Centralized configuration and magic numbers
+   - `StorageManager` - Base storage operations with caching
+   - `StatsUtils` - Statistics tracking
 
-#### Modular Component Design
+### Data Flow & Architecture
 
-- **Single Responsibility**: Each class handles one primary concern
-- **Dependency Injection**: Components receive dependencies rather than creating them
-- **Progressive Enhancement**: Fails gracefully when Ollama is unavailable
-- **Event-Driven Communication**: Message passing between components
+1. **Whitelist Check**: Content script verifies site approval before activation
+2. **Character Analysis**: Multi-analyzer approach determines character genders with cultural context
+3. **Text Processing**: Content chunked with context preservation for LLM processing
+4. **LLM Enhancement**: Background processes chunks via Ollama with character context
+5. **Storage**: Optimized character data stored with compression and automatic purging
 
-#### Data Flow
+### Optimized Storage Format
 
-1. Content script finds novel text
-2. NovelUtils extracts character names
-3. GenderUtils analyzes character genders using 5 specialized analyzers
-4. Text chunked by TextProcessor
-5. Prompts generated with character context
-6. LLM processes chunks via OllamaClient
-7. Enhanced text replaces original content
-
-#### Storage Optimization
-
-Character data uses compressed format to reduce storage usage by ~30-40%:
-
-- Numeric character IDs instead of names as keys
-- Compressed gender codes ("m"/"f"/"u")
-- Chapter numbers only (not objects)
-- Limited evidence storage (max 5 items)
-- Automatic data purging (30+ day old novels)
-
-### Whitelist System
-
-The extension uses a whitelist system to determine where it can run:
-
-- New sites must be explicitly whitelisted by the user
-- Whitelist status is checked when a page loads
-- If a site is not whitelisted, most extension functionality is disabled
-
-### LLM Integration
-
-- Communicates with locally running Ollama service
-- Uses models like Qwen 3 for text enhancement
-- Communication flows through the background script to avoid CORS issues
-- **Chunked Processing**: Large texts split into manageable pieces (default 4000 chars)
-- **Context Preservation**: Surrounding text provided for coherence
-- **Character-Aware Prompts**: Gender information included in prompts
-- **Retry Logic**: Failed chunks skipped, processing continues
-
-### Character Data Storage
-
-The extension uses an optimized format for storing character data:
+Character data uses compressed format (30-40% size reduction):
 
 ```javascript
 {
   [novelId]: {
-    chars: {                      // Character data
-      [characterId]: {            // Numeric ID instead of full name
-        name: string,             // Character name
-        gender: string,           // "m", "f", "u" for "male", "female", "unknown"
-        confidence: number,       // Confidence score (0-1)
-        appearances: number,      // Number of appearances
-        evidences: string[]       // Supporting evidence (limited to 5 entries)
+    chars: {
+      [numericId]: {
+        name: string,
+        gender: "m"|"f"|"u",  // compressed
+        confidence: number,
+        appearances: number,
+        evidences: string[]   // max 5
       }
     },
-    chaps: [number],              // Enhanced chapter numbers
-    style: {...},                 // Novel style information
-    lastAccess: number            // Timestamp for data purging
+    chaps: [number],          // just chapter numbers
+    style: {...},
+    lastAccess: number
   }
 }
 ```
@@ -118,96 +101,75 @@ The extension uses an optimized format for storing character data:
 
 Multi-analyzer approach with cultural awareness:
 
-1. **Cultural Origin Detection**: Identifies western/chinese/japanese/korean origins
-2. **Name Pattern Analysis**: Checks titles, honorifics, name endings by culture
-3. **Pronoun Context Analysis**: Analyzes pronoun usage and detects inconsistencies
-4. **Relationship Analysis**: Examines character roles and relationships
-5. **Appearance Analysis**: Processes physical descriptions
+1. **Cultural Origin**: Identifies western/chinese/japanese/korean contexts
+2. **Name Patterns**: Analyzes titles, honorifics, endings by culture
+3. **Pronoun Analysis**: Detects usage patterns and corrects translation errors
+4. **Relationships**: Examines character roles and connections
+5. **Appearance**: Processes physical descriptions
 
 **Confidence Scoring**: Weighted system with cultural adjustments
-**Evidence Collection**: Up to 5 pieces of supporting evidence per character
-**Translation Error Correction**: Detects and corrects common translation mistakes
+**Translation Error Correction**: Detects and corrects common MT mistakes
 
-### Error Handling Patterns
+### Performance Optimizations
 
-- **Graceful Degradation**: Core functionality continues if sub-components fail
-- **Timeout Management**: Configurable timeouts with proper cleanup
-- **User Feedback**: Toaster notifications for all operations
-- **Input Sanitization**: All content sanitized using DOMPurify
-- **Permission Validation**: Dynamic permission checking and requests
+1. **Element Caching**: DOM queries cached with 5-second TTL
+2. **Storage Caching**: Settings and whitelist cached with expiration
+3. **Chunked Processing**: Large texts split with context preservation
+4. **Request Caching**: LLM responses cached by content hash
+5. **Data Compression**: Storage format optimized for size and efficiency
+6. **Lazy Loading**: Components initialized only when needed
 
-### Performance Considerations
+### Code Organization & Standards
 
-- **Lazy Loading**: Components initialized only when needed
-- **Caching**: Whitelist status (5min TTL), character data, LLM responses
-- **Batch Processing**: Optimized paragraph batch sizes
-- **Memory Management**: Large text processing limits prevent memory issues
-- **Progressive UI**: Real-time progress feedback during long operations
-
-### Code Style Guidelines
-
-- **ES6+ Features**: Arrow functions, destructuring, modern syntax
-- **Private Methods**: Use ES6 private fields (#methodName) for internal methods
-- **Immutable Parameters**: Functions must not modify input parameters
-- **Descriptive Naming**: Variable and function names should be self-documenting
-- **JSDoc Preservation**: Keep all JSDoc comments for documentation
+- **ES6+ Features**: Arrow functions, destructuring, private fields (#method)
+- **No Parameter Mutation**: Functions don't modify input parameters (ESLint enforced)
+- **Base Class Inheritance**: Common functionality in base classes
+- **Shared Constants**: Magic numbers centralized in Constants
+- **Centralized Validation**: SharedUtils provides common validation patterns
 
 ### Development Workflow
 
-#### Testing the Extension
+#### Testing Changes
 
-1. Load the extension in Chrome:
-   - Open Chrome and navigate to `chrome://extensions/`
-   - Enable Developer mode
-   - Click "Load unpacked" and select the project directory
+1. Load extension in Chrome: `chrome://extensions/` → "Load unpacked"
+2. Refresh extension after changes
+3. Refresh target web page for content script changes
 
-2. Testing changes:
-   - After modifying files, click the refresh icon on the extension card
-   - For content script changes, refresh the target web page
+#### Common Patterns
 
-#### Component Integration
+- Use `SharedUtils.validateCharacterName()` for name validation
+- Use `SharedUtils.compressGender()` for storage optimization
+- Extend `BaseGenderAnalyzer` for new gender analysis methods
+- Use `Constants` for configuration values and thresholds
 
-- Content scripts communicate with background via chrome.runtime.sendMessage
-- Background processes Ollama requests to avoid CORS issues
-- UI components (popup/options) update settings via chrome.storage
-- Character data synced between content script and background storage
+#### Adding New Gender Analysis
 
-#### Security Considerations
-
-- **Content Security Policy**: Strict CSP prevents inline scripts
-- **Input Validation**: All user input validated and sanitized
-- **Origin Restrictions**: Extension only runs on whitelisted domains
-- **Local Processing**: No external data transmission (except local Ollama)
-
-### Common Development Tasks
-
-#### Adding New Gender Detection Rules
-
-1. Identify which analyzer is most appropriate (cultural, name, pronoun, relationship, appearance)
-2. Add patterns to the relevant analyzer's methods
-3. Update confidence scoring if needed
+1. Extend `BaseGenderAnalyzer` or use existing analyzer methods
+2. Add patterns to appropriate analyzer (cultural, name, pronoun, etc.)
+3. Update confidence scoring in `GenderUtils.guessGender()`
 4. Test with diverse character names and contexts
 
-#### Extending LLM Functionality
+#### Extending Novel Support
 
-1. Modify PromptGenerator for new prompt templates
-2. Update TextProcessor if new text handling needed
-3. Adjust OllamaClient for new request patterns
-4. Update EnhancerIntegration to coordinate new features
-
-#### Adding Support for New Novel Sites
-
-1. Add domain to manifest.json host_permissions
-2. Update content script selectors in findContentElement()
-3. Test character extraction patterns work on new site
-4. Add site to default whitelist if appropriate
+1. Add domain to whitelist (user-controlled)
+2. Update content selectors in `Constants.SELECTORS` if needed
+3. Test character extraction on new site layouts
 
 ### Architecture Notes
 
-- The extension follows Chrome's messaging architecture (content script <-> background script)
-- Uses progressive enhancement - fails gracefully when Ollama is not available
-- Caches whitelist status to improve performance
-- Handles text in chunks to manage large documents
-- Implements comprehensive error handling with user feedback
-- Optimizes storage format for performance and space efficiency
-- Maintains backwards compatibility through data migration
+- **Message Passing**: Chrome extension messaging between content ↔ background
+- **Whitelist Security**: Extension remains inactive on non-whitelisted sites
+- **Storage Strategy**: Local storage for character data, sync storage for settings
+- **Error Recovery**: Comprehensive error handling with user feedback
+- **Memory Management**: Caching with TTL and size limits
+
+### Critical Implementation Details
+
+1. **No localStorage/sessionStorage**: Not supported in Claude.ai artifacts environment
+2. **Whitelist Gating**: All functionality conditional on site approval
+3. **Compressed Storage**: Gender codes and numeric IDs for efficiency
+4. **Cultural Awareness**: Analysis adapts to detected cultural origin
+5. **Translation Error Correction**: Detects common MT mistakes
+6. **Progressive Enhancement**: Works without Ollama, enhanced with it
+
+This architecture provides a robust, scalable foundation for novel dialogue enhancement with strong performance characteristics, user control through whitelisting, and maintainable code structure.

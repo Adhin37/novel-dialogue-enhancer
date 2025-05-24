@@ -1,12 +1,12 @@
-// enhancerIntegration.js
+// content-enhancer-integration.js
 
 /**
  * Enhanced integration module for Novel Dialogue Enhancer
  * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
  */
-class EnhancerIntegration {
+class ContentEnhancerIntegration {
   /**
-   * Creates a new EnhancerIntegration instance
+   * Creates a new ContentEnhancerIntegration instance
    */
   constructor() {
     this.genderUtils = new GenderUtils();
@@ -346,7 +346,7 @@ class EnhancerIntegration {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = EnhancerIntegration;
+  module.exports = ContentEnhancerIntegration;
 } else {
-  window.enhancerIntegration = EnhancerIntegration;
+  window.enhancerIntegration = ContentEnhancerIntegration;
 }

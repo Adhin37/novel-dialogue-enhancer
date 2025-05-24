@@ -12,16 +12,34 @@ let settings = {
 let isEnhancing = false;
 let pendingEnhancement = false;
 let terminateRequested = false;
-let enhancerIntegration;
+let contentEnhancerIntegration;
 let toaster;
 let isCurrentSiteWhitelisted = false;
 const maxRetries = 3;
+const elementCache = new ContentElementCache();
 
+function findContentElement() {
+  const contentSelectors = Constants.SELECTORS.CONTENT;
+
+  for (const selector of contentSelectors) {
+    try {
+      const element = elementCache.getElement(selector);
+      if (element) {
+        return element;
+      }
+    } catch (error) {
+      console.error(`Error with selector "${selector}":`, error);
+    }
+  }
+
+  // Find largest text block as fallback
+  return findLargestTextBlock();
+}
 /**
  * Initializes the extension
  */
 function init() {
-  enhancerIntegration = new EnhancerIntegration();
+  contentEnhancerIntegration = new ContentEnhancerIntegration();
   toaster = new Toaster();
   toaster.createToaster();
 
@@ -132,16 +150,9 @@ function loadSettings() {
           }
 
           const loadedSettings = {
-            isExtensionPaused:
-              data.isExtensionPaused !== undefined
-                ? Boolean(data.isExtensionPaused)
-                : false,
-            preserveNames:
-              data.preserveNames !== undefined
-                ? Boolean(data.preserveNames)
-                : true,
-            fixPronouns:
-              data.fixPronouns !== undefined ? Boolean(data.fixPronouns) : true
+            isExtensionPaused: !!data.isExtensionPaused,
+            preserveNames: data.preserveNames !== false,
+            fixPronouns: data.fixPronouns !== false
           };
 
           settings = loadedSettings;
@@ -207,7 +218,7 @@ async function checkOllamaStatus() {
 
   while (retries < maxRetries) {
     try {
-      status = await enhancerIntegration.ollamaClient.checkOllamaAvailability();
+      status = await contentEnhancerIntegration.ollamaClient.checkOllamaAvailability();
       break;
     } catch (err) {
       console.warn(
@@ -236,38 +247,6 @@ async function checkOllamaStatus() {
     // If we reached the maximum retries or got a definitive "not available" response
     return false;
   }
-}
-
-/**
- * Finds the main content element of the page
- * @return {HTMLElement|null} - The content element or null if not found
- */
-function findContentElement() {
-  const contentSelectors = [
-    ".chapter-content",
-    "#chapter-content",
-    ".novel_content",
-    ".chapter-text",
-    ".entry-content",
-    ".text-content",
-    ".article-content",
-    ".content-area",
-    "article .content"
-  ];
-
-  for (const selector of contentSelectors) {
-    try {
-      const element = document.querySelector(selector);
-      if (element) {
-        return element;
-      }
-    } catch (error) {
-      console.error(`Error with selector "${selector}":`, error);
-    }
-  }
-
-  // Find largest text block as fallback
-  return findLargestTextBlock();
 }
 
 /**
@@ -349,7 +328,7 @@ async function enhancePage() {
 
   try {
     const ollamaStatus =
-      await enhancerIntegration.ollamaClient.checkOllamaAvailability();
+      await contentEnhancerIntegration.ollamaClient.checkOllamaAvailability();
 
     // Use ollamaStatus parameter with validation
     if (!ollamaStatus || typeof ollamaStatus !== "object") {
@@ -368,7 +347,7 @@ async function enhancePage() {
     }
 
     toaster.showLoading("Analyzing characters...");
-    const contextResult = await enhancerIntegration.setupCharacterContext();
+    const contextResult = await contentEnhancerIntegration.setupCharacterContext();
 
     // Use contextResult parameter
     if (!contextResult || typeof contextResult !== "object") {
@@ -389,7 +368,7 @@ async function enhancePage() {
       await processMultipleParagraphs(paragraphs);
     }
 
-    const stats = enhancerIntegration.statsUtils.getStats();
+    const stats = contentEnhancerIntegration.statsUtils.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
     toaster.showSuccess("Enhancement complete!");
 
@@ -436,7 +415,7 @@ async function processSingleContentBlock() {
   toaster.showLoading("Processing content...");
 
   try {
-    const enhancedText = await enhancerIntegration.enhanceText(originalText);
+    const enhancedText = await contentEnhancerIntegration.enhanceText(originalText);
 
     if (!enhancedText || typeof enhancedText !== "string") {
       console.warn("Invalid enhanced text received:", typeof enhancedText);
@@ -460,7 +439,7 @@ async function processSingleContentBlock() {
 
     // Report paragraph statistics
     const paragraphCount = (enhancedText.match(/\n\n/g) || []).length + 1;
-    const stats = enhancerIntegration.statsUtils.getStats();
+    const stats = contentEnhancerIntegration.statsUtils.getStats();
 
     chrome.runtime.sendMessage({
       action: "updateParagraphStats",
@@ -548,7 +527,7 @@ async function processParagraphBatch(
       } chars)`
     );
 
-    const enhancedText = await enhancerIntegration.enhanceText(batchText);
+    const enhancedText = await contentEnhancerIntegration.enhanceText(batchText);
 
     if (terminateRequested) {
       console.log(
@@ -672,7 +651,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Async operation - return true to keep channel open
     enhancePage()
       .then((result) => {
-        const stats = enhancerIntegration.statsUtils.getStats();
+        const stats = contentEnhancerIntegration.statsUtils.getStats();
         sendResponse({
           status: "enhanced",
           stats: stats
