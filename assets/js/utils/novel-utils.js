@@ -19,7 +19,7 @@ class NovelUtils {
     this.chapterDetector = new NovelChapterDetector();
     this.characterExtractor = new NovelCharacterExtractor();
     this.styleAnalyzer = new NovelStyleAnalyzer();
-    this.storageManager = new StorageManager();
+    this.storageManager = new NovelStorageManager();
 
     // Generate initial novel ID
     this.novelId = this.updateNovelId(url, this.title);
@@ -405,17 +405,19 @@ class NovelUtils {
   #optimizeCharacterMap(characterMap) {
     const optimized = {};
 
-    Object.entries(SharedUtils.deepClone(characterMap) || {}).forEach(([name, data]) => {
-      if (SharedUtils.validateCharacterName(name)) {
-        optimized[name] = SharedUtils.createCharacterData(
-          name,
-          data.gender,
-          data.confidence,
-          data.appearances,
-          data.evidence
-        );
+    Object.entries(SharedUtils.deepClone(characterMap) || {}).forEach(
+      ([name, data]) => {
+        if (SharedUtils.validateCharacterName(name)) {
+          optimized[name] = SharedUtils.createCharacterData(
+            name,
+            data.gender,
+            data.confidence,
+            data.appearances,
+            data.evidence
+          );
+        }
       }
-    });
+    );
 
     return optimized;
   }
