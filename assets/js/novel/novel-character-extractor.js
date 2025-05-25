@@ -38,7 +38,7 @@ class NovelCharacterExtractor {
         if (extractedName) {
           if (!characterMap[extractedName]) {
             characterMap[extractedName] = {
-              gender: "unknown",
+              gender: Constants.GENDER.UNKNOWN,
               appearances: 1
             };
           } else {

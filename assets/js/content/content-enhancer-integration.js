@@ -190,7 +190,9 @@ class ContentEnhancerIntegration {
 
     for (const [name, data] of Object.entries(updatedCharacterMap)) {
       const needsGenderDetermination =
-        data.gender === "unknown" || !data.confidence || data.confidence < 0.7;
+        data.gender === Constants.GENDER.UNKNOWN ||
+        !data.confidence ||
+        data.confidence < 0.7;
 
       if (needsGenderDetermination) {
         const genderInfo = this.genderUtils.guessGender(
@@ -201,7 +203,7 @@ class ContentEnhancerIntegration {
 
         updatedCharacterMap[name] = {
           ...updatedCharacterMap[name],
-          gender: genderInfo.gender,
+          gender: genderInfo.gender, // Already compressed from genderUtils
           confidence: genderInfo.confidence,
           evidence: genderInfo.evidence
         };

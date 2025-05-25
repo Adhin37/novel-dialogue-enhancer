@@ -361,7 +361,7 @@ class GenderUtils {
    */
   #createGenderResult(gender, confidence, evidence) {
     return {
-      gender: gender || "unknown",
+      gender: SharedUtils.compressGender(gender),
       confidence: Math.max(0, Math.min(1, confidence || 0)),
       evidence: Array.isArray(evidence) ? evidence : [evidence || "no evidence"]
     };

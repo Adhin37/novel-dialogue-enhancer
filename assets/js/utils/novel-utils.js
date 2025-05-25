@@ -343,6 +343,13 @@ class NovelUtils {
    * @return {Promise<object>} - Updated character map with existing data
    */
   async loadExistingCharacterData(characterMap) {
+    // Check if background is responsive first
+    const isConnected = await this.#checkBackgroundConnection();
+    if (!isConnected) {
+      console.warn("Background script not responsive, using local data only");
+      return characterMap;
+    }
+
     const novelData = await this.loadExistingNovelData();
     const existingMap = novelData.characterMap || {};
 
@@ -381,8 +388,7 @@ class NovelUtils {
       console.warn("Invalid response from background:", response);
       return { characterMap: {}, enhancedChapters: [] };
     } catch (error) {
-      console.warn("Error loading novel data:", error);
-      // Return empty data instead of failing
+      console.error("Error loading novel data:", error);
       return { characterMap: {}, enhancedChapters: [] };
     }
   }
@@ -448,6 +454,24 @@ class NovelUtils {
   }
 
   /**
+   * Check if background script is responsive
+   * @return {Promise<boolean>} - Whether background is responsive
+   * @private
+   */
+  async #checkBackgroundConnection() {
+    try {
+      const response = await this.#sendBackgroundMessage(
+        { action: "ping" },
+        1 // Only try once for ping
+      );
+      return response && response.status;
+    } catch (error) {
+      console.warn("Background connection check failed:", error);
+      return false;
+    }
+  }
+
+  /**
    * Sync novel style with background storage
    * @param {string} novelId - The novel ID to sync
    * @param {object} styleInfo - The style information to sync
@@ -470,9 +494,8 @@ class NovelUtils {
       });
   }
 
-  // Update the #sendBackgroundMessage method in novel-utils.js
   /**
-   * Send message to background script with retry logic
+   * Send message to background script with improved retry logic
    * @param {object} message - Message to send
    * @param {number} retries - Number of retries remaining
    * @return {Promise<object>} - Response from background
@@ -480,72 +503,115 @@ class NovelUtils {
    */
   async #sendBackgroundMessage(message, retries = 3) {
     return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        if (retries > 0) {
-          console.warn(`Message timeout, retrying... (${retries} left)`);
-          this.#sendBackgroundMessage(message, retries - 1)
-            .then(resolve)
-            .catch(reject);
-        } else {
-          reject(new Error("Background message timeout after all retries"));
-        }
-      }, 5000); // Reduced timeout for faster retries
+      let timeoutId;
+      let resolved = false;
 
-      try {
-        chrome.runtime.sendMessage(message, (response) => {
+      const cleanup = () => {
+        if (timeoutId) {
           clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
 
-          if (chrome.runtime.lastError) {
-            console.warn("Chrome runtime error:", chrome.runtime.lastError);
+      const safeResolve = (value) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve(value);
+        }
+      };
 
-            if (retries > 0) {
-              console.warn(
-                `Retrying message due to error... (${retries} left)`
-              );
-              setTimeout(() => {
-                this.#sendBackgroundMessage(message, retries - 1)
-                  .then(resolve)
-                  .catch(reject);
-              }, 1000); // Wait 1 second before retry
-            } else {
-              reject(chrome.runtime.lastError);
-            }
-            return;
-          }
-
-          if (!response) {
-            if (retries > 0) {
-              console.warn(`Empty response, retrying... (${retries} left)`);
-              setTimeout(() => {
-                this.#sendBackgroundMessage(message, retries - 1)
-                  .then(resolve)
-                  .catch(reject);
-              }, 1000);
-            } else {
-              reject(new Error("Empty response from background script"));
-            }
-            return;
-          }
-
-          resolve(response);
-        });
-      } catch (error) {
-        clearTimeout(timeoutId);
-
-        if (retries > 0) {
-          console.warn(
-            `Exception during message send, retrying... (${retries} left)`,
-            error
-          );
-          setTimeout(() => {
-            this.#sendBackgroundMessage(message, retries - 1)
-              .then(resolve)
-              .catch(reject);
-          }, 1000);
-        } else {
+      const safeReject = (error) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
           reject(error);
         }
-      }
+      };
+
+      const attemptSend = () => {
+        if (resolved) return;
+
+        timeoutId = setTimeout(() => {
+          if (!resolved && retries > 0) {
+            console.warn(`Message timeout, retrying... (${retries} left)`);
+            setTimeout(() => {
+              this.#sendBackgroundMessage(message, retries - 1)
+                .then(safeResolve)
+                .catch(safeReject);
+            }, 1000);
+          } else if (!resolved) {
+            safeReject(
+              new Error("Background message timeout after all retries")
+            );
+          }
+        }, 8000); // Increased timeout to 8 seconds
+
+        try {
+          chrome.runtime.sendMessage(message, (response) => {
+            if (resolved) return;
+
+            cleanup();
+
+            if (chrome.runtime.lastError) {
+              console.warn("Chrome runtime error:", chrome.runtime.lastError);
+
+              // Check for specific error types
+              const errorMessage = chrome.runtime.lastError.message || "";
+              const isConnectionError =
+                errorMessage.includes("message port closed") ||
+                errorMessage.includes("Extension context invalidated") ||
+                errorMessage.includes("receiving end does not exist");
+
+              if (isConnectionError && retries > 0) {
+                console.warn(`Connection error, retrying... (${retries} left)`);
+                setTimeout(() => {
+                  this.#sendBackgroundMessage(message, retries - 1)
+                    .then(safeResolve)
+                    .catch(safeReject);
+                }, 2000); // Longer delay for connection errors
+              } else {
+                safeReject(chrome.runtime.lastError);
+              }
+              return;
+            }
+
+            if (!response) {
+              if (retries > 0) {
+                console.warn(`Empty response, retrying... (${retries} left)`);
+                setTimeout(() => {
+                  this.#sendBackgroundMessage(message, retries - 1)
+                    .then(safeResolve)
+                    .catch(safeReject);
+                }, 1500);
+              } else {
+                safeReject(new Error("Empty response from background script"));
+              }
+              return;
+            }
+
+            safeResolve(response);
+          });
+        } catch (error) {
+          cleanup();
+
+          if (retries > 0) {
+            console.warn(
+              `Exception during message send, retrying... (${retries} left)`,
+              error
+            );
+            setTimeout(() => {
+              this.#sendBackgroundMessage(message, retries - 1)
+                .then(safeResolve)
+                .catch(safeReject);
+            }, 1500);
+          } else {
+            safeReject(error);
+          }
+        }
+      };
+
+      attemptSend();
     });
   }
 
@@ -595,13 +661,19 @@ class NovelUtils {
     Object.entries(SharedUtils.deepClone(characterMap) || {}).forEach(
       ([name, data]) => {
         if (SharedUtils.validateCharacterName(name)) {
-          optimized[name] = SharedUtils.createCharacterData(
-            name,
-            data.gender,
-            data.confidence,
-            data.appearances,
-            data.evidence
-          );
+          optimized[name] = {
+            name: name,
+            gender: SharedUtils.compressGender(data.gender),
+            confidence: SharedUtils.validateConfidence(data.confidence)
+              ? data.confidence
+              : 0,
+            appearances: SharedUtils.validateAppearances(data.appearances)
+              ? data.appearances
+              : 1,
+            evidence: Array.isArray(data.evidence)
+              ? data.evidence.slice(0, 5)
+              : []
+          };
         }
       }
     );
@@ -634,16 +706,19 @@ class NovelUtils {
         : sortedCharacters.slice(0, 10);
 
     displayCharacters.forEach((char) => {
+      const expandedGender = SharedUtils.expandGender(char.gender);
       const pronounInfo =
-        char.gender === "male"
+        expandedGender === Constants.GENDER.MALE_FULL
           ? "he/him/his"
-          : char.gender === "female"
+          : expandedGender === Constants.GENDER.FEMALE_FULL
           ? "she/her/her"
           : "unknown pronouns";
 
-      summary += `- ${char.name}: ${
-        char.gender || "unknown"
-      } (${pronounInfo}), appeared ${char.appearances || "unknown"} times\n`;
+      summary += `- ${
+        char.name
+      }: ${expandedGender} (${pronounInfo}), appeared ${
+        char.appearances || "unknown"
+      } times\n`;
     });
 
     return summary;

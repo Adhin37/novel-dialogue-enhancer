@@ -121,8 +121,7 @@ function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
   if (!maps || typeof maps !== "object") return {};
 
   const now = Date.now();
-  // Use deepClone to avoid mutating the input parameter
-  const purgedMaps = SharedUtils.deepClone(maps);
+  const purgedMaps = JSON.parse(JSON.stringify(maps));
   let purgedCount = 0;
 
   Object.entries(purgedMaps).forEach(([novelId, data]) => {
@@ -952,7 +951,7 @@ function handleMessage(request, sender, sendResponse) {
       ([charId, charData]) => {
         const characterName = charData.name;
         response.characterMap[characterName] = {
-          gender: SharedUtils.expandGender(charData.gender),
+          gender: charData.gender,
           confidence: charData.confidence,
           appearances: charData.appearances,
           evidence: charData.evidences || []
@@ -1243,7 +1242,6 @@ chrome.runtime.onStartup.addListener(() => {
   initializeBackground();
 });
 
-
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab.url) {
     const cacheKey = new URL(tab.url).hostname;
@@ -1269,20 +1267,34 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (
-    !isBackgroundReady &&
-    [
-      "getNovelData",
-      "updateNovelData",
-      "getNovelStyle",
-      "updateNovelStyle"
-    ].includes(request.action)
-  ) {
-    initializeBackground().then(() => {
-      handleMessage(request, sender, sendResponse);
-    });
+  const criticalActions = [
+    "getNovelData",
+    "updateNovelData",
+    "getNovelStyle",
+    "updateNovelStyle"
+  ];
+
+  if (!isBackgroundReady && criticalActions.includes(request.action)) {
+    initializeBackground()
+      .then(() => {
+        try {
+          return handleMessage(request, sender, sendResponse);
+        } catch (error) {
+          console.error("Error in handleMessage after initialization:", error);
+          sendResponse({
+            status: "error",
+            message: "Failed to process message after initialization"
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Background initialization failed:", error);
+        sendResponse({
+          status: "error",
+          message: "Background initialization failed"
+        });
+      });
     return true;
   }
 

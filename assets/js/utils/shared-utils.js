@@ -20,22 +20,40 @@ class SharedUtils {
   static compressGender(gender) {
     if (!gender || typeof gender !== "string") return Constants.GENDER.UNKNOWN;
     const genderLower = gender.toLowerCase();
-    if (genderLower === Constants.GENDER.MALE_FULL)
-      return Constants.GENDER.MALE;
-    if (genderLower === Constants.GENDER.FEMALE_FULL)
-      return Constants.GENDER.FEMALE;
+    const maleSet = new Set([
+      Constants.GENDER.MALE,
+      Constants.GENDER.MALE_FULL
+    ]);
+    const femaleSet = new Set([
+      Constants.GENDER.FEMALE,
+      Constants.GENDER.FEMALE_FULL
+    ]);
+    if (maleSet.has(genderLower)) return Constants.GENDER.MALE;
+    if (femaleSet.has(genderLower)) return Constants.GENDER.FEMALE;
+
     return Constants.GENDER.UNKNOWN;
   }
 
   /**
    * Expand gender code to full string
-   * @param {string} code - Single character gender code
+   * @param {string} gender - Single character gender code
    * @return {string} - Full gender string
    */
-  static expandGender(code) {
-    if (!code || typeof code !== "string") return Constants.GENDER.UNKNOWN_FULL;
-    if (code === Constants.GENDER.MALE) return Constants.GENDER.MALE_FULL;
-    if (code === Constants.GENDER.FEMALE) return Constants.GENDER.FEMALE_FULL;
+  static expandGender(gender) {
+    if (typeof gender !== "string") return Constants.GENDER.UNKNOWN_FULL;
+    const genderLower = gender.toLowerCase();
+    const maleSet = new Set([
+      Constants.GENDER.MALE,
+      Constants.GENDER.MALE_FULL
+    ]);
+    const femaleSet = new Set([
+      Constants.GENDER.FEMALE,
+      Constants.GENDER.FEMALE_FULL
+    ]);
+
+    if (maleSet.has(genderLower)) return Constants.GENDER.MALE_FULL;
+    if (femaleSet.has(genderLower)) return Constants.GENDER.FEMALE_FULL;
+
     return Constants.GENDER.UNKNOWN_FULL;
   }
 
@@ -171,7 +189,7 @@ class SharedUtils {
   ) {
     return {
       name: String(name || ""),
-      gender: this.validateGender(gender) ? gender : "unknown",
+      gender: this.compressGender(gender),
       confidence: this.validateConfidence(confidence) ? confidence : 0,
       appearances: this.validateAppearances(appearances) ? appearances : 1,
       evidence: Array.isArray(evidence) ? evidence.slice(0, 5) : []
