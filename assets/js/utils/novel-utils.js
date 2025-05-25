@@ -378,9 +378,11 @@ class NovelUtils {
         };
       }
 
+      console.warn("Invalid response from background:", response);
       return { characterMap: {}, enhancedChapters: [] };
     } catch (error) {
       console.warn("Error loading novel data:", error);
+      // Return empty data instead of failing
       return { characterMap: {}, enhancedChapters: [] };
     }
   }
@@ -468,24 +470,60 @@ class NovelUtils {
       });
   }
 
+  // Update the #sendBackgroundMessage method in novel-utils.js
   /**
-   * Send message to background script with timeout
+   * Send message to background script with retry logic
    * @param {object} message - Message to send
+   * @param {number} retries - Number of retries remaining
    * @return {Promise<object>} - Response from background
    * @private
    */
-  async #sendBackgroundMessage(message) {
+  async #sendBackgroundMessage(message, retries = 3) {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
-        reject(new Error("Background message timeout"));
-      }, 10000);
+        if (retries > 0) {
+          console.warn(`Message timeout, retrying... (${retries} left)`);
+          this.#sendBackgroundMessage(message, retries - 1)
+            .then(resolve)
+            .catch(reject);
+        } else {
+          reject(new Error("Background message timeout after all retries"));
+        }
+      }, 5000); // Reduced timeout for faster retries
 
       try {
         chrome.runtime.sendMessage(message, (response) => {
           clearTimeout(timeoutId);
 
           if (chrome.runtime.lastError) {
-            reject(chrome.runtime.lastError);
+            console.warn("Chrome runtime error:", chrome.runtime.lastError);
+
+            if (retries > 0) {
+              console.warn(
+                `Retrying message due to error... (${retries} left)`
+              );
+              setTimeout(() => {
+                this.#sendBackgroundMessage(message, retries - 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 1000); // Wait 1 second before retry
+            } else {
+              reject(chrome.runtime.lastError);
+            }
+            return;
+          }
+
+          if (!response) {
+            if (retries > 0) {
+              console.warn(`Empty response, retrying... (${retries} left)`);
+              setTimeout(() => {
+                this.#sendBackgroundMessage(message, retries - 1)
+                  .then(resolve)
+                  .catch(reject);
+              }, 1000);
+            } else {
+              reject(new Error("Empty response from background script"));
+            }
             return;
           }
 
@@ -493,7 +531,20 @@ class NovelUtils {
         });
       } catch (error) {
         clearTimeout(timeoutId);
-        reject(error);
+
+        if (retries > 0) {
+          console.warn(
+            `Exception during message send, retrying... (${retries} left)`,
+            error
+          );
+          setTimeout(() => {
+            this.#sendBackgroundMessage(message, retries - 1)
+              .then(resolve)
+              .catch(reject);
+          }, 1000);
+        } else {
+          reject(error);
+        }
       }
     });
   }

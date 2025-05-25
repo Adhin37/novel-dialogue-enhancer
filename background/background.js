@@ -1,6 +1,8 @@
+// At the top of background/background.js, update the initialization
 const activeRequestControllers = new Map();
-const DEFAULT_OLLAMA_URL = "http://localhost:11434";
+const DEFAULT_OLLAMA_URL = Constants.DEFAULT_OLLAMA_URL;
 let novelCharacterMaps = {};
+let isBackgroundReady = false;
 let globalStats = {
   totalParagraphsEnhanced: 0,
   totalChaptersEnhanced: 0,
@@ -11,6 +13,71 @@ let globalStats = {
   lastEnhancementDate: null,
   firstEnhancementDate: null
 };
+
+// Initialize background script properly
+function initializeBackground() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(["globalStats", "novelCharacterMaps"], (data) => {
+      if (chrome.runtime.lastError) {
+        console.warn(
+          "Error loading background data:",
+          chrome.runtime.lastError
+        );
+      } else {
+        if (data.globalStats) {
+          globalStats = { ...globalStats, ...data.globalStats };
+        }
+        if (data.novelCharacterMaps) {
+          novelCharacterMaps = data.novelCharacterMaps;
+        } else {
+          novelCharacterMaps = {};
+          chrome.storage.local.set({ novelCharacterMaps: {} });
+        }
+      }
+
+      isBackgroundReady = true;
+      console.log(
+        "Background script initialized with",
+        Object.keys(novelCharacterMaps).length,
+        "novels"
+      );
+      resolve();
+    });
+  });
+}
+
+// Update the chrome.runtime.onInstalled listener
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.sync.get(
+    {
+      isExtensionPaused: false,
+      preserveNames: true,
+      fixPronouns: true,
+      modelName: "qwen3:8b",
+      maxChunkSize: 4000,
+      timeout: 180,
+      disabledPages: [],
+      temperature: 0.4,
+      topP: 0.9,
+      whitelistedSites: []
+    },
+    (data) => {
+      chrome.storage.sync.set(data);
+      console.log("Extension initialized with default settings:", data);
+
+      // Initialize background data
+      initializeBackground();
+    }
+  );
+});
+
+// Also initialize on startup
+chrome.runtime.onStartup.addListener(() => {
+  initializeBackground();
+});
+
+// Initialize immediately when script loads
+initializeBackground();
 
 // Add this function after the existing helper functions
 function updateGlobalStats(statsUpdate) {
@@ -708,6 +775,28 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Check if background is ready for data operations
+  if (
+    !isBackgroundReady &&
+    [
+      "getNovelData",
+      "updateNovelData",
+      "getNovelStyle",
+      "updateNovelStyle"
+    ].includes(request.action)
+  ) {
+    console.warn("Background not ready, waiting...");
+    initializeBackground().then(() => {
+      // Retry the operation after initialization
+      handleMessage(request, sender, sendResponse);
+    });
+    return true; // Keep channel open
+  }
+
+  return handleMessage(request, sender, sendResponse);
+});
+
+function handleMessage(request, sender, sendResponse) {
   if (request.action === "updateNovelData") {
     const novelId = request.novelId;
 
@@ -715,6 +804,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       console.warn("No novel ID provided for novel data update");
       sendResponse({ status: "error", message: "No novel ID provided" });
       return false;
+    }
+
+    // Ensure novelCharacterMaps is initialized
+    if (!novelCharacterMaps) {
+      novelCharacterMaps = {};
     }
 
     if (!novelCharacterMaps[novelId]) {
@@ -917,6 +1011,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Ensure novelCharacterMaps is initialized
+    if (!novelCharacterMaps) {
+      novelCharacterMaps = {};
+    }
+
     // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       sendResponse({
@@ -952,7 +1051,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       response.isChapterEnhanced = isEnhanced;
     }
 
-    Object.entries(novelCharacterMaps[novelId].chars).forEach(
+    Object.entries(novelCharacterMaps[novelId].chars || {}).forEach(
       ([charId, charData]) => {
         const characterName = charData.name;
         response.characterMap[characterName] = {
@@ -1117,6 +1216,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     // Async operation - return true to keep channel open
     checkOllamaAvailability(sendResponse);
     return true; // Keep message channel open for async response
+  } else if (request.action === "getOllamaModels") {
+    // Async operation - return true to keep channel open
+    fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then((data) => {
+        const models = data.models
+          ? data.models.map((model) => model.name)
+          : [];
+        sendResponse({ models });
+      })
+      .catch((error) => {
+        console.error("Error fetching Ollama models:", error);
+        sendResponse({ models: [], error: error.message });
+      });
+    return true; // Keep message channel open for async response
   } else if (request.action === "getNovelStyle") {
     const novelId = request.novelId;
 
@@ -1125,9 +1247,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Ensure novelCharacterMaps is initialized
+    if (!novelCharacterMaps) {
+      novelCharacterMaps = {};
+    }
+
     const novelData = novelCharacterMaps[novelId] || {};
     novelData.lastAccess = Date.now();
-    novelCharacterMaps[novelId] = novelData;
+
+    if (!novelCharacterMaps[novelId]) {
+      novelCharacterMaps[novelId] = novelData;
+    }
 
     if (novelData.style) {
       sendResponse({ status: "ok", style: novelData.style });
@@ -1148,6 +1278,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return false;
     }
 
+    // Ensure novelCharacterMaps is initialized
+    if (!novelCharacterMaps) {
+      novelCharacterMaps = {};
+    }
+
     if (!novelCharacterMaps[novelId]) {
       novelCharacterMaps[novelId] = {
         chars: {},
@@ -1166,5 +1301,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return false;
   }
 
+  // Default for unhandled actions
+  sendResponse({ status: "error", error: "Unknown action" });
   return false;
-});
+}
