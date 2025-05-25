@@ -8,13 +8,65 @@ class RelationshipAnalyzer {
    * Check for relationship descriptions that indicate gender
    * @param {string} name - Character name
    * @param {string} text - Text context
+   * @param {string} culturalOrigin - Detected cultural origin
    * @return {object} - Gender scores with evidence
    */
-  checkRelationships(name, text) {
+  checkRelationships(name, text, culturalOrigin = "western") {
     let maleScore = 0;
     let femaleScore = 0;
     let evidence = null;
 
+    // Get cultural-specific relationship patterns
+    const culturalRelationships =
+      this.#getCulturalRelationshipPatterns(culturalOrigin);
+
+    // Check cultural-specific male relationships
+    for (const relation of culturalRelationships.male) {
+      const regex = new RegExp(
+        relation.replace(/\{name\}/g, SharedUtils.escapeRegExp(name)),
+        "i"
+      );
+      if (regex.test(text)) {
+        maleScore += 3;
+        evidence = `${culturalOrigin} relationship: ${relation}`;
+        break;
+      }
+    }
+
+    // Check cultural-specific female relationships
+    if (!evidence) {
+      for (const relation of culturalRelationships.female) {
+        const regex = new RegExp(
+          relation.replace(/\{name\}/g, SharedUtils.escapeRegExp(name)),
+          "i"
+        );
+        if (regex.test(text)) {
+          femaleScore += 3;
+          evidence = `${culturalOrigin} relationship: ${relation}`;
+          break;
+        }
+      }
+    }
+
+    // Fall back to general relationship patterns if no cultural match
+    if (!evidence) {
+      const generalResult = this.#checkGeneralRelationships(name, text);
+      maleScore += generalResult.maleScore;
+      femaleScore += generalResult.femaleScore;
+      evidence = generalResult.evidence;
+    }
+
+    return { maleScore, femaleScore, evidence };
+  }
+
+  /**
+   * Check general relationship patterns as fallback
+   * @param {string} name - Character name
+   * @param {string} text - Text context
+   * @return {object} - Analysis results
+   * @private
+   */
+  #checkGeneralRelationships(name, text) {
     const maleRelationships = [
       `${name} was her husband`,
       `${name} was his husband`,
@@ -22,18 +74,8 @@ class RelationshipAnalyzer {
       `${name} was the father`,
       `${name} was the son`,
       `${name} was the brother`,
-      `${name} was the uncle`,
-      `${name} was the grandfather`,
-      `${name} was the grandson`,
-      `${name} was the king`,
-      `${name} was the prince`,
-      `${name} was the emperor`,
-      `${name} was the lord`,
-      `${name} was the duke`,
-      `${name} was the boyfriend`,
       `${name}, the husband`,
-      `${name}, the father`,
-      `${name}, the brother`
+      `${name}, the father`
     ];
 
     const femaleRelationships = [
@@ -43,39 +85,172 @@ class RelationshipAnalyzer {
       `${name} was the mother`,
       `${name} was the daughter`,
       `${name} was the sister`,
-      `${name} was the aunt`,
-      `${name} was the grandmother`,
-      `${name} was the granddaughter`,
-      `${name} was the queen`,
-      `${name} was the princess`,
-      `${name} was the empress`,
-      `${name} was the lady`,
-      `${name} was the duchess`,
-      `${name} was the girlfriend`,
       `${name}, the wife`,
-      `${name}, the mother`,
-      `${name}, the sister`
+      `${name}, the mother`
     ];
 
-    // Check for male relationship indicators
+    let maleScore = 0;
+    let femaleScore = 0;
+    let evidence = null;
+
     for (const relation of maleRelationships) {
       if (text.toLowerCase().includes(relation.toLowerCase())) {
         maleScore += 3;
-        evidence = relation;
+        evidence = `general relationship: ${relation}`;
         break;
       }
     }
 
-    // Check for female relationship indicators
-    for (const relation of femaleRelationships) {
-      if (text.toLowerCase().includes(relation.toLowerCase())) {
-        femaleScore += 3;
-        evidence = relation;
-        break;
+    if (!evidence) {
+      for (const relation of femaleRelationships) {
+        if (text.toLowerCase().includes(relation.toLowerCase())) {
+          femaleScore += 3;
+          evidence = `general relationship: ${relation}`;
+          break;
+        }
       }
     }
 
     return { maleScore, femaleScore, evidence };
+  }
+
+  /**
+   * Get cultural-specific relationship patterns
+   * @param {string} culturalOrigin - Cultural origin
+   * @return {object} - Cultural relationship patterns
+   * @private
+   */
+  #getCulturalRelationshipPatterns(culturalOrigin) {
+    const patterns = {
+      western: {
+        male: [
+          "{name} was her husband",
+          "{name} was his husband",
+          "{name}'s wife",
+          "{name} was the father",
+          "{name} was the son",
+          "{name} was the brother",
+          "{name} was the uncle",
+          "{name} was the grandfather",
+          "{name} was the boyfriend",
+          "{name}, the husband",
+          "{name}, the father"
+        ],
+        female: [
+          "{name} was his wife",
+          "{name} was her wife",
+          "{name}'s husband",
+          "{name} was the mother",
+          "{name} was the daughter",
+          "{name} was the sister",
+          "{name} was the aunt",
+          "{name} was the grandmother",
+          "{name} was the girlfriend",
+          "{name}, the wife",
+          "{name}, the mother"
+        ]
+      },
+      chinese: {
+        male: [
+          "{name} was her husband",
+          "{name}'s wife",
+          "{name} was the father",
+          "{name} was the son",
+          "{name} was the elder brother",
+          "{name} was the younger brother",
+          "{name} was the uncle",
+          "{name} was the grandfather",
+          "{name}, the young master",
+          "{name}, the sect master",
+          "{name}, the patriarch",
+          "{name} dage",
+          "{name} gege",
+          "{name} shixiong",
+          "{name} shifu"
+        ],
+        female: [
+          "{name} was his wife",
+          "{name}'s husband",
+          "{name} was the mother",
+          "{name} was the daughter",
+          "{name} was the elder sister",
+          "{name} was the younger sister",
+          "{name} was the aunt",
+          "{name} was the grandmother",
+          "{name}, the young miss",
+          "{name}, the sect mistress",
+          "{name}, the matriarch",
+          "{name} jiejie",
+          "{name} meimei",
+          "{name} shijie",
+          "{name} shimei"
+        ]
+      },
+      japanese: {
+        male: [
+          "{name} was her husband",
+          "{name}'s wife",
+          "{name} was the father",
+          "{name} was the son",
+          "{name} was the older brother",
+          "{name} was the younger brother",
+          "{name} was the uncle",
+          "{name} was the grandfather",
+          "{name}-kun",
+          "{name}-sama",
+          "{name}-san",
+          "{name} oniisan",
+          "{name} otouto",
+          "{name} otousan"
+        ],
+        female: [
+          "{name} was his wife",
+          "{name}'s husband",
+          "{name} was the mother",
+          "{name} was the daughter",
+          "{name} was the older sister",
+          "{name} was the younger sister",
+          "{name} was the aunt",
+          "{name} was the grandmother",
+          "{name}-chan",
+          "{name}-sama",
+          "{name}-san",
+          "{name} oneesan",
+          "{name} imouto",
+          "{name} okaasan"
+        ]
+      },
+      korean: {
+        male: [
+          "{name} was her husband",
+          "{name}'s wife",
+          "{name} was the father",
+          "{name} was the son",
+          "{name} was the older brother",
+          "{name} was the younger brother",
+          "{name} was the uncle",
+          "{name} was the grandfather",
+          "{name} oppa",
+          "{name} hyung",
+          "{name} abeoji"
+        ],
+        female: [
+          "{name} was his wife",
+          "{name}'s husband",
+          "{name} was the mother",
+          "{name} was the daughter",
+          "{name} was the older sister",
+          "{name} was the younger sister",
+          "{name} was the aunt",
+          "{name} was the grandmother",
+          "{name} unni",
+          "{name} eonni",
+          "{name} eomeoni"
+        ]
+      }
+    };
+
+    return patterns[culturalOrigin] || patterns.western;
   }
 
   /**

@@ -48,14 +48,18 @@ class PronounAnalyzer {
 
       const directMaleConnection = followingText.match(
         new RegExp(
-          `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,30}\\b(he|him|his)\\b`,
+          `\\b${SharedUtils.escapeRegExp(
+            name
+          )}\\b[^.!?]{0,30}\\b(he|him|his)\\b`,
           "i"
         )
       );
 
       const directFemaleConnection = followingText.match(
         new RegExp(
-          `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,30}\\b(she|her|hers)\\b`,
+          `\\b${SharedUtils.escapeRegExp(
+            name
+          )}\\b[^.!?]{0,30}\\b(she|her|hers)\\b`,
           "i"
         )
       );
@@ -82,10 +86,14 @@ class PronounAnalyzer {
     }
 
     // Check proximity text for additional clues
-    this.#analyzeProximityText(name, proximityMatches, { maleScore, femaleScore });
+    const proximityResult = this.#analyzeProximityText(name, proximityMatches);
+    maleScore += proximityResult.maleScore;
+    femaleScore += proximityResult.femaleScore;
 
     // Check for archetypal gender indicators
-    this.#checkArchetypes(name, text, { maleScore, femaleScore });
+    const archetypeResult = this.#checkArchetypes(name, text);
+    maleScore += archetypeResult.maleScore;
+    femaleScore += archetypeResult.femaleScore;
 
     return {
       maleScore,
@@ -99,10 +107,13 @@ class PronounAnalyzer {
    * Analyze text surrounding the character name
    * @param {string} name - Character name
    * @param {Array} proximityMatches - Matches of text near the character name
-   * @param {object} scores - Object containing maleScore and femaleScore
+   * @return {object} - Analysis results with scores
    * @private
    */
-  #analyzeProximityText(name, proximityMatches, scores) {
+  #analyzeProximityText(name, proximityMatches) {
+    let maleScore = 0;
+    let femaleScore = 0;
+
     for (const match of proximityMatches) {
       const proximityText = match[0];
 
@@ -116,7 +127,7 @@ class PronounAnalyzer {
           )
         )
       ) {
-        scores.maleScore += 3;
+        maleScore += 3;
       }
 
       if (
@@ -129,7 +140,7 @@ class PronounAnalyzer {
           )
         )
       ) {
-        scores.femaleScore += 3;
+        femaleScore += 3;
       }
 
       if (
@@ -142,7 +153,7 @@ class PronounAnalyzer {
           )
         )
       ) {
-        scores.maleScore += 2;
+        maleScore += 2;
       }
 
       if (
@@ -155,19 +166,24 @@ class PronounAnalyzer {
           )
         )
       ) {
-        scores.femaleScore += 2;
+        femaleScore += 2;
       }
     }
+
+    return { maleScore, femaleScore };
   }
 
   /**
    * Check for archetypal gender indicators in text
    * @param {string} name - Character name
    * @param {string} text - Text to analyze
-   * @param {object} scores - Object containing maleScore and femaleScore
+   * @return {object} - Analysis results with scores
    * @private
    */
-  #checkArchetypes(name, text, scores) {
+  #checkArchetypes(name, text) {
+    let maleScore = 0;
+    let femaleScore = 0;
+
     const maleArchetypes = [
       `\\b${SharedUtils.escapeRegExp(
         name
@@ -188,15 +204,17 @@ class PronounAnalyzer {
 
     for (const pattern of maleArchetypes) {
       if (new RegExp(pattern, "i").test(text)) {
-        scores.maleScore += 3;
+        maleScore += 3;
       }
     }
 
     for (const pattern of femaleArchetypes) {
       if (new RegExp(pattern, "i").test(text)) {
-        scores.femaleScore += 3;
+        femaleScore += 3;
       }
     }
+
+    return { maleScore, femaleScore };
   }
 
   /**

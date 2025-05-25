@@ -18,13 +18,13 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
   }
 
   /**
-   * Detect the likely cultural origin of a name
+   * Enhanced cultural origin detection with improved accuracy
    * @param {string} name - The name to analyze
    * @param {string} text - Surrounding text context
    * @return {string} - Cultural origin (western, chinese, japanese, korean)
    */
   detectNameCulturalOrigin(name, text) {
-    // Check for obvious character usage first
+    // Priority 1: Check for obvious character usage
     if (this.characterPatterns.chinese.test(name)) {
       return "chinese";
     }
@@ -35,55 +35,62 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
       return "korean";
     }
 
-    // Enhanced name pattern recognition for romanized East Asian names
+    // Priority 2: Enhanced name pattern recognition (now includes western)
     const namePatterns = this.#getNamePatterns();
+    const nameScores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
 
-    for (const pattern of namePatterns.chinese) {
-      if (pattern.test(name)) {
-        return "chinese";
+    // Score each cultural pattern
+    for (const [culture, patterns] of Object.entries(namePatterns)) {
+      for (const pattern of patterns) {
+        if (pattern.test(name)) {
+          nameScores[culture] += 2;
+        }
       }
     }
 
-    for (const pattern of namePatterns.japanese) {
-      if (pattern.test(name)) {
-        return "japanese";
-      }
-    }
-
-    for (const pattern of namePatterns.korean) {
-      if (pattern.test(name)) {
-        return "korean";
-      }
-    }
-
-    // Check context for cultural indicators when name pattern doesn't give a clear result
+    // Priority 3: Context analysis with enhanced cultural indicators
     const contextClues = this.#getContextClues();
-    const culturalScores = {
-      chinese: 0,
-      japanese: 0,
-      korean: 0,
-      western: 0
-    };
+    const contextScores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
 
-    // Count matches of cultural references in the surrounding text
-    for (const culture in contextClues) {
-      for (const pattern of contextClues[culture]) {
-        const matches = text.match(pattern) || [];
-        culturalScores[culture] += matches.length;
+    // Enhanced context scoring with proximity weighting
+    const nameProximityText = this._getProximityText(name, text, 200);
+    const combinedText = nameProximityText.join(" ");
+
+    for (const [culture, patterns] of Object.entries(contextClues)) {
+      for (const pattern of patterns) {
+        const matches = combinedText.match(pattern) || [];
+        contextScores[culture] += matches.length * 2;
       }
     }
 
-    // Get the dominant culture from the context
-    const dominantCulture = Object.keys(culturalScores).reduce(
-      (a, b) => (culturalScores[a] > culturalScores[b] ? a : b),
+    // Priority 4: Enhanced cultural linguistic patterns
+    const linguisticScores = this.#analyzeLinguisticPatterns(combinedText);
+
+    // Combine all scores with different weights
+    const finalScores = {};
+    for (const culture of ["chinese", "japanese", "korean", "western"]) {
+      finalScores[culture] =
+        nameScores[culture] * 3 + // Name patterns are most reliable
+        contextScores[culture] * 2 + // Context is very important
+        linguisticScores[culture] * 1; // Linguistic patterns support
+    }
+
+    // Find the dominant culture
+    const dominantCulture = Object.keys(finalScores).reduce(
+      (a, b) => (finalScores[a] > finalScores[b] ? a : b),
       "western"
     );
 
-    if (dominantCulture !== "western" && culturalScores[dominantCulture] > 0) {
+    // Return result with reasonable confidence threshold
+    if (finalScores[dominantCulture] >= 2) {
       return dominantCulture;
     }
 
-    // Default to western when no strong indicators exist
+    // Default fallback
+    console.log(
+      `Cultural detection uncertain for ${name}, scores:`,
+      finalScores
+    );
     return "western";
   }
 
@@ -178,7 +185,7 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
   }
 
   /**
-   * Get the name patterns for different cultures
+   * Get the name patterns for different cultures (now includes western)
    * @return {object} - Object with name patterns for each culture
    * @private
    */
@@ -207,8 +214,70 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
         /^(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
         // Common Korean name components
         /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
+      ],
+      western: [
+        // Common Western male first names
+        /^(?:John|James|Robert|Michael|William|David|Richard|Charles|Joseph|Thomas|Christopher|Daniel|Paul|Mark|Donald|George|Kenneth|Steven|Edward|Brian|Ronald|Anthony|Kevin|Jason|Matthew|Gary|Timothy|Jose|Larry|Jeffrey|Frank|Scott|Eric|Jonathan|Stephen|Larry|Justin|Andrew|Kenneth|Peter|Joshua|Jacob|Wayne|Noah|Henry|Alexander|Aaron|Samuel|Logan|Benjamin|Mason|Ethan|Nathan|Lucas|Tyler|Liam|Owen|Caleb|Ryan|Carter|Connor)\b/i,
+        // Common Western female first names
+        /^(?:Mary|Patricia|Jennifer|Linda|Elizabeth|Barbara|Susan|Jessica|Sarah|Karen|Nancy|Lisa|Betty|Helen|Sandra|Donna|Carol|Ruth|Sharon|Michelle|Laura|Sarah|Kimberly|Deborah|Dorothy|Lisa|Nancy|Karen|Betty|Helen|Margaret|Ruth|Carol|Sharon|Michelle|Laura|Sarah|Ashley|Emily|Emma|Madison|Olivia|Hannah|Abigail|Isabella|Samantha|Elizabeth|Charlotte|Amelia|Evelyn|Ava|Harper|Sophia|Aria|Luna|Grace|Chloe|Penelope|Layla|Riley|Zoey|Nora|Lily|Eleanor|Hannah|Lillian|Addison|Aubrey|Ellie|Stella|Natalie|Zoe)\b/i,
+        // Common Western surnames
+        /\b(?:Smith|Johnson|Williams|Brown|Jones|Garcia|Miller|Davis|Rodriguez|Martinez|Hernandez|Lopez|Gonzalez|Wilson|Anderson|Thomas|Taylor|Moore|Jackson|Martin|Lee|Perez|Thompson|White|Harris|Sanchez|Clark|Ramirez|Lewis|Robinson|Walker|Young|Allen|King|Wright|Scott|Torres|Nguyen|Hill|Flores|Green|Adams|Nelson|Baker|Hall|Rivera|Campbell|Mitchell|Carter|Roberts|Gomez|Phillips|Evans|Turner|Diaz|Parker|Cruz|Edwards|Collins|Reyes|Stewart|Morris|Morales|Murphy|Cook|Rogers|Gutierrez|Ortiz|Morgan|Cooper|Peterson|Bailey|Reed|Kelly|Howard|Ramos|Kim|Cox|Ward|Richardson|Watson|Brooks|Chavez|Wood|James|Bennett|Gray|Mendoza|Ruiz|Hughes|Price|Alvarez|Castillo|Sanders|Patel|Myers|Long|Ross|Foster|Jimenez)\b/i,
+        // Western titles and honorifics
+        /^(?:Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Professor|Sir|Lord|Lady|Duke|Duchess|Count|Countess|Baron|Baroness|Prince|Princess|King|Queen)/i,
+        // Common Western name patterns
+        /^[A-Z][a-z]+\s[A-Z][a-z]+$/, // FirstName LastName pattern
+        /^[A-Z][a-z]+\s[A-Z]\.\s[A-Z][a-z]+$/, // FirstName M. LastName pattern
+        /^[A-Z]\.\s[A-Z][a-z]+\s[A-Z][a-z]+$/ // F. MiddleName LastName pattern
       ]
     };
+  }
+
+  /**
+   * Analyze linguistic patterns in text
+   * @param {string} text - Text to analyze
+   * @return {object} - Linguistic pattern scores
+   * @private
+   */
+  #analyzeLinguisticPatterns(text) {
+    const scores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
+
+    // Chinese-specific patterns
+    if (
+      /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i.test(
+        text
+      )
+    ) {
+      scores.chinese += 3;
+    }
+
+    // Japanese-specific patterns
+    if (
+      /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i.test(
+        text
+      )
+    ) {
+      scores.japanese += 3;
+    }
+
+    // Korean-specific patterns
+    if (
+      /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i.test(
+        text
+      )
+    ) {
+      scores.korean += 3;
+    }
+
+    // Western-specific patterns
+    if (
+      /\b(mister|miss|mrs|sir|lord|lady|duke|duchess|prince|princess|king|queen|knight|castle|manor|estate|nobility|aristocracy|parliament|congress|democracy|republic|university|college|corporation|company|business|enterprise|church|cathedral|chapel|priest|minister|pastor|reverend|doctor|professor|attorney|lawyer|judge|sheriff|mayor|governor|president|senator|congressman|representative)\b/i.test(
+        text
+      )
+    ) {
+      scores.western += 3;
+    }
+
+    return scores;
   }
 
   /**
