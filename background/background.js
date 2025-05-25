@@ -1,8 +1,9 @@
-// At the top of background/background.js, update the initialization
+// background.js
 const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 let isBackgroundReady = false;
+let initializationPromise = null; // Prevent multiple simultaneous initializations
 let globalStats = {
   totalParagraphsEnhanced: 0,
   totalChaptersEnhanced: 0,
@@ -13,10 +14,20 @@ let globalStats = {
   lastEnhancementDate: null,
   firstEnhancementDate: null
 };
+const whitelistCache = new Map();
+const CACHE_EXPIRY = 5 * 60 * 1000;
 
-// Initialize background script properly
+// Single initialization function
 function initializeBackground() {
-  return new Promise((resolve) => {
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  if (isBackgroundReady) {
+    return Promise.resolve();
+  }
+
+  initializationPromise = new Promise((resolve) => {
     chrome.storage.local.get(["globalStats", "novelCharacterMaps"], (data) => {
       if (chrome.runtime.lastError) {
         console.warn(
@@ -36,6 +47,7 @@ function initializeBackground() {
       }
 
       isBackgroundReady = true;
+      initializationPromise = null; // Reset for future calls
       console.log(
         "Background script initialized with",
         Object.keys(novelCharacterMaps).length,
@@ -44,40 +56,9 @@ function initializeBackground() {
       resolve();
     });
   });
+
+  return initializationPromise;
 }
-
-// Update the chrome.runtime.onInstalled listener
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.get(
-    {
-      isExtensionPaused: false,
-      preserveNames: true,
-      fixPronouns: true,
-      modelName: "qwen3:8b",
-      maxChunkSize: 4000,
-      timeout: 180,
-      disabledPages: [],
-      temperature: 0.4,
-      topP: 0.9,
-      whitelistedSites: []
-    },
-    (data) => {
-      chrome.storage.sync.set(data);
-      console.log("Extension initialized with default settings:", data);
-
-      // Initialize background data
-      initializeBackground();
-    }
-  );
-});
-
-// Also initialize on startup
-chrome.runtime.onStartup.addListener(() => {
-  initializeBackground();
-});
-
-// Initialize immediately when script loads
-initializeBackground();
 
 // Add this function after the existing helper functions
 function updateGlobalStats(statsUpdate) {
@@ -698,55 +679,6 @@ async function requestPermission(domain) {
   );
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.get(
-    {
-      isExtensionPaused: false,
-      preserveNames: true,
-      fixPronouns: true,
-      modelName: "qwen3:8b",
-      maxChunkSize: 4000,
-      timeout: 180,
-      disabledPages: [],
-      temperature: 0.4,
-      topP: 0.9,
-      whitelistedSites: []
-    },
-    (data) => {
-      chrome.storage.sync.set(data);
-      console.log("Extension initialized with default settings:", data);
-    }
-  );
-});
-
-const whitelistCache = new Map();
-const CACHE_EXPIRY = 5 * 60 * 1000;
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === "complete" && tab.url) {
-    const cacheKey = new URL(tab.url).hostname;
-    const cachedResult = whitelistCache.get(cacheKey);
-
-    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
-      sendWhitelistStatus(tabId, cachedResult.isWhitelisted);
-      return;
-    }
-
-    isSiteWhitelisted(tab.url)
-      .then((isWhitelisted) => {
-        whitelistCache.set(cacheKey, {
-          isWhitelisted,
-          timestamp: Date.now()
-        });
-
-        sendWhitelistStatus(tabId, isWhitelisted);
-      })
-      .catch((error) => {
-        console.error("Error checking whitelist status:", error);
-      });
-  }
-});
-
 /**
  * Sends whitelist status to a tab
  * @param {number} tabId - Tab ID
@@ -760,41 +692,6 @@ function sendWhitelistStatus(tabId, isWhitelisted) {
     })
     .catch(() => {});
 }
-
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.get("globalStats", (data) => {
-    if (data.globalStats) {
-      globalStats = { ...globalStats, ...data.globalStats };
-    }
-  });
-  chrome.storage.local.get("novelCharacterMaps", (data) => {
-    if (data.novelCharacterMaps) {
-      novelCharacterMaps = data.novelCharacterMaps;
-    }
-  });
-});
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // Check if background is ready for data operations
-  if (
-    !isBackgroundReady &&
-    [
-      "getNovelData",
-      "updateNovelData",
-      "getNovelStyle",
-      "updateNovelStyle"
-    ].includes(request.action)
-  ) {
-    console.warn("Background not ready, waiting...");
-    initializeBackground().then(() => {
-      // Retry the operation after initialization
-      handleMessage(request, sender, sendResponse);
-    });
-    return true; // Keep channel open
-  }
-
-  return handleMessage(request, sender, sendResponse);
-});
 
 function handleMessage(request, sender, sendResponse) {
   if (request.action === "updateNovelData") {
@@ -1305,3 +1202,89 @@ function handleMessage(request, sender, sendResponse) {
   sendResponse({ status: "error", error: "Unknown action" });
   return false;
 }
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.sync.get(
+    {
+      isExtensionPaused: false,
+      preserveNames: true,
+      fixPronouns: true,
+      modelName: "qwen3:8b",
+      maxChunkSize: 4000,
+      timeout: 180,
+      disabledPages: [],
+      temperature: 0.4,
+      topP: 0.9,
+      whitelistedSites: []
+    },
+    (data) => {
+      chrome.storage.sync.set(data);
+      console.log("Extension initialized with default settings:", data);
+    }
+  );
+
+  chrome.storage.local.get("globalStats", (data) => {
+    if (data.globalStats) {
+      globalStats = { ...globalStats, ...data.globalStats };
+    }
+  });
+  chrome.storage.local.get("novelCharacterMaps", (data) => {
+    if (data.novelCharacterMaps) {
+      novelCharacterMaps = data.novelCharacterMaps;
+    }
+  });
+
+  // Initialize background data
+  initializeBackground();
+});
+
+// Handle Chrome startup (reload existing data)
+chrome.runtime.onStartup.addListener(() => {
+  initializeBackground();
+});
+
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === "complete" && tab.url) {
+    const cacheKey = new URL(tab.url).hostname;
+    const cachedResult = whitelistCache.get(cacheKey);
+
+    if (cachedResult && Date.now() - cachedResult.timestamp < CACHE_EXPIRY) {
+      sendWhitelistStatus(tabId, cachedResult.isWhitelisted);
+      return;
+    }
+
+    isSiteWhitelisted(tab.url)
+      .then((isWhitelisted) => {
+        whitelistCache.set(cacheKey, {
+          isWhitelisted,
+          timestamp: Date.now()
+        });
+
+        sendWhitelistStatus(tabId, isWhitelisted);
+      })
+      .catch((error) => {
+        console.error("Error checking whitelist status:", error);
+      });
+  }
+});
+
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (
+    !isBackgroundReady &&
+    [
+      "getNovelData",
+      "updateNovelData",
+      "getNovelStyle",
+      "updateNovelStyle"
+    ].includes(request.action)
+  ) {
+    initializeBackground().then(() => {
+      handleMessage(request, sender, sendResponse);
+    });
+    return true;
+  }
+
+  return handleMessage(request, sender, sendResponse);
+});

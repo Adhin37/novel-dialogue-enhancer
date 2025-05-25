@@ -29,9 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const refreshStatsBtn = document.getElementById("refresh-stats");
   const resetStatsBtn = document.getElementById("reset-stats");
 
-  // Initialize StorageManager for consistent data handling
-  const storage = new StorageManager();
-
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
   });
@@ -241,15 +238,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  themeSwitch.addEventListener("change", async () => {
-    try {
-      await storage.set("darkMode", themeSwitch.checked);
-      darkModeManager.setTheme(themeSwitch.checked);
-      updateAllSliderBackgrounds();
-      console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
-    } catch (error) {
-      console.error("Error saving dark mode setting:", error);
-    }
+  themeSwitch.addEventListener("change", () => {
+    chrome.storage.sync.set({ darkMode: themeSwitch.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error saving dark mode setting:",
+          chrome.runtime.lastError
+        );
+      } else {
+        darkModeManager.setTheme(themeSwitch.checked);
+        updateAllSliderBackgrounds();
+        console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+      }
+    });
   });
 
   /**
@@ -262,16 +263,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   window
     .matchMedia("(prefers-color-scheme: dark)")
-    .addEventListener("change", async (e) => {
-      try {
-        const darkModeData = await storage.get("darkMode");
-        if (darkModeData === undefined || darkModeData === null) {
+    .addEventListener("change", (e) => {
+      chrome.storage.sync.get("darkMode", (data) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Error checking dark mode setting:",
+            chrome.runtime.lastError
+          );
+          return;
+        }
+
+        if (data.darkMode === undefined || data.darkMode === null) {
           themeSwitch.checked = e.matches;
           updateAllSliderBackgrounds();
         }
-      } catch (error) {
-        console.error("Error checking dark mode setting:", error);
-      }
+      });
     });
 
   document.addEventListener("themeChanged", () => {
@@ -748,17 +754,28 @@ document.addEventListener("DOMContentLoaded", () => {
     setupNovelSearch();
     syncThemeSwitchWithState();
 
-    // Load dark mode setting directly
     chrome.storage.sync.get("darkMode", (data) => {
-      if (data.darkMode !== undefined) {
-        themeSwitch.checked = data.darkMode;
-        darkModeManager.setTheme(data.darkMode);
-      } else {
-        // Use system preference
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error loading dark mode setting:",
+          chrome.runtime.lastError
+        );
+        // Use system preference as fallback
         themeSwitch.checked = window.matchMedia(
           "(prefers-color-scheme: dark)"
         ).matches;
         darkModeManager.setTheme(themeSwitch.checked);
+      } else {
+        if (data.darkMode !== undefined) {
+          themeSwitch.checked = data.darkMode;
+          darkModeManager.setTheme(data.darkMode);
+        } else {
+          // Use system preference
+          themeSwitch.checked = window.matchMedia(
+            "(prefers-color-scheme: dark)"
+          ).matches;
+          darkModeManager.setTheme(themeSwitch.checked);
+        }
       }
       updateAllSliderBackgrounds();
     });
@@ -766,9 +783,16 @@ document.addEventListener("DOMContentLoaded", () => {
     // Update theme switch handler
     themeSwitch.addEventListener("change", () => {
       chrome.storage.sync.set({ darkMode: themeSwitch.checked }, () => {
-        darkModeManager.setTheme(themeSwitch.checked);
-        updateAllSliderBackgrounds();
-        console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Error saving dark mode setting:",
+            chrome.runtime.lastError
+          );
+        } else {
+          darkModeManager.setTheme(themeSwitch.checked);
+          updateAllSliderBackgrounds();
+          console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+        }
       });
     });
 
@@ -776,6 +800,14 @@ document.addEventListener("DOMContentLoaded", () => {
       .matchMedia("(prefers-color-scheme: dark)")
       .addEventListener("change", (e) => {
         chrome.storage.sync.get("darkMode", (data) => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "Error checking dark mode setting:",
+              chrome.runtime.lastError
+            );
+            return;
+          }
+
           if (data.darkMode === undefined || data.darkMode === null) {
             themeSwitch.checked = e.matches;
             updateAllSliderBackgrounds();
