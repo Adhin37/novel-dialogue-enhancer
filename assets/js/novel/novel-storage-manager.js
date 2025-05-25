@@ -1,4 +1,4 @@
-// novel-storage-manager.js
+// assets/js/novel/novel-storage-manager.js
 /**
  * Manages novel data storage and retrieval
  */
@@ -6,7 +6,7 @@ class NovelStorageManager extends StorageManager {
   constructor() {
     super();
     this.novelId = null;
-    this.characterIdMap = new Map(); // Track name -> numericId mapping
+    this.characterIdMap = new Map();
   }
 
   /**
@@ -31,8 +31,8 @@ class NovelStorageManager extends StorageManager {
     const cacheKey = `novelStyle_${this.novelId}`;
 
     try {
-      // Try to get from cache first using parent class method
-      const cachedStyle = await this.get(cacheKey, null, true);
+      // Try to get from session cache first
+      const cachedStyle = await this.get(cacheKey, null, true, true);
       if (cachedStyle) {
         return cachedStyle;
       }
@@ -44,8 +44,8 @@ class NovelStorageManager extends StorageManager {
       });
 
       if (response && response.status === "ok" && response.style) {
-        // Store in cache using parent class method
-        await this.set(cacheKey, response.style, true);
+        // Store in session cache
+        await this.set(cacheKey, response.style, true, true);
         return response.style;
       }
 
@@ -68,39 +68,46 @@ class NovelStorageManager extends StorageManager {
     const cacheKey = `novelData_${this.novelId}`;
 
     try {
-      // Try to get from cache first using parent class method
-      const cachedData = await this.get(cacheKey, null, true);
-      if (cachedData) {
-        // Update character ID map from cached data
+      // Try to get from session cache first
+      const cachedData = await this.get(cacheKey, null, true, true);
+      if (cachedData && Object.keys(cachedData.characterMap).length > 0) {
+        console.log("Using cached novel data:", cachedData);
         this.#updateCharacterIdMap(cachedData.characterMap);
         return cachedData;
       }
 
-      // If not in cache, fetch from background with raw data request
+      // If not in cache, fetch from background
+      console.log("Fetching novel data from background for:", this.novelId);
       const response = await this.#sendBackgroundMessage({
         action: "getNovelData",
         novelId: this.novelId,
-        includeRawData: true // Request both converted and raw data
+        includeRawData: true
       });
 
-      const novelData =
-        response && response.status === "ok"
-          ? {
-              characterMap: response.characterMap || {},
-              enhancedChapters: response.enhancedChapters || []
-            }
-          : { characterMap: {}, enhancedChapters: [] };
+      if (response && response.status === "ok") {
+        const novelData = {
+          characterMap: response.characterMap || {},
+          enhancedChapters: response.enhancedChapters || []
+        };
 
-      // Update character ID map from raw data if available
-      if (response && response.rawCharacterData) {
-        this.#buildCharacterIdMapFromRaw(response.rawCharacterData);
-      } else {
-        this.#updateCharacterIdMap(novelData.characterMap);
+        console.log("Received novel data from background:", novelData);
+
+        // Update character ID map from raw data if available
+        if (response.rawCharacterData) {
+          this.#buildCharacterIdMapFromRaw(response.rawCharacterData);
+        } else {
+          this.#updateCharacterIdMap(novelData.characterMap);
+        }
+
+        // Only cache if we have actual data
+        if (Object.keys(novelData.characterMap).length > 0) {
+          await this.set(cacheKey, novelData, true, true);
+        }
+
+        return novelData;
       }
 
-      // Store in cache using parent class method
-      await this.set(cacheKey, novelData, true);
-      return novelData;
+      return { characterMap: {}, enhancedChapters: [] };
     } catch (error) {
       console.warn("Error getting novel data:", error);
       return { characterMap: {}, enhancedChapters: [] };
@@ -120,8 +127,8 @@ class NovelStorageManager extends StorageManager {
     const cacheKey = `chapterStatus_${this.novelId}_${chapterNumber}`;
 
     try {
-      // Try to get from cache first using parent class method
-      const cachedStatus = await this.get(cacheKey, null, true);
+      // Try to get from session cache first
+      const cachedStatus = await this.get(cacheKey, null, true, true);
       if (cachedStatus !== null) {
         return Boolean(cachedStatus);
       }
@@ -139,8 +146,8 @@ class NovelStorageManager extends StorageManager {
           ? Boolean(response.isChapterEnhanced)
           : false;
 
-      // Store in cache using parent class method
-      await this.set(cacheKey, isEnhanced, true);
+      // Store in session cache
+      await this.set(cacheKey, isEnhanced, true, true);
       return isEnhanced;
     } catch (error) {
       console.warn("Error checking chapter status:", error);
@@ -168,9 +175,9 @@ class NovelStorageManager extends StorageManager {
       const success = response && response.status === "ok";
 
       if (success) {
-        // Update cache using parent class method
+        // Update session cache
         const cacheKey = `novelStyle_${this.novelId}`;
-        await this.set(cacheKey, styleInfo, true);
+        await this.set(cacheKey, styleInfo, true, true);
       }
 
       return success;
@@ -192,7 +199,9 @@ class NovelStorageManager extends StorageManager {
       return false;
     }
 
+    console.log("Syncing character map:", characterMap);
     const optimizedChars = this.#createOptimizedCharacterData(characterMap);
+    console.log("Optimized character data:", optimizedChars);
 
     try {
       const response = await this.#sendBackgroundMessage({
@@ -205,18 +214,22 @@ class NovelStorageManager extends StorageManager {
       const success = response && response.status === "ok";
 
       if (success) {
+        console.log("Character map synced successfully");
+
         // Update character ID map with any new assignments
         this.#updateCharacterIdMap(characterMap);
 
-        // Update cache - clear novel data cache so it gets refreshed next time
+        // Clear session cache so it gets refreshed next time
         const novelDataCacheKey = `novelData_${this.novelId}`;
         this.clearCache(novelDataCacheKey);
 
         // If we have a chapter number, update that cache too
         if (chapterNumber) {
           const chapterCacheKey = `chapterStatus_${this.novelId}_${chapterNumber}`;
-          await this.set(chapterCacheKey, true, true);
+          await this.set(chapterCacheKey, true, true, true);
         }
+      } else {
+        console.warn("Failed to sync character map:", response);
       }
 
       return success;
@@ -266,7 +279,7 @@ class NovelStorageManager extends StorageManager {
       return;
     }
 
-    // For new characters, we'll assign IDs when creating optimized data
+    // For existing characters, preserve their mappings
     Object.keys(characterMap).forEach((name) => {
       if (!this.characterIdMap.has(name)) {
         // Will be assigned in createOptimizedCharacterData
@@ -284,6 +297,7 @@ class NovelStorageManager extends StorageManager {
       return;
     }
 
+    console.log("Building character ID map from raw data:", rawCharacterData);
     this.characterIdMap.clear();
 
     Object.entries(rawCharacterData).forEach(([numericId, charData]) => {
@@ -291,6 +305,8 @@ class NovelStorageManager extends StorageManager {
         this.characterIdMap.set(charData.name, parseInt(numericId, 10));
       }
     });
+
+    console.log("Character ID map built:", this.characterIdMap);
   }
 
   /**
@@ -326,6 +342,7 @@ class NovelStorageManager extends StorageManager {
       if (numericId === undefined) {
         numericId = this.#getNextCharacterId();
         this.characterIdMap.set(name, numericId);
+        console.log(`Assigned new ID ${numericId} to character: ${name}`);
       }
 
       optimized[numericId] = {

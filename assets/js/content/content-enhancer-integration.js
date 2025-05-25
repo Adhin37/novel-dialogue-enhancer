@@ -133,11 +133,13 @@ class ContentEnhancerIntegration {
    * @return {Array} - Array of character objects
    */
   #convertCharacterMapToArray(characterMap) {
-    return Object.entries(SharedUtils.deepClone(characterMap) || {}).map(([name, data]) => ({
-      name,
-      gender: data.gender,
-      appearances: data.appearances
-    }));
+    return Object.entries(SharedUtils.deepClone(characterMap) || {}).map(
+      ([name, data]) => ({
+        name,
+        gender: data.gender,
+        appearances: data.appearances
+      })
+    );
   }
 
   /**
@@ -147,10 +149,12 @@ class ContentEnhancerIntegration {
    */
   async extractCharacterInfo(text) {
     console.log("Extracting character information...");
-    const startCharCount = Object.keys(this.novelUtils.characterMap).length;
 
     // Let novelUtils extract the character names (now async)
     let characterMap = await this.novelUtils.extractCharacterNames(text);
+
+    const startCharCount = Object.keys(characterMap).length;
+    console.log(`Starting with ${startCharCount} characters`);
 
     // If the current chapter was already enhanced, we might be using cached data
     if (!this.novelUtils.isCurrentChapterEnhanced) {
@@ -158,12 +162,13 @@ class ContentEnhancerIntegration {
       characterMap = await this.determineCharacterGenders(characterMap, text);
     }
 
-    // Track new characters found
-    const newCharCount = Object.keys(characterMap).length - startCharCount;
+    // Track new characters found - use 0 as baseline since characterMap includes all characters
+    const finalCharCount = Object.keys(characterMap).length;
+    const newCharCount = Math.max(0, finalCharCount - 0); // Always use 0 as baseline
     this.statsUtils.setTotalCharactersDetected(newCharCount);
 
     console.log(
-      `Processed ${Object.keys(characterMap).length} characters for novel ${
+      `Processed ${finalCharCount} characters for novel ${
         this.novelUtils.novelId
       }${
         this.novelUtils.chapterInfo?.chapterNumber

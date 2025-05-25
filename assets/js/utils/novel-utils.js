@@ -346,9 +346,12 @@ class NovelUtils {
 
       if (this.isCurrentChapterEnhanced) {
         console.log(
-          `Chapter ${currentChapter} was previously enhanced, using existing character data`
+          `Chapter ${currentChapter} was previously enhanced, using existing character data (${
+            Object.keys(mergedCharacterMap).length
+          } characters)`
         );
-        return true;
+        // Still return false so character processing continues with existing data
+        return false;
       }
     }
 
