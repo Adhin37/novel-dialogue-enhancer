@@ -39,7 +39,6 @@ function findContentElement() {
  * Initializes the extension
  */
 function init() {
-  contentEnhancerIntegration = new ContentEnhancerIntegration();
   toaster = new Toaster();
   toaster.createToaster();
 
@@ -290,12 +289,16 @@ function findLargestTextBlock() {
 async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
   console.time("enhancePage");
-
+  
   if (isEnhancing) {
     pendingEnhancement = true;
     console.log("Enhancement already in progress, queuing request");
     toaster.showInfo("Enhancement already in progress, queued for later");
     return false;
+  }
+
+  if (!contentEnhancerIntegration) {
+    contentEnhancerIntegration = new ContentEnhancerIntegration();
   }
 
   isEnhancing = true;
