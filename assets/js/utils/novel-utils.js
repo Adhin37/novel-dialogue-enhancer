@@ -1,4 +1,4 @@
-// novelUtils.js
+// assets/js/utils/novel-utils.js
 /**
  * Main orchestrator class for novel processing utilities
  * Coordinates specialized modules for different novel-related tasks
@@ -9,17 +9,15 @@ class NovelUtils {
    * @param {string} url - URL of the novel page
    * @param {string} title - Title of the novel page
    */
-  // Fix 1: Initialize novelId in constructor
   constructor(url, title) {
     this.url = url;
     this.title = title || document.title || "";
 
-    // Initialize specialized modules first
+    // Initialize specialized modules
     this.idGenerator = new NovelIdGenerator();
     this.chapterDetector = new NovelChapterDetector();
     this.characterExtractor = new NovelCharacterExtractor();
     this.styleAnalyzer = new NovelStyleAnalyzer();
-    this.storageManager = new NovelStorageManager();
 
     // Generate initial novel ID
     this.novelId = this.updateNovelId(url, this.title);
@@ -47,7 +45,6 @@ class NovelUtils {
     if (novelId !== this.novelId) {
       console.log(`Generated novel ID: ${novelId}`);
       this.novelId = novelId;
-      this.storageManager.setNovelId(novelId);
     }
 
     return this.novelId;
@@ -142,31 +139,23 @@ class NovelUtils {
       return this.novelStyle;
     }
 
-    // Try to fetch existing style from storage if novelId is provided
+    // Try to fetch existing style from background if novelId is provided
     if (novelId) {
       try {
-        const existingStyle = await this.storageManager.getExistingNovelStyle();
-        if (existingStyle) {
+        const response = await this.#sendBackgroundMessage({
+          action: "getNovelStyle",
+          novelId: novelId
+        });
+
+        if (response && response.status === "ok" && response.style) {
           if (novelId === this.novelId) {
-            this.novelStyle = existingStyle;
+            this.novelStyle = response.style;
           }
-          return existingStyle;
+          return response.style;
         }
       } catch (err) {
         console.warn("Failed to fetch existing novel style:", err);
-        // Return a default style instead of failing
-        const defaultStyle = {
-          style: "standard narrative",
-          tone: "neutral",
-          confidence: 0,
-          analyzed: true
-        };
-
-        if (novelId === this.novelId) {
-          this.novelStyle = defaultStyle;
-        }
-
-        return defaultStyle;
+        // Continue to analyze instead of failing
       }
     }
 
@@ -190,7 +179,6 @@ class NovelUtils {
   async extractCharacterNames(text, existingCharacterMap = {}) {
     console.log("Extracting character names...");
     let characterMap = this.#optimizeCharacterMap(existingCharacterMap);
-    const startCharCount = Object.keys(characterMap).length;
 
     // Initialize novel ID and chapter info
     const initialized = this.#initializeNovelContext();
@@ -206,7 +194,7 @@ class NovelUtils {
       return this.characterMap;
     }
 
-    // Load existing character data from storage and merge it
+    // Load existing character data from background and merge it
     characterMap = await this.loadExistingCharacterData(characterMap);
 
     // Extract character names using the character extractor
@@ -222,14 +210,7 @@ class NovelUtils {
       }
     });
 
-    // Track statistics
-    const newCharCount = Object.keys(characterMap).length - startCharCount;
-    console.log(
-      `Extracted ${newCharCount} new characters, total: ${
-        Object.keys(characterMap).length
-      }`
-    );
-
+    // Store character map in background
     if (this.novelId && Object.keys(characterMap).length > 0) {
       this.syncCharacterMap(characterMap);
     }
@@ -318,7 +299,7 @@ class NovelUtils {
       return false;
     }
 
-    const novelData = await this.storageManager.loadExistingNovelData();
+    const novelData = await this.loadExistingNovelData();
 
     // Merge character maps
     const mergedCharacterMap = {
@@ -339,9 +320,7 @@ class NovelUtils {
 
       if (!this.isCurrentChapterEnhanced) {
         this.isCurrentChapterEnhanced =
-          await this.storageManager.verifyChapterEnhancementStatus(
-            currentChapter
-          );
+          await this.verifyChapterEnhancementStatus(currentChapter);
       }
 
       if (this.isCurrentChapterEnhanced) {
@@ -359,12 +338,12 @@ class NovelUtils {
   }
 
   /**
-   * Load existing character data from storage
+   * Load existing character data from background
    * @param {object} characterMap - Current character map
    * @return {Promise<object>} - Updated character map with existing data
    */
   async loadExistingCharacterData(characterMap) {
-    const novelData = await this.storageManager.loadExistingNovelData();
+    const novelData = await this.loadExistingNovelData();
     const existingMap = novelData.characterMap || {};
 
     const mergedMap = {
@@ -378,6 +357,62 @@ class NovelUtils {
   }
 
   /**
+   * Load existing novel data from background
+   * @return {Promise<object>} - Novel data object
+   */
+  async loadExistingNovelData() {
+    if (!this.novelId) {
+      return { characterMap: {}, enhancedChapters: [] };
+    }
+
+    try {
+      const response = await this.#sendBackgroundMessage({
+        action: "getNovelData",
+        novelId: this.novelId
+      });
+
+      if (response && response.status === "ok") {
+        return {
+          characterMap: response.characterMap || {},
+          enhancedChapters: response.enhancedChapters || []
+        };
+      }
+
+      return { characterMap: {}, enhancedChapters: [] };
+    } catch (error) {
+      console.warn("Error loading novel data:", error);
+      return { characterMap: {}, enhancedChapters: [] };
+    }
+  }
+
+  /**
+   * Verify if a chapter has been enhanced
+   * @param {number} chapterNumber - Chapter number to check
+   * @return {Promise<boolean>} - Whether the chapter was enhanced
+   */
+  async verifyChapterEnhancementStatus(chapterNumber) {
+    if (!this.novelId || !chapterNumber) {
+      return false;
+    }
+
+    try {
+      const response = await this.#sendBackgroundMessage({
+        action: "getNovelData",
+        novelId: this.novelId,
+        checkChapter: true,
+        chapterNumber: chapterNumber
+      });
+
+      return response && response.status === "ok"
+        ? Boolean(response.isChapterEnhanced)
+        : false;
+    } catch (error) {
+      console.warn("Error checking chapter status:", error);
+      return false;
+    }
+  }
+
+  /**
    * Sync character map with background storage
    * @param {object} characterMap - Character map to sync
    */
@@ -387,7 +422,26 @@ class NovelUtils {
       SharedUtils.validateObject(characterMap) &&
       Object.keys(characterMap).length > 0
     ) {
-      this.storageManager.syncCharacterMap(characterMap, chapterNumber);
+      console.log("Syncing character map to background:", characterMap);
+
+      const optimizedChars = this.#createOptimizedCharacterData(characterMap);
+
+      this.#sendBackgroundMessage({
+        action: "updateNovelData",
+        chars: optimizedChars,
+        novelId: this.novelId,
+        chapterNumber: chapterNumber
+      })
+        .then((response) => {
+          if (response && response.status === "ok") {
+            console.log("Character map synced successfully");
+          } else {
+            console.warn("Failed to sync character map:", response);
+          }
+        })
+        .catch((error) => {
+          console.warn("Error syncing character map:", error);
+        });
     }
   }
 
@@ -397,13 +451,92 @@ class NovelUtils {
    * @param {object} styleInfo - The style information to sync
    */
   syncNovelStyle(novelId, styleInfo) {
-    this.storageManager.syncNovelStyle(styleInfo);
+    this.#sendBackgroundMessage({
+      action: "updateNovelStyle",
+      novelId: novelId,
+      style: styleInfo
+    })
+      .then((response) => {
+        if (response && response.status === "ok") {
+          console.log("Novel style synced successfully");
+        } else {
+          console.warn("Failed to sync novel style:", response);
+        }
+      })
+      .catch((error) => {
+        console.warn("Error syncing novel style:", error);
+      });
+  }
+
+  /**
+   * Send message to background script with timeout
+   * @param {object} message - Message to send
+   * @return {Promise<object>} - Response from background
+   * @private
+   */
+  async #sendBackgroundMessage(message) {
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error("Background message timeout"));
+      }, 10000);
+
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          clearTimeout(timeoutId);
+
+          if (chrome.runtime.lastError) {
+            reject(chrome.runtime.lastError);
+            return;
+          }
+
+          resolve(response);
+        });
+      } catch (error) {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Create optimized character data using shared utilities
+   * @param {object} characterMap - Raw character map
+   * @return {object} - Optimized character data
+   * @private
+   */
+  #createOptimizedCharacterData(characterMap) {
+    const optimized = {};
+
+    Object.entries(characterMap).forEach(([name, data], index) => {
+      if (SharedUtils.validateCharacterName(name)) {
+        optimized[index] = {
+          name: name,
+          gender: SharedUtils.compressGender(data.gender),
+          confidence: SharedUtils.validateConfidence(data.confidence)
+            ? data.confidence
+            : 0,
+          appearances: SharedUtils.validateAppearances(data.appearances)
+            ? data.appearances
+            : 1
+        };
+
+        if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+          optimized[index].evidences = data.evidence.slice(
+            0,
+            Constants.STORAGE.MAX_EVIDENCE_ENTRIES
+          );
+        }
+      }
+    });
+
+    return optimized;
   }
 
   /**
    * Optimized character map conversion
    * @param {object} characterMap - Raw character data
    * @return {object} - Optimized character map
+   * @private
    */
   #optimizeCharacterMap(characterMap) {
     const optimized = {};

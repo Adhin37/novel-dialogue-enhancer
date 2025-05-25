@@ -30,11 +30,9 @@ export default defineConfig([
         NovelStyleAnalyzer: "readonly",
         NovelCharacterExtractor: "readonly",
         NovelChapterDetector: "readonly",
-        NovelStorageManager: "readonly",
         NovelIdGenerator: "readonly",
         SharedUtils: "readonly",
         Constants: "readonly",
-        StorageManager: "readonly",
         BaseGenderAnalyzer: "readonly",
         ContentElementCache: "readonly"
       }

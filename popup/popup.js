@@ -1,4 +1,5 @@
-document.addEventListener("DOMContentLoaded", async () => {
+// popup/popup.js
+document.addEventListener("DOMContentLoaded", () => {
   const pauseButton = document.getElementById("pause-button");
   const whitelistButton = document.getElementById("whitelist-button");
   const whitelistText = document.getElementById("whitelist-text");
@@ -12,97 +13,100 @@ document.addEventListener("DOMContentLoaded", async () => {
   let currentTabHostname = "";
   let whitelistedSites = [];
   let isExtensionPaused = false;
-  const storage = new StorageManager();
 
   // Initialize dark mode manager if available
   if (window.darkModeManager) {
     window.darkModeManager.init();
   }
 
-  try {
-    // Load all settings at once using StorageManager
-    const settings = await storage.getMultiple(
-      ["whitelistedSites", "isExtensionPaused", "preserveNames", "fixPronouns"],
-      {
-        whitelistedSites: [],
-        isExtensionPaused: false,
-        preserveNames: true,
-        fixPronouns: true
+  // Load all settings at once using direct chrome.storage calls
+  chrome.storage.sync.get(
+    ["whitelistedSites", "isExtensionPaused", "preserveNames", "fixPronouns"],
+    (data) => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error loading initial settings:",
+          chrome.runtime.lastError
+        );
+        // Use defaults on error
+        whitelistedSites = [];
+        isExtensionPaused = false;
+        preserveNamesToggle.checked = true;
+        fixPronounsToggle.checked = true;
+      } else {
+        whitelistedSites = Array.isArray(data.whitelistedSites)
+          ? data.whitelistedSites
+          : [];
+        isExtensionPaused = Boolean(data.isExtensionPaused);
+        preserveNamesToggle.checked = data.preserveNames !== false;
+        fixPronounsToggle.checked = data.fixPronouns !== false;
+
+        console.log("Loaded settings:", {
+          whitelistedSites: whitelistedSites.length,
+          isExtensionPaused,
+          preserveNames: preserveNamesToggle.checked,
+          fixPronouns: fixPronounsToggle.checked
+        });
       }
-    );
 
-    whitelistedSites = Array.isArray(settings.whitelistedSites)
-      ? settings.whitelistedSites
-      : [];
-    isExtensionPaused = Boolean(settings.isExtensionPaused);
-    preserveNamesToggle.checked = Boolean(settings.preserveNames);
-    fixPronounsToggle.checked = Boolean(settings.fixPronouns);
-
-    console.log("Loaded settings:", {
-      whitelistedSites: whitelistedSites.length,
-      isExtensionPaused,
-      preserveNames: preserveNamesToggle.checked,
-      fixPronouns: fixPronounsToggle.checked
-    });
-
-    processCurrentTab();
-    updatePauseButton();
-  } catch (error) {
-    console.error("Error loading initial settings:", error);
-    // Use defaults on error
-    whitelistedSites = [];
-    isExtensionPaused = false;
-    preserveNamesToggle.checked = true;
-    fixPronounsToggle.checked = true;
-
-    processCurrentTab();
-    updatePauseButton();
-  }
-
-  // Update settings using StorageManager
-  preserveNamesToggle.addEventListener("change", async function () {
-    try {
-      await storage.set("preserveNames", this.checked);
-      console.log(`Preserve names setting updated: ${this.checked}`);
-    } catch (error) {
-      console.error("Error saving preserve names setting:", error);
+      processCurrentTab();
+      updatePauseButton();
     }
+  );
+
+  // Update settings using direct chrome.storage calls
+  preserveNamesToggle.addEventListener("change", function () {
+    chrome.storage.sync.set({ preserveNames: this.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error saving preserve names setting:",
+          chrome.runtime.lastError
+        );
+      } else {
+        console.log(`Preserve names setting updated: ${this.checked}`);
+      }
+    });
   });
 
-  fixPronounsToggle.addEventListener("change", async function () {
-    try {
-      await storage.set("fixPronouns", this.checked);
-      console.log(`Fix pronouns setting updated: ${this.checked}`);
-    } catch (error) {
-      console.error("Error saving fix pronouns setting:", error);
-    }
+  fixPronounsToggle.addEventListener("change", function () {
+    chrome.storage.sync.set({ fixPronouns: this.checked }, () => {
+      if (chrome.runtime.lastError) {
+        console.error(
+          "Error saving fix pronouns setting:",
+          chrome.runtime.lastError
+        );
+      } else {
+        console.log(`Fix pronouns setting updated: ${this.checked}`);
+      }
+    });
   });
 
   // Handle whitelist button click
   whitelistButton.addEventListener("click", handleWhitelistButtonClick);
 
   // Handle pause/resume button
-  pauseButton.addEventListener("click", async () => {
+  pauseButton.addEventListener("click", () => {
     // Toggle paused CSS class for visual feedback
     document.getElementById("header").classList.toggle("paused");
 
     isExtensionPaused = !isExtensionPaused;
 
-    try {
-      await storage.set("isExtensionPaused", isExtensionPaused);
-      console.log(`Extension paused state set to: ${isExtensionPaused}`);
+    chrome.storage.sync.set({ isExtensionPaused: isExtensionPaused }, () => {
+      if (chrome.runtime.lastError) {
+        console.error("Failed to save pause state:", chrome.runtime.lastError);
+        statusMessage.textContent = "Error saving pause state";
+        setTimeout(() => updateStatus(), 2000);
+      } else {
+        console.log(`Extension paused state set to: ${isExtensionPaused}`);
 
-      if (isExtensionPaused) {
-        await terminateActiveOperations();
+        if (isExtensionPaused) {
+          terminateActiveOperations();
+        }
+
+        updatePauseButton();
+        updateStatus();
       }
-
-      updatePauseButton();
-      updateStatus();
-    } catch (error) {
-      console.error("Failed to save pause state:", error);
-      statusMessage.textContent = "Error saving pause state";
-      setTimeout(() => updateStatus(), 2000);
-    }
+    });
   });
 
   enhanceNowBtn.addEventListener("click", handleEnhanceNowClick);
@@ -110,67 +114,61 @@ document.addEventListener("DOMContentLoaded", async () => {
   /**
    * Terminate active operations when pausing extension
    */
-  async function terminateActiveOperations() {
-    return new Promise((resolve) => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-          console.error("No active tabs found for termination:", tabs);
-          statusMessage.textContent = "Extension paused (no active tab)";
-          resolve();
-          return;
-        }
+  function terminateActiveOperations() {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
+        console.error("No active tabs found for termination:", tabs);
+        statusMessage.textContent = "Extension paused (no active tab)";
+        return;
+      }
 
-        const activeTab = tabs[0];
-        if (!activeTab || !activeTab.id) {
-          console.error("Invalid active tab for termination:", activeTab);
-          statusMessage.textContent = "Extension paused (invalid tab)";
-          resolve();
-          return;
-        }
+      const activeTab = tabs[0];
+      if (!activeTab || !activeTab.id) {
+        console.error("Invalid active tab for termination:", activeTab);
+        statusMessage.textContent = "Extension paused (invalid tab)";
+        return;
+      }
 
-        try {
-          chrome.tabs.sendMessage(
-            activeTab.id,
-            { action: "terminateOperations" },
-            (terminateResponse) => {
-              if (chrome.runtime.lastError) {
-                console.error(
-                  "Failed to send termination signal:",
-                  chrome.runtime.lastError
-                );
-              } else if (terminateResponse) {
-                console.log(
-                  "Termination signal sent successfully:",
-                  terminateResponse
-                );
-              }
-              resolve();
+      try {
+        chrome.tabs.sendMessage(
+          activeTab.id,
+          { action: "terminateOperations" },
+          (terminateResponse) => {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "Failed to send termination signal:",
+                chrome.runtime.lastError
+              );
+            } else if (terminateResponse) {
+              console.log(
+                "Termination signal sent successfully:",
+                terminateResponse
+              );
             }
-          );
-
-          statusMessage.textContent = "Extension paused, operations terminated";
-        } catch (error) {
-          console.error("Failed to send termination signal:", error);
-          statusMessage.textContent = "Extension paused (termination failed)";
-          resolve();
-        }
-      });
-
-      // Also terminate background requests
-      chrome.runtime.sendMessage(
-        { action: "terminateAllRequests" },
-        (terminateResponse) => {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "Failed to terminate background requests:",
-              chrome.runtime.lastError
-            );
-          } else if (terminateResponse) {
-            console.log("Background requests terminated:", terminateResponse);
           }
-        }
-      );
+        );
+
+        statusMessage.textContent = "Extension paused, operations terminated";
+      } catch (error) {
+        console.error("Failed to send termination signal:", error);
+        statusMessage.textContent = "Extension paused (termination failed)";
+      }
     });
+
+    // Also terminate background requests
+    chrome.runtime.sendMessage(
+      { action: "terminateAllRequests" },
+      (terminateResponse) => {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "Failed to terminate background requests:",
+            chrome.runtime.lastError
+          );
+        } else if (terminateResponse) {
+          console.log("Background requests terminated:", terminateResponse);
+        }
+      }
+    );
   }
 
   /**
@@ -203,7 +201,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         action: "addSiteToWhitelist",
         url: currentTabUrl
       },
-      async (response) => {
+      (response) => {
         if (chrome.runtime.lastError) {
           console.error("Runtime error:", chrome.runtime.lastError);
           statusMessage.textContent = "Error communicating with extension";
@@ -225,12 +223,19 @@ document.addEventListener("DOMContentLoaded", async () => {
           if (!whitelistedSites.includes(currentTabHostname)) {
             whitelistedSites.push(currentTabHostname);
 
-            try {
-              await storage.set("whitelistedSites", whitelistedSites);
-              console.log(`Whitelist updated: added ${currentTabHostname}`);
-            } catch (error) {
-              console.error("Error updating local whitelist storage:", error);
-            }
+            chrome.storage.sync.set(
+              { whitelistedSites: whitelistedSites },
+              () => {
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "Error updating local whitelist storage:",
+                    chrome.runtime.lastError
+                  );
+                } else {
+                  console.log(`Whitelist updated: added ${currentTabHostname}`);
+                }
+              }
+            );
           }
 
           updateWhitelistButton(true);
@@ -258,7 +263,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         action: "removeSiteFromWhitelist",
         hostname: currentTabHostname
       },
-      async (response) => {
+      (response) => {
         if (chrome.runtime.lastError) {
           console.error("Runtime error:", chrome.runtime.lastError);
           statusMessage.textContent = "Error communicating with extension";
@@ -285,12 +290,21 @@ document.addEventListener("DOMContentLoaded", async () => {
           );
 
           if (whitelistedSites.length < originalLength) {
-            try {
-              await storage.set("whitelistedSites", whitelistedSites);
-              console.log(`Whitelist updated: removed ${currentTabHostname}`);
-            } catch (error) {
-              console.error("Error updating local whitelist storage:", error);
-            }
+            chrome.storage.sync.set(
+              { whitelistedSites: whitelistedSites },
+              () => {
+                if (chrome.runtime.lastError) {
+                  console.error(
+                    "Error updating local whitelist storage:",
+                    chrome.runtime.lastError
+                  );
+                } else {
+                  console.log(
+                    `Whitelist updated: removed ${currentTabHostname}`
+                  );
+                }
+              }
+            );
           }
 
           updateWhitelistButton(false);

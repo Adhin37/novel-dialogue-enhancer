@@ -312,16 +312,18 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Loads the whitelist data from storage and renders it
    */
-  async function loadWhitelist() {
-    try {
-      const whitelistedSites = await storage.get("whitelistedSites", []);
-      renderWhitelistedSites(whitelistedSites);
-      clearAllBtn.disabled = whitelistedSites.length === 0;
-    } catch (error) {
-      console.error("Error loading whitelist:", error);
-      renderWhitelistedSites([]);
-      clearAllBtn.disabled = true;
-    }
+  function loadWhitelist() {
+    chrome.storage.sync.get("whitelistedSites", (data) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error loading whitelist:", chrome.runtime.lastError);
+        renderWhitelistedSites([]);
+        clearAllBtn.disabled = true;
+      } else {
+        const whitelistedSites = data.whitelistedSites || [];
+        renderWhitelistedSites(whitelistedSites);
+        clearAllBtn.disabled = whitelistedSites.length === 0;
+      }
+    });
   }
 
   /**
@@ -409,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /**
    * Reset settings to defaults
    */
-  async function resetSettings() {
+  function resetSettings() {
     if (
       confirm("Are you sure you want to reset all settings to default values?")
     ) {
@@ -421,27 +423,27 @@ document.addEventListener("DOMContentLoaded", () => {
         topP: Constants.DEFAULTS.TOP_P
       };
 
-      try {
-        await storage.setMultiple(defaultSettings);
+      chrome.storage.sync.set(defaultSettings, () => {
+        if (chrome.runtime.lastError) {
+          console.error("Error resetting settings:", chrome.runtime.lastError);
+          window.feedbackManager.show("Error resetting settings", "error");
+        } else {
+          modelNameInput.value = defaultSettings.modelName;
+          maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
+          maxChunkSizeValue.textContent = defaultSettings.maxChunkSize;
+          timeoutSlider.value = defaultSettings.timeout;
+          timeoutValue.textContent = defaultSettings.timeout;
+          temperatureSlider.value = defaultSettings.temperature;
+          temperatureValue.textContent = defaultSettings.temperature;
+          topPSlider.value = defaultSettings.topP;
+          topPValue.textContent = defaultSettings.topP;
 
-        modelNameInput.value = defaultSettings.modelName;
-        maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
-        maxChunkSizeValue.textContent = defaultSettings.maxChunkSize;
-        timeoutSlider.value = defaultSettings.timeout;
-        timeoutValue.textContent = defaultSettings.timeout;
-        temperatureSlider.value = defaultSettings.temperature;
-        temperatureValue.textContent = defaultSettings.temperature;
-        topPSlider.value = defaultSettings.topP;
-        topPValue.textContent = defaultSettings.topP;
+          updateAllSliderBackgrounds();
 
-        updateAllSliderBackgrounds();
-
-        window.feedbackManager.show("Settings Reset to Defaults!", "success");
-        console.log("Settings reset to defaults successfully");
-      } catch (error) {
-        console.error("Error resetting settings:", error);
-        window.feedbackManager.show("Error resetting settings", "error");
-      }
+          window.feedbackManager.show("Settings Reset to Defaults!", "success");
+          console.log("Settings reset to defaults successfully");
+        }
+      });
     }
   }
 
@@ -744,21 +746,41 @@ document.addEventListener("DOMContentLoaded", () => {
     initTabs();
     loadNovelCharacterMaps();
     setupNovelSearch();
-
     syncThemeSwitchWithState();
+
+    // Load dark mode setting directly
+    chrome.storage.sync.get("darkMode", (data) => {
+      if (data.darkMode !== undefined) {
+        themeSwitch.checked = data.darkMode;
+        darkModeManager.setTheme(data.darkMode);
+      } else {
+        // Use system preference
+        themeSwitch.checked = window.matchMedia(
+          "(prefers-color-scheme: dark)"
+        ).matches;
+        darkModeManager.setTheme(themeSwitch.checked);
+      }
+      updateAllSliderBackgrounds();
+    });
+
+    // Update theme switch handler
+    themeSwitch.addEventListener("change", () => {
+      chrome.storage.sync.set({ darkMode: themeSwitch.checked }, () => {
+        darkModeManager.setTheme(themeSwitch.checked);
+        updateAllSliderBackgrounds();
+        console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+      });
+    });
 
     window
       .matchMedia("(prefers-color-scheme: dark)")
-      .addEventListener("change", async (e) => {
-        try {
-          const darkModeData = await storage.get("darkMode");
-          if (darkModeData === undefined || darkModeData === null) {
+      .addEventListener("change", (e) => {
+        chrome.storage.sync.get("darkMode", (data) => {
+          if (data.darkMode === undefined || data.darkMode === null) {
             themeSwitch.checked = e.matches;
             updateAllSliderBackgrounds();
           }
-        } catch (error) {
-          console.error("Error checking dark mode setting:", error);
-        }
+        });
       });
 
     loadWhitelist();
@@ -778,22 +800,26 @@ document.addEventListener("DOMContentLoaded", () => {
     setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
     setupSlider(timeoutSlider, timeoutValue);
 
-    clearAllBtn.addEventListener("click", async () => {
+    clearAllBtn.addEventListener("click", () => {
       if (
         confirm("Are you sure you want to remove all sites from the whitelist?")
       ) {
-        try {
-          await storage.set("whitelistedSites", []);
-          loadWhitelist();
-          window.feedbackManager.show(
-            "All sites removed from whitelist",
-            "success"
-          );
-          console.log("Whitelist cleared successfully");
-        } catch (error) {
-          console.error("Error clearing whitelist:", error);
-          window.feedbackManager.show("Error clearing whitelist", "error");
-        }
+        chrome.storage.sync.set({ whitelistedSites: [] }, () => {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "Error clearing whitelist:",
+              chrome.runtime.lastError
+            );
+            window.feedbackManager.show("Error clearing whitelist", "error");
+          } else {
+            loadWhitelist();
+            window.feedbackManager.show(
+              "All sites removed from whitelist",
+              "success"
+            );
+            console.log("Whitelist cleared successfully");
+          }
+        });
       }
     });
 
@@ -806,47 +832,50 @@ document.addEventListener("DOMContentLoaded", () => {
     resetButton.addEventListener("click", resetSettings);
 
     try {
-      // Load initial settings using StorageManager
-      const initialSettings = await storage.getMultiple(
+      // Load initial settings directly
+      chrome.storage.sync.get(
         ["modelName", "maxChunkSize", "timeout", "temperature", "topP"],
-        {
-          modelName: Constants.DEFAULTS.MODEL_NAME,
-          maxChunkSize: Constants.DEFAULTS.MAX_CHUNK_SIZE,
-          timeout: Constants.DEFAULTS.TIMEOUT,
-          temperature: Constants.DEFAULTS.TEMPERATURE,
-          topP: Constants.DEFAULTS.TOP_P
+        (data) => {
+          if (chrome.runtime.lastError) {
+            console.error("Error loading settings:", chrome.runtime.lastError);
+            // Use fallback values
+            modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
+            maxChunkSizeSlider.value = Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            maxChunkSizeValue.textContent = Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            timeoutSlider.value = Constants.DEFAULTS.TIMEOUT;
+            timeoutValue.textContent = Constants.DEFAULTS.TIMEOUT;
+            temperatureSlider.value = Constants.DEFAULTS.TEMPERATURE;
+            temperatureValue.textContent = Constants.DEFAULTS.TEMPERATURE;
+            topPSlider.value = Constants.DEFAULTS.TOP_P;
+            topPValue.textContent = Constants.DEFAULTS.TOP_P;
+          } else {
+            modelNameInput.value =
+              data.modelName || Constants.DEFAULTS.MODEL_NAME;
+            maxChunkSizeSlider.value =
+              data.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            maxChunkSizeValue.textContent =
+              data.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            timeoutSlider.value = data.timeout || Constants.DEFAULTS.TIMEOUT;
+            timeoutValue.textContent =
+              data.timeout || Constants.DEFAULTS.TIMEOUT;
+            temperatureSlider.value =
+              data.temperature || Constants.DEFAULTS.TEMPERATURE;
+            temperatureValue.textContent =
+              data.temperature || Constants.DEFAULTS.TEMPERATURE;
+            topPSlider.value = data.topP || Constants.DEFAULTS.TOP_P;
+            topPValue.textContent = data.topP || Constants.DEFAULTS.TOP_P;
+
+            console.log("Initial settings loaded successfully:", data);
+          }
+
+          updateAllSliderBackgrounds();
         }
       );
-
-      modelNameInput.value = initialSettings.modelName;
-      maxChunkSizeSlider.value = initialSettings.maxChunkSize;
-      maxChunkSizeValue.textContent = initialSettings.maxChunkSize;
-      timeoutSlider.value = initialSettings.timeout;
-      timeoutValue.textContent = initialSettings.timeout;
-      temperatureSlider.value = initialSettings.temperature;
-      temperatureValue.textContent = initialSettings.temperature;
-      topPSlider.value = initialSettings.topP;
-      topPValue.textContent = initialSettings.topP;
-
-      updateAllSliderBackgrounds();
-      console.log("Initial settings loaded successfully:", initialSettings);
     } catch (error) {
       console.error("Error loading initial settings:", error);
-      // Use fallback values from Constants if available
-      modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
-      maxChunkSizeSlider.value = Constants.DEFAULTS.MAX_CHUNK_SIZE;
-      maxChunkSizeValue.textContent = Constants.DEFAULTS.MAX_CHUNK_SIZE;
-      timeoutSlider.value = Constants.DEFAULTS.TIMEOUT;
-      timeoutValue.textContent = Constants.DEFAULTS.TIMEOUT;
-      temperatureSlider.value = Constants.DEFAULTS.TEMPERATURE;
-      temperatureValue.textContent = Constants.DEFAULTS.TEMPERATURE;
-      topPSlider.value = Constants.DEFAULTS.TOP_P;
-      topPValue.textContent = Constants.DEFAULTS.TOP_P;
-
-      updateAllSliderBackgrounds();
     }
 
-    saveButton.addEventListener("click", async () => {
+    saveButton.addEventListener("click", () => {
       const maxChunkSize = parseInt(maxChunkSizeSlider.value);
       const timeout = parseInt(timeoutSlider.value);
       const temperature = parseFloat(temperatureSlider.value);
@@ -860,14 +889,18 @@ document.addEventListener("DOMContentLoaded", () => {
         topP: topP
       };
 
-      try {
-        await storage.setMultiple(settingsToSave);
-        window.feedbackManager.show("Settings Saved Successfully!", "success");
-        console.log("Settings saved successfully:", settingsToSave);
-      } catch (error) {
-        console.error("Error saving settings:", error);
-        window.feedbackManager.show("Error saving settings", "error");
-      }
+      chrome.storage.sync.set(settingsToSave, () => {
+        if (chrome.runtime.lastError) {
+          console.error("Error saving settings:", chrome.runtime.lastError);
+          window.feedbackManager.show("Error saving settings", "error");
+        } else {
+          window.feedbackManager.show(
+            "Settings Saved Successfully!",
+            "success"
+          );
+          console.log("Settings saved successfully:", settingsToSave);
+        }
+      });
     });
 
     if (statsTab) {
