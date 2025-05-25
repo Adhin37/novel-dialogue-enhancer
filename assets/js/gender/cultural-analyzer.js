@@ -18,7 +18,7 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
   }
 
   /**
-   * Enhanced cultural origin detection with improved accuracy
+   * Simplified cultural origin detection focused on non-western patterns
    * @param {string} name - The name to analyze
    * @param {string} text - Surrounding text context
    * @return {string} - Cultural origin (western, chinese, japanese, korean)
@@ -35,11 +35,10 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
       return "korean";
     }
 
-    // Priority 2: Enhanced name pattern recognition (now includes western)
+    // Priority 2: Name pattern recognition (non-western only)
     const namePatterns = this.#getNamePatterns();
-    const nameScores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
+    const nameScores = { chinese: 0, japanese: 0, korean: 0 };
 
-    // Score each cultural pattern
     for (const [culture, patterns] of Object.entries(namePatterns)) {
       for (const pattern of patterns) {
         if (pattern.test(name)) {
@@ -48,11 +47,10 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
       }
     }
 
-    // Priority 3: Context analysis with enhanced cultural indicators
+    // Priority 3: Context analysis
     const contextClues = this.#getContextClues();
-    const contextScores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
+    const contextScores = { chinese: 0, japanese: 0, korean: 0 };
 
-    // Enhanced context scoring with proximity weighting
     const nameProximityText = this._getProximityText(name, text, 200);
     const combinedText = nameProximityText.join(" ");
 
@@ -63,35 +61,125 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
       }
     }
 
-    // Priority 4: Enhanced cultural linguistic patterns
+    // Priority 4: Linguistic patterns
     const linguisticScores = this.#analyzeLinguisticPatterns(combinedText);
 
-    // Combine all scores with different weights
+    // Combine all scores
     const finalScores = {};
-    for (const culture of ["chinese", "japanese", "korean", "western"]) {
+    for (const culture of ["chinese", "japanese", "korean"]) {
       finalScores[culture] =
-        nameScores[culture] * 3 + // Name patterns are most reliable
-        contextScores[culture] * 2 + // Context is very important
-        linguisticScores[culture] * 1; // Linguistic patterns support
+        nameScores[culture] * 3 +
+        contextScores[culture] * 2 +
+        linguisticScores[culture] * 1;
     }
 
-    // Find the dominant culture
-    const dominantCulture = Object.keys(finalScores).reduce(
-      (a, b) => (finalScores[a] > finalScores[b] ? a : b),
-      "western"
-    );
+    // Find the dominant non-western culture
+    let dominantCulture = "western"; // Default fallback
+    let maxScore = 0;
 
-    // Return result with reasonable confidence threshold
-    if (finalScores[dominantCulture] >= 2) {
+    for (const culture of ["chinese", "japanese", "korean"]) {
+      if (finalScores[culture] > maxScore) {
+        dominantCulture = culture;
+        maxScore = finalScores[culture];
+      }
+    }
+
+    // Return result with confidence threshold for non-western
+    if (maxScore >= 2) {
       return dominantCulture;
     }
 
-    // Default fallback
+    // Default fallback to western
     console.log(
-      `Cultural detection uncertain for ${name}, scores:`,
-      finalScores
+      `Cultural detection uncertain for ${name}, defaulting to western`
     );
     return "western";
+  }
+
+  /**
+   * Get name patterns for non-western cultures only
+   * @return {object} - Object with name patterns for each culture
+   * @private
+   */
+  #getNamePatterns() {
+    return {
+      chinese: [
+        /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao|Cao|Deng|Xu|Cheng|Wei|Shen|Luo|Jiang|Ye|Shi|Yan)/i,
+        /^(?:Sect Master|Young Master|Elder|Ancestor|Grandmaster|Immortal|Dao Lord|Sovereign|Venerable|Imperial|Heavenly|Divine|Martial)/i,
+        /^(?:Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi)/i,
+        /(?:Xiang|Tian|Jiang|Pan|Wei|Ye|Yuan|Lu|Deng|Yao|Peng|Cao|Zou|Xiong|Qian|Dai|Fu|Ding|Jiang)/i
+      ],
+      japanese: [
+        /^(?:Sato|Suzuki|Takahashi|Tanaka|Watanabe|Ito|Yamamoto|Nakamura|Kobayashi|Kato|Yoshida|Yamada|Sasaki|Yamaguchi|Matsumoto|Inoue|Kimura|Hayashi|Shimizu|Yamazaki|Mori|Abe|Ikeda|Hashimoto|Ishikawa)/i,
+        /(?:Akira|Yuki|Haruto|Soma|Yuma|Ren|Haru|Sora|Haruki|Ayumu|Riku|Taiyo|Hinata|Yamato|Minato|Yuto|Sota|Yui|Hina|Koharu|Mei|Mio|Rin|Miyu|Kokona|Hana|Yuna|Sakura|Saki|Ichika|Akari|Himari)/i,
+        /(?:-san|-kun|-chan|-sama|-sensei|-senpai|-dono)$/i
+      ],
+      korean: [
+        /^(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
+        /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
+      ]
+    };
+  }
+
+  /**
+   * Get context clues for non-western cultures only
+   * @return {object} - Object with cultural context patterns
+   * @private
+   */
+  #getContextClues() {
+    return {
+      chinese: [
+        /Shanghai|Beijing|Guangzhou|Chinese|China|Mandarin|Cantonese|Dynasty|Emperor|Immortal|Cultivation|Dao|Qi|Taoist|Daoist|Wuxia|Xianxia|Jianghu/gi,
+        /Master|Shizun|Shifu|Shidi|Shixiong|Shimei|Shijie|Gongzi|Gongsun|Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi/gi
+      ],
+      japanese: [
+        /Tokyo|Osaka|Kyoto|Japanese|Japan|Senpai|Sensei|Sama|Kun|Chan|San|Dono|Hakase|Sushi|Ramen|Katana|Shinobi|Ninja|Samurai|Shogun|Daimyo|Ronin/gi,
+        /Onee|Onii|Nee|Nii|Imouto|Otouto|Oba|Oji|Okaa|Otou|Obaa|Ojii|-san|-kun|-chan|-sama|-dono|-sensei/gi
+      ],
+      korean: [
+        /Seoul|Busan|Incheon|Korean|Korea|Hangul|Hanbok|Kimchi|Chaebol|Manhwa|Webtoon|Noona|Hyung|Oppa|Unnie|Sunbae|Hoobae|Ahjussi|Ahjumma/gi,
+        /Hyung|Noona|Oppa|Unnie|Sunbae|Hoobae|Dongsaeng|Chingu|Ahjussi|Ahjumma|Halmeoni|Harabeoji/gi
+      ]
+    };
+  }
+
+  /**
+   * Analyze linguistic patterns for non-western cultures only
+   * @param {string} text - Text to analyze
+   * @return {object} - Linguistic pattern scores
+   * @private
+   */
+  #analyzeLinguisticPatterns(text) {
+    const scores = { chinese: 0, japanese: 0, korean: 0 };
+
+    // Chinese-specific patterns
+    if (
+      /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i.test(
+        text
+      )
+    ) {
+      scores.chinese += 3;
+    }
+
+    // Japanese-specific patterns
+    if (
+      /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i.test(
+        text
+      )
+    ) {
+      scores.japanese += 3;
+    }
+
+    // Korean-specific patterns
+    if (
+      /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i.test(
+        text
+      )
+    ) {
+      scores.korean += 3;
+    }
+
+    return scores;
   }
 
   /**
@@ -185,179 +273,12 @@ class CulturalAnalyzer extends BaseGenderAnalyzer {
   }
 
   /**
-   * Get the name patterns for different cultures (now includes western)
-   * @return {object} - Object with name patterns for each culture
-   * @private
-   */
-  #getNamePatterns() {
-    return {
-      chinese: [
-        // Common Chinese surnames
-        /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao|Cao|Deng|Xu|Cheng|Wei|Shen|Luo|Jiang|Ye|Shi|Yan)/i,
-        // Common cultivation novel prefixes
-        /^(?:Sect Master|Young Master|Elder|Ancestor|Grandmaster|Immortal|Dao Lord|Sovereign|Venerable|Imperial|Heavenly|Divine|Martial)/i,
-        // Special prefixes common in Chinese novels
-        /^(?:Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi)/i,
-        // Common name particles
-        /(?:Xiang|Tian|Jiang|Pan|Wei|Ye|Yuan|Lu|Deng|Yao|Peng|Cao|Zou|Xiong|Qian|Dai|Fu|Ding|Jiang)/i
-      ],
-      japanese: [
-        // Common Japanese surnames
-        /^(?:Sato|Suzuki|Takahashi|Tanaka|Watanabe|Ito|Yamamoto|Nakamura|Kobayashi|Kato|Yoshida|Yamada|Sasaki|Yamaguchi|Matsumoto|Inoue|Kimura|Hayashi|Shimizu|Yamazaki|Mori|Abe|Ikeda|Hashimoto|Ishikawa)/i,
-        // Common Japanese given names
-        /(?:Akira|Yuki|Haruto|Soma|Yuma|Ren|Haru|Sora|Haruki|Ayumu|Riku|Taiyo|Hinata|Yamato|Minato|Yuto|Sota|Yui|Hina|Koharu|Mei|Mio|Rin|Miyu|Kokona|Hana|Yuna|Sakura|Saki|Ichika|Akari|Himari)/i,
-        // Honorifics that identify Japanese names
-        /(?:-san|-kun|-chan|-sama|-sensei|-senpai|-dono)$/i
-      ],
-      korean: [
-        // Common Korean surnames
-        /^(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
-        // Common Korean name components
-        /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
-      ],
-      western: [
-        // Common Western male first names
-        /^(?:John|James|Robert|Michael|William|David|Richard|Charles|Joseph|Thomas|Christopher|Daniel|Paul|Mark|Donald|George|Kenneth|Steven|Edward|Brian|Ronald|Anthony|Kevin|Jason|Matthew|Gary|Timothy|Jose|Larry|Jeffrey|Frank|Scott|Eric|Jonathan|Stephen|Larry|Justin|Andrew|Kenneth|Peter|Joshua|Jacob|Wayne|Noah|Henry|Alexander|Aaron|Samuel|Logan|Benjamin|Mason|Ethan|Nathan|Lucas|Tyler|Liam|Owen|Caleb|Ryan|Carter|Connor)\b/i,
-        // Common Western female first names
-        /^(?:Mary|Patricia|Jennifer|Linda|Elizabeth|Barbara|Susan|Jessica|Sarah|Karen|Nancy|Lisa|Betty|Helen|Sandra|Donna|Carol|Ruth|Sharon|Michelle|Laura|Sarah|Kimberly|Deborah|Dorothy|Lisa|Nancy|Karen|Betty|Helen|Margaret|Ruth|Carol|Sharon|Michelle|Laura|Sarah|Ashley|Emily|Emma|Madison|Olivia|Hannah|Abigail|Isabella|Samantha|Elizabeth|Charlotte|Amelia|Evelyn|Ava|Harper|Sophia|Aria|Luna|Grace|Chloe|Penelope|Layla|Riley|Zoey|Nora|Lily|Eleanor|Hannah|Lillian|Addison|Aubrey|Ellie|Stella|Natalie|Zoe)\b/i,
-        // Common Western surnames
-        /\b(?:Smith|Johnson|Williams|Brown|Jones|Garcia|Miller|Davis|Rodriguez|Martinez|Hernandez|Lopez|Gonzalez|Wilson|Anderson|Thomas|Taylor|Moore|Jackson|Martin|Lee|Perez|Thompson|White|Harris|Sanchez|Clark|Ramirez|Lewis|Robinson|Walker|Young|Allen|King|Wright|Scott|Torres|Nguyen|Hill|Flores|Green|Adams|Nelson|Baker|Hall|Rivera|Campbell|Mitchell|Carter|Roberts|Gomez|Phillips|Evans|Turner|Diaz|Parker|Cruz|Edwards|Collins|Reyes|Stewart|Morris|Morales|Murphy|Cook|Rogers|Gutierrez|Ortiz|Morgan|Cooper|Peterson|Bailey|Reed|Kelly|Howard|Ramos|Kim|Cox|Ward|Richardson|Watson|Brooks|Chavez|Wood|James|Bennett|Gray|Mendoza|Ruiz|Hughes|Price|Alvarez|Castillo|Sanders|Patel|Myers|Long|Ross|Foster|Jimenez)\b/i,
-        // Western titles and honorifics
-        /^(?:Mr\.|Mrs\.|Miss|Ms\.|Dr\.|Professor|Sir|Lord|Lady|Duke|Duchess|Count|Countess|Baron|Baroness|Prince|Princess|King|Queen)/i,
-        // Common Western name patterns
-        /^[A-Z][a-z]+\s[A-Z][a-z]+$/, // FirstName LastName pattern
-        /^[A-Z][a-z]+\s[A-Z]\.\s[A-Z][a-z]+$/, // FirstName M. LastName pattern
-        /^[A-Z]\.\s[A-Z][a-z]+\s[A-Z][a-z]+$/ // F. MiddleName LastName pattern
-      ]
-    };
-  }
-
-  /**
-   * Analyze linguistic patterns in text
-   * @param {string} text - Text to analyze
-   * @return {object} - Linguistic pattern scores
-   * @private
-   */
-  #analyzeLinguisticPatterns(text) {
-    const scores = { chinese: 0, japanese: 0, korean: 0, western: 0 };
-
-    // Chinese-specific patterns
-    if (
-      /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i.test(
-        text
-      )
-    ) {
-      scores.chinese += 3;
-    }
-
-    // Japanese-specific patterns
-    if (
-      /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i.test(
-        text
-      )
-    ) {
-      scores.japanese += 3;
-    }
-
-    // Korean-specific patterns
-    if (
-      /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i.test(
-        text
-      )
-    ) {
-      scores.korean += 3;
-    }
-
-    // Western-specific patterns
-    if (
-      /\b(mister|miss|mrs|sir|lord|lady|duke|duchess|prince|princess|king|queen|knight|castle|manor|estate|nobility|aristocracy|parliament|congress|democracy|republic|university|college|corporation|company|business|enterprise|church|cathedral|chapel|priest|minister|pastor|reverend|doctor|professor|attorney|lawyer|judge|sheriff|mayor|governor|president|senator|congressman|representative)\b/i.test(
-        text
-      )
-    ) {
-      scores.western += 3;
-    }
-
-    return scores;
-  }
-
-  /**
-   * Get context clues for cultural detection
-   * @return {object} - Object with cultural context patterns
-   * @private
-   */
-  #getContextClues() {
-    return {
-      chinese: [
-        // Common Chinese cultural and cultivation terms
-        /Shanghai|Beijing|Guangzhou|Chinese|China|Mandarin|Cantonese|Dynasty|Emperor|Immortal|Cultivation|Dao|Qi|Taoist|Daoist|Wuxia|Xianxia|Jianghu/gi,
-        // Common titles and forms of address
-        /Master|Shizun|Shifu|Shidi|Shixiong|Shimei|Shijie|Gongzi|Gongsun|Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi/gi
-      ],
-      japanese: [
-        // Japanese locations and terms
-        /Tokyo|Osaka|Kyoto|Japanese|Japan|Senpai|Sensei|Sama|Kun|Chan|San|Dono|Hakase|Sushi|Ramen|Katana|Shinobi|Ninja|Samurai|Shogun|Daimyo|Ronin/gi,
-        // Japanese forms of address and suffixes
-        /Onee|Onii|Nee|Nii|Imouto|Otouto|Oba|Oji|Okaa|Otou|Obaa|Ojii|-san|-kun|-chan|-sama|-dono|-sensei/gi
-      ],
-      korean: [
-        // Korean locations and cultural terms
-        /Seoul|Busan|Incheon|Korean|Korea|Hangul|Hanbok|Kimchi|Chaebol|Manhwa|Webtoon|Noona|Hyung|Oppa|Unnie|Sunbae|Hoobae|Ahjussi|Ahjumma/gi,
-        // Korean forms of address
-        /Hyung|Noona|Oppa|Unnie|Sunbae|Hoobae|Dongsaeng|Chingu|Ahjussi|Ahjumma|Halmeoni|Harabeoji/gi
-      ]
-    };
-  }
-
-  /**
-   * Get cultural indicators for different cultures
+   * Get cultural indicators for non-western cultures only
    * @return {object} - Object with cultural indicators
    * @private
    */
   #getCulturalIndicators() {
     return {
-      western: {
-        male: [
-          "man",
-          "boy",
-          "gentleman",
-          "male",
-          "lad",
-          "groom",
-          "bachelor",
-          "Mr",
-          "Mr.",
-          "sir",
-          "lord",
-          "king",
-          "prince",
-          "duke",
-          "emperor",
-          "chairman",
-          "master",
-          "knight"
-        ],
-        female: [
-          "woman",
-          "girl",
-          "lady",
-          "female",
-          "lass",
-          "bride",
-          "maiden",
-          "Miss",
-          "Mrs",
-          "Ms",
-          "madam",
-          "ma'am",
-          "queen",
-          "princess",
-          "duchess",
-          "empress",
-          "chairwoman",
-          "mistress",
-          "dame"
-        ]
-      },
       chinese: {
         male: [
           "shixiong",

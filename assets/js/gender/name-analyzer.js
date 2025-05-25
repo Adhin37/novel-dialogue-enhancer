@@ -5,32 +5,41 @@
  */
 class NameAnalyzer {
   /**
-   * Check for gendered titles and honorifics in name
+   * Check for gendered titles and honorifics in name (non-western only)
    * @param {string} name - Name to check
    * @param {string} culturalOrigin - Detected cultural origin
    * @return {object} - Gender determination with evidence
    */
   checkTitlesAndHonorifics(name, culturalOrigin = "western") {
+    // Skip analysis for western origin - no patterns defined
+    if (culturalOrigin === "western") {
+      return { gender: "unknown", evidence: null };
+    }
+
     const maleTitles = this.#getMaleTitles();
     const femaleTitles = this.#getFemaleTitles();
 
-    // Check all cultural title sets, but prioritize the detected culture
-    const culturesToCheck = [
-      culturalOrigin,
-      ...Object.keys(maleTitles).filter((c) => c !== culturalOrigin)
-    ];
+    const culturesToCheck = [culturalOrigin];
 
     for (const culture of culturesToCheck) {
+      if (!maleTitles[culture] || !femaleTitles[culture]) continue;
+
       // Check if name starts with a title
       for (const title of maleTitles[culture]) {
-        const titleRegex = new RegExp(`^${SharedUtils.escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(
+          `^${SharedUtils.escapeRegExp(title)}\\s+`,
+          "i"
+        );
         if (titleRegex.test(name) || name === title) {
           return { gender: "male", evidence: `${title} (${culture})` };
         }
       }
 
       for (const title of femaleTitles[culture]) {
-        const titleRegex = new RegExp(`^${SharedUtils.escapeRegExp(title)}\\s+`, "i");
+        const titleRegex = new RegExp(
+          `^${SharedUtils.escapeRegExp(title)}\\s+`,
+          "i"
+        );
         if (titleRegex.test(name) || name === title) {
           return { gender: "female", evidence: `${title} (${culture})` };
         }
@@ -38,23 +47,8 @@ class NameAnalyzer {
 
       // Check if name ends with a title
       for (const title of maleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${SharedUtils.escapeRegExp(title)}$`, "i");
-        if (titleRegex.test(name)) {
-          return { gender: "male", evidence: `${title} (${culture})` };
-        }
-      }
-
-      for (const title of femaleTitles[culture]) {
-        const titleRegex = new RegExp(`\\s+${SharedUtils.escapeRegExp(title)}$`, "i");
-        if (titleRegex.test(name)) {
-          return { gender: "female", evidence: `${title} (${culture})` };
-        }
-      }
-
-      // Check if name contains a title
-      for (const title of maleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${SharedUtils.escapeRegExp(title)}\\s+`,
+          `\\s+${SharedUtils.escapeRegExp(title)}$`,
           "i"
         );
         if (titleRegex.test(name)) {
@@ -64,7 +58,7 @@ class NameAnalyzer {
 
       for (const title of femaleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${SharedUtils.escapeRegExp(title)}\\s+`,
+          `\\s+${SharedUtils.escapeRegExp(title)}$`,
           "i"
         );
         if (titleRegex.test(name)) {
@@ -77,28 +71,31 @@ class NameAnalyzer {
   }
 
   /**
-   * Check name patterns (endings, etc.) for gender clues
+   * Check name patterns for non-western cultures only
    * @param {string} name - Name to check
    * @param {string} culturalOrigin - Detected cultural origin
    * @return {object} - Gender determination with evidence
    */
   checkNamePatterns(name, culturalOrigin = "western") {
+    // Skip analysis for western origin
+    if (culturalOrigin === "western") {
+      return { gender: "unknown", evidence: null };
+    }
+
     const firstName = name.split(" ")[0];
     const nameLower = firstName.toLowerCase();
 
     const femaleEndings = this.#getFemaleEndings();
     const maleEndings = this.#getMaleEndings();
-
-    // Additional specific patterns by culture for first name detection
     const culturalSpecificPatterns = this.#getCulturalSpecificPatterns();
 
-    // First check specific cultural name structures
+    // Check specific cultural name structures
     if (culturalOrigin in culturalSpecificPatterns) {
       for (const pattern of culturalSpecificPatterns[culturalOrigin].male) {
         if (pattern.test(name)) {
           return {
             gender: "male",
-            evidence: `${culturalOrigin} name pattern: ${pattern.toString()}`
+            evidence: `${culturalOrigin} male name pattern`
           };
         }
       }
@@ -107,7 +104,7 @@ class NameAnalyzer {
         if (pattern.test(name)) {
           return {
             gender: "female",
-            evidence: `${culturalOrigin} name pattern: ${pattern.toString()}`
+            evidence: `${culturalOrigin} female name pattern`
           };
         }
       }
@@ -118,7 +115,7 @@ class NameAnalyzer {
       if (nameLower.endsWith(ending)) {
         return {
           gender: "female",
-          evidence: `${culturalOrigin} name ending with '${ending}'`
+          evidence: `${culturalOrigin} name ending '${ending}'`
         };
       }
     }
@@ -127,35 +124,17 @@ class NameAnalyzer {
       if (nameLower.endsWith(ending)) {
         return {
           gender: "male",
-          evidence: `${culturalOrigin} name ending with '${ending}'`
+          evidence: `${culturalOrigin} name ending '${ending}'`
         };
       }
     }
 
-    // If no match with the specific culture, try western patterns for names that might be westernized
-    if (culturalOrigin !== "western") {
-      for (const ending of femaleEndings.western) {
-        if (nameLower.endsWith(ending)) {
-          return {
-            gender: "female",
-            evidence: `western name ending with '${ending}'`
-          };
-        }
-      }
-
-      for (const ending of maleEndings.western) {
-        if (nameLower.endsWith(ending)) {
-          return {
-            gender: "male",
-            evidence: `western name ending with '${ending}'`
-          };
-        }
-      }
-    }
-
-    // Check East Asian common single-character names
-    if (culturalOrigin === "chinese" && name.length <= 3) {
-      const result = this.#checkChineseSingleCharNames(name);
+    // Check East Asian single-character names
+    if (
+      ["chinese", "japanese", "korean"].includes(culturalOrigin) &&
+      name.length <= 3
+    ) {
+      const result = this.#checkEastAsianSingleCharNames(name, culturalOrigin);
       if (result.gender !== "unknown") {
         return result;
       }
@@ -165,33 +144,203 @@ class NameAnalyzer {
   }
 
   /**
-   * Get female name endings for different cultures
+   * Check East Asian single-character names for gender patterns
+   * @param {string} name - Name to check
+   * @param {string} culturalOrigin - Cultural origin
+   * @return {object} - Gender determination with evidence
+   * @private
+   */
+  #checkEastAsianSingleCharNames(name, culturalOrigin) {
+    const culturalSingleChars = {
+      chinese: {
+        male: [
+          "Bo",
+          "Yi",
+          "Yu",
+          "Lei",
+          "Hao",
+          "Jie",
+          "Jun",
+          "Wei",
+          "Feng",
+          "Long",
+          "Peng",
+          "Kun",
+          "Fei",
+          "Tai",
+          "Hai",
+          "Gang",
+          "Ming",
+          "Tao",
+          "Cheng",
+          "Qiang",
+          "Bin",
+          "Jian",
+          "Dong",
+          "Qing",
+          "Kai",
+          "Yong",
+          "Shan"
+        ],
+        female: [
+          "Yan",
+          "Yu",
+          "Xin",
+          "Mei",
+          "Li",
+          "Jing",
+          "Ying",
+          "Yue",
+          "Hua",
+          "Qian",
+          "Min",
+          "Ning",
+          "Ping",
+          "Zhen",
+          "Jiao",
+          "Qiao",
+          "Lian",
+          "Wei",
+          "Na",
+          "Xia",
+          "Juan",
+          "Fang",
+          "Lan",
+          "Hong",
+          "Rui",
+          "Xue"
+        ]
+      },
+      japanese: {
+        male: [
+          "Hiro",
+          "Yuki",
+          "Taka",
+          "Kazu",
+          "Masa",
+          "Aki",
+          "Dai",
+          "Ken",
+          "Shin",
+          "Ryu",
+          "Go",
+          "Jin",
+          "Ren",
+          "Sho",
+          "Taro",
+          "Jiro",
+          "Ichiro"
+        ],
+        female: [
+          "Yuki",
+          "Hana",
+          "Miku",
+          "Rin",
+          "Saki",
+          "Yui",
+          "Kana",
+          "Mao",
+          "Rei",
+          "Ai",
+          "Emi",
+          "Nana",
+          "Mami",
+          "Saya",
+          "Moe",
+          "Ami"
+        ]
+      },
+      korean: {
+        male: [
+          "Min",
+          "Jun",
+          "Woo",
+          "Jin",
+          "Seung",
+          "Hyun",
+          "Tae",
+          "Ho",
+          "Joon",
+          "Seok",
+          "Yong",
+          "Cheol",
+          "Hwan",
+          "Gyu",
+          "Dong",
+          "Chang"
+        ],
+        female: [
+          "Min",
+          "Hee",
+          "Jung",
+          "Yeon",
+          "Ji",
+          "Soo",
+          "Eun",
+          "Ah",
+          "Young",
+          "Kyung",
+          "Sun",
+          "Ok",
+          "Ja",
+          "Seon",
+          "Hyun"
+        ]
+      }
+    };
+
+    if (!(culturalOrigin in culturalSingleChars)) {
+      return { gender: "unknown", evidence: null };
+    }
+
+    const chars = culturalSingleChars[culturalOrigin];
+
+    // Check for exact matches in male names
+    if (chars.male.includes(name)) {
+      return {
+        gender: "male",
+        evidence: `${culturalOrigin} single-character male name`
+      };
+    }
+
+    // Check for exact matches in female names
+    if (chars.female.includes(name)) {
+      return {
+        gender: "female",
+        evidence: `${culturalOrigin} single-character female name`
+      };
+    }
+
+    // For compound names, check if the first character matches
+    if (name.length > 1) {
+      const firstChar =
+        name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+
+      if (chars.male.includes(firstChar)) {
+        return {
+          gender: "male",
+          evidence: `${culturalOrigin} name starts with male character '${firstChar}'`
+        };
+      }
+
+      if (chars.female.includes(firstChar)) {
+        return {
+          gender: "female",
+          evidence: `${culturalOrigin} name starts with female character '${firstChar}'`
+        };
+      }
+    }
+
+    return { gender: "unknown", evidence: null };
+  }
+
+  /**
+   * Get female name endings for non-western cultures only
    * @return {object} - Female name endings by culture
    * @private
    */
   #getFemaleEndings() {
     return {
-      western: [
-        "a",
-        "ia",
-        "ie",
-        "y",
-        "ey",
-        "i",
-        "elle",
-        "ette",
-        "ine",
-        "ell",
-        "lyn",
-        "ina",
-        "ah",
-        "ella",
-        "anna",
-        "enna",
-        "anne",
-        "issa",
-        "ara"
-      ],
       chinese: [
         "xia",
         "qian",
@@ -252,36 +401,12 @@ class NameAnalyzer {
   }
 
   /**
-   * Get male name endings for different cultures
+   * Get male name endings for non-western cultures only
    * @return {object} - Male name endings by culture
    * @private
    */
   #getMaleEndings() {
     return {
-      western: [
-        "o",
-        "er",
-        "on",
-        "en",
-        "us",
-        "or",
-        "k",
-        "d",
-        "t",
-        "io",
-        "ian",
-        "im",
-        "am",
-        "ik",
-        "to",
-        "ro",
-        "hn",
-        "il",
-        "rt",
-        "ng",
-        "ez",
-        "an"
-      ],
       chinese: [
         "hao",
         "wei",
@@ -343,116 +468,12 @@ class NameAnalyzer {
   }
 
   /**
-   * Get cultural-specific pattern regexes
-   * @return {object} - Patterns by culture
-   * @private
-   */
-  #getCulturalSpecificPatterns() {
-    return {
-      chinese: {
-        male: [
-          /^(Li|Wang|Zhang|Chen|Zhao|Yang|Liu)\s/i,
-          /^(Wu|Sun|Xu|Yu|Hu)\s/i
-        ],
-        female: [/^(Lin|Ying|Qian|Mei|Xia|Yun|Yan)\s/i, /^(Zhen|Hua|Xiao)\s/i]
-      },
-      japanese: {
-        male: [
-          /^(Taka|Hiro|Yoshi|Kazu|Masa|Nobu|Haru)/i,
-          /(suke|hiko|taro|maro|shi)$/i
-        ],
-        female: [/^(Saku|Yuki|Haru|Mao|Rin|Miku|Yui)/i, /(ko|mi|ka|na|yo)$/i]
-      },
-      korean: {
-        male: [
-          /^(Min|Seung|Hyun|Jung|Jae|Do|Woo|Tae)\s/i,
-          /(ho|hwan|jun|min|seok)$/i
-        ],
-        female: [/^(Seo|Ji|Hye|Yeon|Min|Hee|Eun)\s/i, /(mi|hee|jung|ah|soo)$/i]
-      }
-    };
-  }
-
-  /**
-   * Check Chinese single-character names
-   * @param {string} name - Name to check
-   * @return {object} - Gender determination with evidence
-   * @private
-   */
-  #checkChineseSingleCharNames(name) {
-    // Common single-character male names in Chinese
-    const chineseSingleCharMale = [
-      "Bo",
-      "Yi",
-      "Yu",
-      "Lei",
-      "Hao",
-      "Jie",
-      "Jun",
-      "Wei"
-    ];
-    // Common single-character female names in Chinese
-    const chineseSingleCharFemale = [
-      "Yan",
-      "Yu",
-      "Xin",
-      "Mei",
-      "Li",
-      "Jing",
-      "Ying"
-    ];
-
-    if (chineseSingleCharMale.includes(name)) {
-      return {
-        gender: "male",
-        evidence: "single-character Chinese male name"
-      };
-    }
-    if (chineseSingleCharFemale.includes(name)) {
-      return {
-        gender: "female",
-        evidence: "single-character Chinese female name"
-      };
-    }
-
-    return { gender: "unknown", evidence: null };
-  }
-
-  /**
-   * Get male titles for different cultures
+   * Get male titles for non-western cultures only
    * @return {object} - Male titles by culture
    * @private
    */
   #getMaleTitles() {
     return {
-      western: [
-        "Mr",
-        "Mr.",
-        "Sir",
-        "Lord",
-        "Master",
-        "Prince",
-        "King",
-        "Duke",
-        "Count",
-        "Baron",
-        "Emperor",
-        "Brother",
-        "Uncle",
-        "Father",
-        "Dad",
-        "Daddy",
-        "Papa",
-        "Grandpa",
-        "Grandfather",
-        "Boy",
-        "Son",
-        "Husband",
-        "Mister",
-        "Gentleman",
-        "Lad",
-        "Fellow"
-      ],
       chinese: [
         "Dage",
         "Gege",
@@ -524,41 +545,12 @@ class NameAnalyzer {
   }
 
   /**
-   * Get female titles for different cultures
+   * Get female titles for non-western cultures only
    * @return {object} - Female titles by culture
    * @private
    */
   #getFemaleTitles() {
     return {
-      western: [
-        "Mrs",
-        "Mrs.",
-        "Ms",
-        "Ms.",
-        "Miss",
-        "Lady",
-        "Princess",
-        "Queen",
-        "Duchess",
-        "Countess",
-        "Baroness",
-        "Empress",
-        "Sister",
-        "Aunt",
-        "Mother",
-        "Mom",
-        "Mommy",
-        "Mama",
-        "Grandma",
-        "Grandmother",
-        "Girl",
-        "Daughter",
-        "Wife",
-        "Madam",
-        "Madame",
-        "Mistress",
-        "Dame"
-      ],
       chinese: [
         "Jiejie",
         "Meimei",
@@ -621,6 +613,42 @@ class NameAnalyzer {
         "Yeoja",
         "Agassi"
       ]
+    };
+  }
+
+  /**
+   * Get cultural-specific pattern regexes (non-western only)
+   * @return {object} - Patterns by culture
+   * @private
+   */
+  #getCulturalSpecificPatterns() {
+    return {
+      chinese: {
+        male: [
+          /^(Li|Wang|Zhang|Chen|Zhao|Yang|Liu)\s/i,
+          /^(Wu|Sun|Xu|Yu|Hu)\s/i,
+          /^(Young Master|Sect Master|Elder)\s/i
+        ],
+        female: [
+          /^(Lin|Ying|Qian|Mei|Xia|Yun|Yan)\s/i,
+          /^(Zhen|Hua|Xiao)\s/i,
+          /^(Young Miss|Young Lady|Fairy)\s/i
+        ]
+      },
+      japanese: {
+        male: [
+          /^(Taka|Hiro|Yoshi|Kazu|Masa|Nobu|Haru)/i,
+          /(suke|hiko|taro|maro|shi)$/i
+        ],
+        female: [/^(Saku|Yuki|Haru|Mao|Rin|Miku|Yui)/i, /(ko|mi|ka|na|yo)$/i]
+      },
+      korean: {
+        male: [
+          /^(Min|Seung|Hyun|Jung|Jae|Do|Woo|Tae)\s/i,
+          /(ho|hwan|jun|min|seok)$/i
+        ],
+        female: [/^(Seo|Ji|Hye|Yeon|Min|Hee|Eun)\s/i, /(mi|hee|jung|ah|soo)$/i]
+      }
     };
   }
 }

@@ -261,7 +261,7 @@ class GenderUtils {
   }
 
   /**
-   * Calculate cultural bonus based on origin
+   * Calculate cultural bonus (no western bonus)
    * @param {string} culturalOrigin - Detected cultural origin
    * @param {number} baseScore - Base score to modify
    * @return {number} - Cultural bonus
@@ -271,8 +271,8 @@ class GenderUtils {
     const culturalMultipliers = {
       chinese: 1.2,
       japanese: 1.15,
-      korean: 1.1,
-      western: 1.0
+      korean: 1.1
+      // No western multiplier - will use baseScore as-is
     };
 
     const multiplier = culturalMultipliers[culturalOrigin] || 1.0;
@@ -280,7 +280,7 @@ class GenderUtils {
   }
 
   /**
-   * Get cultural-specific minimum threshold
+   * Get cultural-specific minimum threshold (default for western)
    * @param {string} culturalOrigin - Cultural origin
    * @return {number} - Minimum threshold
    * @private
@@ -289,15 +289,15 @@ class GenderUtils {
     const thresholds = {
       chinese: 3,
       japanese: 3,
-      korean: 3,
-      western: 3
+      korean: 3
+      // Western uses default of 3
     };
 
     return thresholds[culturalOrigin] || 3;
   }
 
   /**
-   * Get translation adjustment factor
+   * Get translation adjustment factor (none for western)
    * @param {string} culturalOrigin - Cultural origin
    * @return {number} - Translation adjustment
    * @private
@@ -306,8 +306,8 @@ class GenderUtils {
     const adjustments = {
       chinese: 1,
       japanese: 1,
-      korean: 1,
-      western: 0
+      korean: 1
+      // Western gets no adjustment (0)
     };
 
     return adjustments[culturalOrigin] || 0;
