@@ -18,11 +18,13 @@ class SharedUtils {
    * @return {string} - Single character gender code
    */
   static compressGender(gender) {
-    if (!gender || typeof gender !== "string") return "u";
+    if (!gender || typeof gender !== "string") return Constants.GENDER.UNKNOWN;
     const genderLower = gender.toLowerCase();
-    if (genderLower === "male") return "m";
-    if (genderLower === "female") return "f";
-    return "u";
+    if (genderLower === Constants.GENDER.MALE_FULL)
+      return Constants.GENDER.MALE;
+    if (genderLower === Constants.GENDER.FEMALE_FULL)
+      return Constants.GENDER.FEMALE;
+    return Constants.GENDER.UNKNOWN;
   }
 
   /**
@@ -31,10 +33,10 @@ class SharedUtils {
    * @return {string} - Full gender string
    */
   static expandGender(code) {
-    if (!code || typeof code !== "string") return "unknown";
-    if (code === "m") return "male";
-    if (code === "f") return "female";
-    return "unknown";
+    if (!code || typeof code !== "string") return Constants.GENDER.UNKNOWN_FULL;
+    if (code === Constants.GENDER.MALE) return Constants.GENDER.MALE_FULL;
+    if (code === Constants.GENDER.FEMALE) return Constants.GENDER.FEMALE_FULL;
+    return Constants.GENDER.UNKNOWN_FULL;
   }
 
   /**
@@ -112,7 +114,11 @@ class SharedUtils {
    * @return {boolean} - Whether name is valid
    */
   static validateCharacterName(name) {
-    return typeof name === "string" && name.length > 1 && name.length <= 50;
+    return (
+      typeof name === "string" &&
+      name.length >= Constants.VALIDATION.MIN_NAME_LENGTH &&
+      name.length <= Constants.VALIDATION.MAX_NAME_LENGTH
+    );
   }
 
   /**

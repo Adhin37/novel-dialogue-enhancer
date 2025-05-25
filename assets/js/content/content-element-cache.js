@@ -6,7 +6,7 @@ class ContentElementCache {
   constructor() {
     this.cache = new Map();
     this.lastCacheTime = 0;
-    this.cacheTimeout = 5000; // 5 seconds
+    this.cacheTimeout = Constants.STORAGE.CACHE_TTL_MS;
   }
 
   /**

@@ -19,7 +19,7 @@ class StatsUtils {
    * @param {number} wordsProcessed - New count value
    */
   setTotalWordsProcessed(wordsProcessed) {
-    if (!this.#isNumber(wordsProcessed)) {
+    if (!SharedUtils.isValidNumber(wordsProcessed)) {
       console.error("Invalid wordsProcessed value");
       return;
     }
@@ -31,7 +31,7 @@ class StatsUtils {
    * @param {number} ratio - New compression ratio value
    */
   setCompressionRatio(ratio) {
-    if (!this.#isNumber(ratio)) {
+    if (!SharedUtils.isValidNumber(ratio)) {
       console.error("Invalid compressionRatio value");
       return;
     }
@@ -73,7 +73,7 @@ class StatsUtils {
    * @param {number} dialoguesEnhanced - New count value
    */
   setTotalDialoguesEnhanced(dialoguesEnhanced) {
-    if (!this.#isNumber(dialoguesEnhanced)) {
+    if (!SharedUtils.isValidNumber(dialoguesEnhanced)) {
       console.error("Invalid dialoguesEnhanced value");
       return;
     }
@@ -93,7 +93,7 @@ class StatsUtils {
    * @param {number} charactersDetected - New count value
    */
   setTotalCharactersDetected(charactersDetected) {
-    if (!this.#isNumber(charactersDetected)) {
+    if (!SharedUtils.isValidNumber(charactersDetected)) {
       console.error("Invalid charactersDetected value");
       return;
     }
@@ -113,7 +113,7 @@ class StatsUtils {
    * @param {number} processingTime - New processing time in milliseconds
    */
   setProcessingTime(processingTime) {
-    if (!this.#isNumber(processingTime)) {
+    if (!SharedUtils.isValidNumber(processingTime)) {
       console.error("Invalid processingTime value");
       return;
     }
@@ -135,10 +135,6 @@ class StatsUtils {
     this.totalDialoguesEnhanced = stats.totalDialoguesEnhanced || 0;
     this.totalCharactersDetected = stats.totalCharactersDetected || 0;
     this.processingTime = stats.processingTime || 0;
-  }
-
-  #isNumber(value) {
-    return typeof value === "number" && !isNaN(value);
   }
 }
 

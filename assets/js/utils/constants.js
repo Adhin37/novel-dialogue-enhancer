@@ -49,7 +49,8 @@ const Constants = {
     OLLAMA_BASE: "http://localhost:11434",
     OLLAMA_GENERATE: "/api/generate",
     OLLAMA_VERSION: "/api/version",
-    OLLAMA_TAGS: "/api/tags"
+    OLLAMA_TAGS: "/api/tags",
+    TIMEOUT: 200000
   },
 
   // CSS selectors for content detection

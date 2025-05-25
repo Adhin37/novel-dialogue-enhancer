@@ -281,7 +281,7 @@ class ContentEnhancerIntegration {
    */
   async #processChunks(chunks, characterContext, novelInfo, settings) {
     const enhancedChunks = [];
-    const BATCH_DELAY = 800;
+    const BATCH_DELAY = Constants.PROCESSING.BATCH_DELAY_MS;
     let errorCount = 0;
 
     for (let i = 0; i < chunks.length; i++) {

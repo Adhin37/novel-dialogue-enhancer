@@ -5,8 +5,8 @@
  */
 class OllamaClient {
   constructor(options = {}) {
-    this.API_ENDPOINT = options.endpoint || "http://localhost:11434/api";
-    this.CLIENT_TIMEOUT = options.timeout || 200000;
+    this.API_ENDPOINT = options.endpoint || Constants.API.OLLAMA_BASE + "/api";
+    this.CLIENT_TIMEOUT = options.timeout || Constants.API.TIMEOUT;
     this.isCheckingAvailability = false;
     this.lastAvailabilityCheckTime = null;
     this.cachedAvailabilityStatus = null;

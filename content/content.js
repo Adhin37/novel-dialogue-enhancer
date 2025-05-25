@@ -13,6 +13,7 @@ let isEnhancing = false;
 let pendingEnhancement = false;
 let terminateRequested = false;
 let contentEnhancerIntegration;
+let ollamaClient;
 let toaster;
 let isCurrentSiteWhitelisted = false;
 const maxRetries = 3;
@@ -207,6 +208,17 @@ function checkSitePermissions() {
 }
 
 /**
+ * Get Ollama client instance
+ * @return {OllamaClient} - Ollama client instance
+ */
+function getOllamaClient() {
+  if (!ollamaClient) {
+    ollamaClient = new OllamaClient();
+  }
+  return ollamaClient;
+}
+
+/**
  * Checks the availability of Ollama with timeout
  * @return {Promise<boolean>}
  */
@@ -217,7 +229,7 @@ async function checkOllamaStatus() {
 
   while (retries < maxRetries) {
     try {
-      status = await contentEnhancerIntegration.ollamaClient.checkOllamaAvailability();
+      status = await getOllamaClient().checkOllamaAvailability();
       break;
     } catch (err) {
       console.warn(
@@ -331,7 +343,7 @@ async function enhancePage() {
 
   try {
     const ollamaStatus =
-      await contentEnhancerIntegration.ollamaClient.checkOllamaAvailability();
+      await getOllamaClient().checkOllamaAvailability();
 
     // Use ollamaStatus parameter with validation
     if (!ollamaStatus || typeof ollamaStatus !== "object") {
