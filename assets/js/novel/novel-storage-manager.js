@@ -1,4 +1,4 @@
-// In assets/js/novel/novel-storage-manager.js - Properly use parent caching
+// novel-storage-manager.js
 /**
  * Manages novel data storage and retrieval
  */
@@ -6,6 +6,7 @@ class NovelStorageManager extends StorageManager {
   constructor() {
     super();
     this.novelId = null;
+    this.characterIdMap = new Map(); // Track name -> numericId mapping
   }
 
   /**
@@ -14,6 +15,8 @@ class NovelStorageManager extends StorageManager {
    */
   setNovelId(novelId) {
     this.novelId = novelId;
+    // Clear the character ID map when novel ID changes
+    this.characterIdMap.clear();
   }
 
   /**
@@ -68,13 +71,16 @@ class NovelStorageManager extends StorageManager {
       // Try to get from cache first using parent class method
       const cachedData = await this.get(cacheKey, null, true);
       if (cachedData) {
+        // Update character ID map from cached data
+        this.#updateCharacterIdMap(cachedData.characterMap);
         return cachedData;
       }
 
-      // If not in cache, fetch from background
+      // If not in cache, fetch from background with raw data request
       const response = await this.#sendBackgroundMessage({
         action: "getNovelData",
-        novelId: this.novelId
+        novelId: this.novelId,
+        includeRawData: true // Request both converted and raw data
       });
 
       const novelData =
@@ -84,6 +90,13 @@ class NovelStorageManager extends StorageManager {
               enhancedChapters: response.enhancedChapters || []
             }
           : { characterMap: {}, enhancedChapters: [] };
+
+      // Update character ID map from raw data if available
+      if (response && response.rawCharacterData) {
+        this.#buildCharacterIdMapFromRaw(response.rawCharacterData);
+      } else {
+        this.#updateCharacterIdMap(novelData.characterMap);
+      }
 
       // Store in cache using parent class method
       await this.set(cacheKey, novelData, true);
@@ -192,6 +205,9 @@ class NovelStorageManager extends StorageManager {
       const success = response && response.status === "ok";
 
       if (success) {
+        // Update character ID map with any new assignments
+        this.#updateCharacterIdMap(characterMap);
+
         // Update cache - clear novel data cache so it gets refreshed next time
         const novelDataCacheKey = `novelData_${this.novelId}`;
         this.clearCache(novelDataCacheKey);
@@ -241,7 +257,58 @@ class NovelStorageManager extends StorageManager {
   }
 
   /**
-   * Create optimized character data using shared utilities
+   * Update character ID map from character map data
+   * @param {object} characterMap - Character map with name keys
+   * @private
+   */
+  #updateCharacterIdMap(characterMap) {
+    if (!characterMap || typeof characterMap !== "object") {
+      return;
+    }
+
+    // For new characters, we'll assign IDs when creating optimized data
+    Object.keys(characterMap).forEach((name) => {
+      if (!this.characterIdMap.has(name)) {
+        // Will be assigned in createOptimizedCharacterData
+      }
+    });
+  }
+
+  /**
+   * Build character ID map from raw storage data
+   * @param {object} rawCharacterData - Raw character data from storage
+   * @private
+   */
+  #buildCharacterIdMapFromRaw(rawCharacterData) {
+    if (!rawCharacterData || typeof rawCharacterData !== "object") {
+      return;
+    }
+
+    this.characterIdMap.clear();
+
+    Object.entries(rawCharacterData).forEach(([numericId, charData]) => {
+      if (charData && charData.name) {
+        this.characterIdMap.set(charData.name, parseInt(numericId, 10));
+      }
+    });
+  }
+
+  /**
+   * Get the next available character ID
+   * @return {number} - Next available ID
+   * @private
+   */
+  #getNextCharacterId() {
+    if (this.characterIdMap.size === 0) {
+      return 0;
+    }
+
+    const existingIds = Array.from(this.characterIdMap.values());
+    return Math.max(...existingIds) + 1;
+  }
+
+  /**
+   * Create optimized character data preserving existing IDs
    * @param {object} characterMap - Raw character map
    * @return {object} - Optimized character data
    * @private
@@ -249,25 +316,34 @@ class NovelStorageManager extends StorageManager {
   #createOptimizedCharacterData(characterMap) {
     const optimized = {};
 
-    Object.entries(characterMap).forEach(([name, data], index) => {
-      if (SharedUtils.validateCharacterName(name)) {
-        optimized[index] = {
-          name: name,
-          gender: SharedUtils.compressGender(data.gender),
-          confidence: SharedUtils.validateConfidence(data.confidence)
-            ? data.confidence
-            : 0,
-          appearances: SharedUtils.validateAppearances(data.appearances)
-            ? data.appearances
-            : 1
-        };
+    Object.entries(characterMap).forEach(([name, data]) => {
+      if (!SharedUtils.validateCharacterName(name)) {
+        return;
+      }
 
-        if (Array.isArray(data.evidence) && data.evidence.length > 0) {
-          optimized[index].evidences = data.evidence.slice(
-            0,
-            Constants.STORAGE.MAX_EVIDENCE_ENTRIES
-          );
-        }
+      // Use existing ID or assign new one
+      let numericId = this.characterIdMap.get(name);
+      if (numericId === undefined) {
+        numericId = this.#getNextCharacterId();
+        this.characterIdMap.set(name, numericId);
+      }
+
+      optimized[numericId] = {
+        name: name,
+        gender: SharedUtils.compressGender(data.gender),
+        confidence: SharedUtils.validateConfidence(data.confidence)
+          ? data.confidence
+          : 0,
+        appearances: SharedUtils.validateAppearances(data.appearances)
+          ? data.appearances
+          : 1
+      };
+
+      if (Array.isArray(data.evidence) && data.evidence.length > 0) {
+        optimized[numericId].evidences = data.evidence.slice(
+          0,
+          Constants.STORAGE.MAX_EVIDENCE_ENTRIES
+        );
       }
     });
 

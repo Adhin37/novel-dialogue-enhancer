@@ -923,7 +923,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         status: "ok",
         characterMap: {},
         enhancedChapters: [],
-        isChapterEnhanced: false
+        isChapterEnhanced: false,
+        rawCharacterData: {}
       });
       return false;
     }
@@ -936,6 +937,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       enhancedChapters: [],
       isChapterEnhanced: false
     };
+
+    // Include raw character data if requested
+    if (request.includeRawData) {
+      response.rawCharacterData = novelCharacterMaps[novelId].chars || {};
+    }
 
     if (request.checkChapter && request.chapterNumber) {
       const checkChapterNum = parseInt(request.chapterNumber, 10);
