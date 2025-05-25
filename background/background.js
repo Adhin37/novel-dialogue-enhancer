@@ -1,6 +1,6 @@
 // At the top of background/background.js, update the initialization
 const activeRequestControllers = new Map();
-const DEFAULT_OLLAMA_URL = Constants.DEFAULT_OLLAMA_URL;
+const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 let isBackgroundReady = false;
 let globalStats = {
