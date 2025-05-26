@@ -17,14 +17,29 @@ let ollamaClient;
 let toaster;
 let isCurrentSiteWhitelisted = false;
 const maxRetries = 3;
-const elementCache = new ContentElementCache();
+let elementCache;
 
+/**
+ * Gets the element cache instance
+ * @return {ContentElementCache} - Element cache instance
+ */
+function getElementCache() {
+  if (!elementCache) {
+    elementCache = new ContentElementCache();
+  }
+  return elementCache;
+}
+
+/**
+ * Finds the content element on the page
+ * @return {HTMLElement|null} - Content element or null
+ */
 function findContentElement() {
   const contentSelectors = Constants.SELECTORS.CONTENT;
 
   for (const selector of contentSelectors) {
     try {
-      const element = elementCache.getElement(selector);
+      const element = getElementCache().getElement(selector);
       if (element) {
         return element;
       }

@@ -16,12 +16,12 @@ class PronounAnalyzer {
     let inconsistencies = 0;
 
     const nameSentenceRegex = new RegExp(
-      `[^.!?]{0,100}\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]*[.!?]`,
+      `[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,50}[.!?]`,
       "gi"
     );
 
     const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,200}`,
+      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,80}`,
       "gi"
     );
 
@@ -33,64 +33,47 @@ class PronounAnalyzer {
       const matchIndex = match.index;
       const sentenceWithName = match[0];
 
-      // Get about 200 characters of context after the name mention
       const followingText = text.substring(
         matchIndex,
-        matchIndex + sentenceWithName.length + 200
+        matchIndex + sentenceWithName.length + 100
       );
       contexts.push(followingText);
 
-      // Count pronouns in the following text
-      const malePronouns = (followingText.match(/\b(he|him|his)\b/gi) || [])
-        .length;
-      const femalePronouns = (followingText.match(/\b(she|her|hers)\b/gi) || [])
-        .length;
-
-      const directMaleConnection = followingText.match(
-        new RegExp(
-          `\\b${SharedUtils.escapeRegExp(
-            name
-          )}\\b[^.!?]{0,30}\\b(he|him|his)\\b`,
-          "i"
-        )
+      const directMaleConnection = this.#checkDirectPronounConnection(
+        name,
+        followingText,
+        ["he", "him", "his"]
       );
 
-      const directFemaleConnection = followingText.match(
-        new RegExp(
-          `\\b${SharedUtils.escapeRegExp(
-            name
-          )}\\b[^.!?]{0,30}\\b(she|her|hers)\\b`,
-          "i"
-        )
+      const directFemaleConnection = this.#checkDirectPronounConnection(
+        name,
+        followingText,
+        ["she", "her", "hers"]
       );
 
-      if (directMaleConnection) maleScore += 2;
-      if (directFemaleConnection) femaleScore += 2;
-
-      // Determine score based on pronoun frequency
-      if (malePronouns > femalePronouns) {
-        maleScore += Math.min(4, malePronouns);
-      } else if (femalePronouns > malePronouns) {
-        femaleScore += Math.min(4, femalePronouns);
+      if (directMaleConnection.isDirectConnection) {
+        maleScore += 3;
+      } else if (directMaleConnection.closeProximity) {
+        maleScore += 1;
       }
 
-      if (malePronouns > 0 && femalePronouns > 0) {
+      if (directFemaleConnection.isDirectConnection) {
+        femaleScore += 3;
+      } else if (directFemaleConnection.closeProximity) {
+        femaleScore += 1;
+      }
+      if (directMaleConnection.count > 0 && directFemaleConnection.count > 0) {
         inconsistencies++;
-
-        if (malePronouns > femalePronouns * 2) {
-          maleScore += 1;
-        } else if (femalePronouns > malePronouns * 2) {
-          femaleScore += 1;
-        }
       }
     }
 
-    // Check proximity text for additional clues
-    const proximityResult = this.#analyzeProximityText(name, proximityMatches);
+    const proximityResult = this.#analyzeProximityTextImproved(
+      name,
+      proximityMatches
+    );
     maleScore += proximityResult.maleScore;
     femaleScore += proximityResult.femaleScore;
 
-    // Check for archetypal gender indicators
     const archetypeResult = this.#checkArchetypes(name, text);
     maleScore += archetypeResult.maleScore;
     femaleScore += archetypeResult.femaleScore;
@@ -104,19 +87,58 @@ class PronounAnalyzer {
   }
 
   /**
-   * Analyze text surrounding the character name
+   * Check for direct pronoun connections with improved accuracy
+   * @param {string} name - Character name
+   * @param {string} text - Text to analyze
+   * @param {Array<string>} pronouns - Pronouns to check
+   * @return {object} - Connection analysis results
+   * @private
+   */
+  #checkDirectPronounConnection(name, text, pronouns) {
+    let count = 0;
+    let isDirectConnection = false;
+    let closeProximity = false;
+
+    for (const pronoun of pronouns) {
+      // Very close connection (within 15 characters)
+      const directPattern = new RegExp(
+        `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,15}\\b${pronoun}\\b`,
+        "i"
+      );
+
+      // Close proximity (within 40 characters)
+      const proximityPattern = new RegExp(
+        `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,40}\\b${pronoun}\\b`,
+        "i"
+      );
+
+      if (directPattern.test(text)) {
+        isDirectConnection = true;
+        count++;
+      } else if (proximityPattern.test(text)) {
+        closeProximity = true;
+        count++;
+      }
+    }
+
+    return { isDirectConnection, closeProximity, count };
+  }
+
+  /**
+   * Analyze text surrounding the character name with improved filtering
    * @param {string} name - Character name
    * @param {Array} proximityMatches - Matches of text near the character name
    * @return {object} - Analysis results with scores
    * @private
    */
-  #analyzeProximityText(name, proximityMatches) {
+  #analyzeProximityTextImproved(name, proximityMatches) {
     let maleScore = 0;
     let femaleScore = 0;
 
     for (const match of proximityMatches) {
       const proximityText = match[0];
 
+      // Check for possessive patterns (more reliable)
       if (
         proximityText.match(
           new RegExp(
@@ -143,34 +165,76 @@ class PronounAnalyzer {
         femaleScore += 3;
       }
 
-      if (
-        proximityText.match(
-          new RegExp(
-            `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
-              name
-            )}\\s+said,?\\s+(he|his)\\b`,
-            "i"
-          )
-        )
-      ) {
+      // Check for dialogue attribution patterns (more restrictive)
+      const dialogueMalePattern = new RegExp(
+        `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
+          name
+        )}\\s+(?:said|replied|asked|shouted|whispered|exclaimed|muttered|responded|commented)[^.!?]{0,20}\\b(he|his)\\b`,
+        "i"
+      );
+
+      const dialogueFemalePattern = new RegExp(
+        `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
+          name
+        )}\\s+(?:said|replied|asked|shouted|whispered|exclaimed|muttered|responded|commented)[^.!?]{0,20}\\b(she|her)\\b`,
+        "i"
+      );
+
+      if (dialogueMalePattern.test(proximityText)) {
         maleScore += 2;
       }
 
-      if (
-        proximityText.match(
-          new RegExp(
-            `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
-              name
-            )}\\s+said,?\\s+(she|her)\\b`,
-            "i"
-          )
-        )
-      ) {
+      if (dialogueFemalePattern.test(proximityText)) {
         femaleScore += 2;
+      }
+
+      // Filter out pronouns that clearly refer to other characters
+      if (!this.#containsOtherCharacterNames(proximityText, name)) {
+        // Only analyze pronouns if no other character names are present
+        const isolatedMalePronouns = (
+          proximityText.match(/\b(he|him|his)\b/gi) || []
+        ).length;
+        const isolatedFemalePronouns = (
+          proximityText.match(/\b(she|her|hers)\b/gi) || []
+        ).length;
+
+        // Apply much lower weight for isolated pronouns
+        if (isolatedMalePronouns > isolatedFemalePronouns) {
+          maleScore += Math.min(1, isolatedMalePronouns * 0.3);
+        } else if (isolatedFemalePronouns > isolatedMalePronouns) {
+          femaleScore += Math.min(1, isolatedFemalePronouns * 0.3);
+        }
       }
     }
 
     return { maleScore, femaleScore };
+  }
+
+  /**
+   * Check if text contains other character names that might cause pronoun confusion
+   * @param {string} text - Text to check
+   * @param {string} targetName - Target character name to exclude
+   * @return {boolean} - Whether other character names are present
+   * @private
+   */
+  #containsOtherCharacterNames(text, targetName) {
+    // Common patterns for character names in novels
+    const namePatterns = [
+      /\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/g, // Two-word names
+      /\b(?:Master|Lady|Lord|Sir|Young|Elder)\s+[A-Z][a-z]+\b/g, // Titled names
+      /\b[A-Z][a-z]{2,}\b/g // Single capitalized words (potential names)
+    ];
+
+    for (const pattern of namePatterns) {
+      const matches = text.match(pattern) || [];
+      for (const match of matches) {
+        if (match !== targetName && match.length > 3) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -259,19 +323,19 @@ class PronounAnalyzer {
       return errorPatternResult;
     }
 
-    // If dominant gender is clear despite inconsistencies
-    if (totalMale > totalFemale * 2) {
+    // Use higher thresholds to avoid false corrections
+    if (totalMale > totalFemale * 3) {
       correctedGender = "male";
       correction = `inconsistent pronouns detected (${totalMale} male vs ${totalFemale} female) - corrected to male`;
-    } else if (totalFemale > totalMale * 2) {
+    } else if (totalFemale > totalMale * 3) {
       correctedGender = "female";
       correction = `inconsistent pronouns detected (${totalFemale} female vs ${totalMale} male) - corrected to female`;
     }
     // If direction of mistranslation is clear
-    else if (maleToFemaleCount > femaleToMaleCount * 2) {
+    else if (maleToFemaleCount > femaleToMaleCount * 3) {
       correctedGender = "male";
       correction = `detected translation error pattern (male→female) - corrected to male`;
-    } else if (femaleToMaleCount > maleToFemaleCount * 2) {
+    } else if (femaleToMaleCount > maleToFemaleCount * 3) {
       correctedGender = "female";
       correction = `detected translation error pattern (female→male) - corrected to female`;
     }
