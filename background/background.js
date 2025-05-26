@@ -900,6 +900,79 @@ function handleMessage(request, sender, sendResponse) {
 
     sendResponse({ status: "ok", stats: globalStats });
     return false;
+  } else if (request.action === "updateCharacterGender") {
+    const { novelId, charId, newGender, isManualOverride } = request;
+
+    if (!novelId || !charId) {
+      sendResponse({
+        status: "error",
+        message: "Missing novel ID or character ID"
+      });
+      return false;
+    }
+
+    // Ensure novelCharacterMaps is initialized
+    if (!novelCharacterMaps) {
+      novelCharacterMaps = {};
+    }
+
+    if (
+      !novelCharacterMaps[novelId] ||
+      !novelCharacterMaps[novelId].chars ||
+      !novelCharacterMaps[novelId].chars[charId]
+    ) {
+      sendResponse({ status: "error", message: "Character not found" });
+      return false;
+    }
+
+    const character = novelCharacterMaps[novelId].chars[charId];
+
+    if (isManualOverride) {
+      let genderCode;
+      switch (newGender) {
+        case "male":
+          genderCode = "m";
+          break;
+        case "female":
+          genderCode = "f";
+          break;
+        case "unknown":
+        default:
+          genderCode = "u";
+          break;
+      }
+
+      character.gender = genderCode;
+      character.confidence = 1.0; // Set confidence to 100% for manual overrides
+      character.manualOverride = true;
+      character.evidences = [`manually set to ${newGender}`];
+
+      console.log(
+        `Character ${character.name} gender manually set to ${newGender}`
+      );
+    } else {
+      delete character.manualOverride;
+      console.log(`Character ${character.name} reverted to auto-detection`);
+    }
+
+    novelCharacterMaps[novelId].lastAccess = Date.now();
+
+    storeNovelCharacterMaps(novelCharacterMaps);
+
+    const responseData = {
+      status: "ok",
+      message: "Character gender updated successfully"
+    };
+
+    if (!isManualOverride) {
+      let detectedGender = "unknown";
+      if (character.gender === "m") detectedGender = "male";
+      else if (character.gender === "f") detectedGender = "female";
+      responseData.detectedGender = detectedGender;
+    }
+
+    sendResponse(responseData);
+    return false;
   } else if (request.action === "updateParagraphStats") {
     const statsUpdate = {
       paragraphsEnhanced: request.paragraphCount || 0,
@@ -933,12 +1006,9 @@ function handleMessage(request, sender, sendResponse) {
       return false;
     }
 
-    // Ensure novelCharacterMaps is initialized
     if (!novelCharacterMaps) {
       novelCharacterMaps = {};
     }
-
-    // Synchronous operation - return false immediately
     if (!novelCharacterMaps[novelId]) {
       sendResponse({
         status: "ok",
@@ -959,7 +1029,6 @@ function handleMessage(request, sender, sendResponse) {
       isChapterEnhanced: false
     };
 
-    // Include raw character data if requested
     if (request.includeRawData) {
       response.rawCharacterData = novelCharacterMaps[novelId].chars || {};
     }
@@ -994,9 +1063,8 @@ function handleMessage(request, sender, sendResponse) {
     }
 
     sendResponse(response);
-    return false; // Synchronous operation
+    return false;
   } else if (request.action === "checkSitePermission") {
-    // Async operation - return true to keep channel open
     checkSitePermission(request.url)
       .then((hasPermission) => {
         sendResponse({ hasPermission });
@@ -1005,7 +1073,7 @@ function handleMessage(request, sender, sendResponse) {
         console.error("Error in checkSitePermission:", error);
         sendResponse({ hasPermission: false, error: error.message });
       });
-    return true; // Keep message channel open for async response
+    return true;
   } else if (request.action === "addSiteToWhitelist") {
     const url = request.url;
     try {
@@ -1051,7 +1119,7 @@ function handleMessage(request, sender, sendResponse) {
     } catch (e) {
       sendResponse({ success: false, message: `Invalid URL: ${e.message}` });
     }
-    return true; // Keep message channel open for async response
+    return true;  
   } else if (request.action === "removeSiteFromWhitelist") {
     const hostname = request.hostname;
     chrome.storage.sync.get("whitelistedSites", (data) => {
@@ -1070,20 +1138,16 @@ function handleMessage(request, sender, sendResponse) {
         sendResponse({ success: false, error: error.message });
       }
     });
-    return true; // Keep message channel open for async response
+    return true; 
   } else if (request.action === "updateFinalEnhancementStats") {
     const finalStats = request.stats || {};
 
-    // Create comprehensive stats update from the final enhancement stats
     const statsUpdate = {
       enhancementSession: request.enhancementSession || true,
       processingTime: finalStats.processingTime || 0,
-      // Note: paragraphs and characters are already tracked via other messages
-      // but we can update error counts here
       errorCount: finalStats.errorCount || 0
     };
 
-    // Update compression ratio if available
     if (finalStats.compressionRatio && finalStats.compressionRatio !== 1.0) {
       console.log(
         `Enhancement compression ratio: ${finalStats.compressionRatio}`
@@ -1103,9 +1167,8 @@ function handleMessage(request, sender, sendResponse) {
     sendResponse({ status: "ok" });
     return false;
   } else if (request.action === "ollamaRequest") {
-    // Async operation - return true to keep channel open
     handleOllamaRequest(request, sendResponse);
-    return true; // Keep message channel open for async response
+    return true; 
   } else if (request.action === "checkActiveTabPermission") {
     if (!request.url) {
       sendResponse({ hasPermission: false, error: "No URL provided" });
@@ -1114,7 +1177,6 @@ function handleMessage(request, sender, sendResponse) {
 
     try {
       const url = request.url;
-      // Async operation - return true to keep channel open
       isSiteWhitelisted(url)
         .then((isWhitelisted) => {
           if (isWhitelisted) {
@@ -1150,7 +1212,7 @@ function handleMessage(request, sender, sendResponse) {
       return false;
     }
 
-    return true; // Keep message channel open for async response
+    return true; 
   } else if (request.action === "terminateAllRequests") {
     console.log(`Terminating ${activeRequestControllers.size} active requests`);
 
@@ -1164,13 +1226,11 @@ function handleMessage(request, sender, sendResponse) {
       status: "terminated",
       count: activeRequestControllers.size
     });
-    return false; // Synchronous operation
+    return false; 
   } else if (request.action === "checkOllamaAvailability") {
-    // Async operation - return true to keep channel open
     checkOllamaAvailability(sendResponse);
-    return true; // Keep message channel open for async response
+    return true; 
   } else if (request.action === "getOllamaModels") {
-    // Async operation - return true to keep channel open
     fetch(DEFAULT_OLLAMA_URL + "/api/tags", {
       method: "GET",
       headers: { "Content-Type": "application/json" }
@@ -1191,7 +1251,7 @@ function handleMessage(request, sender, sendResponse) {
         console.error("Error fetching Ollama models:", error);
         sendResponse({ models: [], error: error.message });
       });
-    return true; // Keep message channel open for async response
+    return true; 
   } else if (request.action === "getNovelStyle") {
     const novelId = request.novelId;
 
@@ -1200,7 +1260,6 @@ function handleMessage(request, sender, sendResponse) {
       return false;
     }
 
-    // Ensure novelCharacterMaps is initialized
     if (!novelCharacterMaps) {
       novelCharacterMaps = {};
     }
@@ -1231,7 +1290,6 @@ function handleMessage(request, sender, sendResponse) {
       return false;
     }
 
-    // Ensure novelCharacterMaps is initialized
     if (!novelCharacterMaps) {
       novelCharacterMaps = {};
     }
@@ -1254,7 +1312,6 @@ function handleMessage(request, sender, sendResponse) {
     return false;
   }
 
-  // Default for unhandled actions
   sendResponse({ status: "error", error: "Unknown action" });
   return false;
 }
@@ -1290,11 +1347,9 @@ chrome.runtime.onInstalled.addListener(() => {
     }
   });
 
-  // Initialize background data
   initializeBackground();
 });
 
-// Handle Chrome startup (reload existing data)
 chrome.runtime.onStartup.addListener(() => {
   initializeBackground();
 });

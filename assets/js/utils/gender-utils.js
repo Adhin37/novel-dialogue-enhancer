@@ -32,15 +32,14 @@ class GenderUtils {
     this.pronounAnalyzer = new PronounAnalyzer();
     this.relationshipAnalyzer = new RelationshipAnalyzer();
     this.appearanceAnalyzer = new AppearanceAnalyzer();
+    this.multiCharacterAnalyzer = new MultiCharacterContextAnalyzer();
   }
 
-  // assets/js/utils/gender-utils.js - Enhanced guessGender method
   /**
-   * Advanced character gender detection with improved accuracy and context awareness
-   * Optimized for LLM prompting with confidence scores and cultural adaptation
+   * Enhanced character gender detection with multi-character context awareness
    * @param {string} name - The character name
    * @param {string} text - Surrounding text context
-   * @param {object} characterMap - Existing character data (optional)
+   * @param {object} characterMap - Existing character data
    * @return {object} - Detailed gender information with confidence
    */
   guessGender(name, text, characterMap = {}) {
@@ -52,19 +51,36 @@ class GenderUtils {
       return this.#createGenderResult("unknown", 0, ["name too short"]);
     }
 
+    // Initialize the multi-character analyzer if not exists
+    if (!this.multiCharacterAnalyzer) {
+      this.multiCharacterAnalyzer = new MultiCharacterContextAnalyzer();
+    }
+
     let maleScore = 0;
     let femaleScore = 0;
     const evidence = [];
 
-    // Step 1: Detect cultural origin - this is crucial for accurate analysis
+    // Step 1: Detect cultural origin
     const culturalOrigin = this.culturalAnalyzer.detectNameCulturalOrigin(
       name,
       text
     );
-    console.log(`Cultural origin for ${name}: ${culturalOrigin}`);
     this.culturalOrigins[culturalOrigin]++;
 
-    // Step 2: Enhanced title and honorific analysis with cultural context
+    // Step 2: Enhanced multi-character context analysis (primary method)
+    const multiCharResult =
+      this.multiCharacterAnalyzer.analyzeWithMultiCharacterContext(
+        name,
+        text,
+        characterMap
+      );
+    maleScore += multiCharResult.maleScore;
+    femaleScore += multiCharResult.femaleScore;
+    if (multiCharResult.evidence) {
+      evidence.push(multiCharResult.evidence);
+    }
+
+    // Step 3: Title and honorific analysis
     const titleResult = this.nameAnalyzer.checkTitlesAndHonorifics(
       name,
       culturalOrigin
@@ -80,7 +96,40 @@ class GenderUtils {
       }
     }
 
-    // Step 3: Enhanced relationship analysis with cultural context
+    // Step 4: Name pattern analysis
+    const namePatternResult = this.nameAnalyzer.checkNamePatterns(
+      name,
+      culturalOrigin
+    );
+    if (namePatternResult.gender !== "unknown") {
+      const nameScore = this.#calculateCulturalBonus(culturalOrigin, 2);
+      if (namePatternResult.gender === "male") {
+        maleScore += nameScore;
+        evidence.push(`name pattern: ${namePatternResult.evidence}`);
+      } else {
+        femaleScore += nameScore;
+        evidence.push(`name pattern: ${namePatternResult.evidence}`);
+      }
+    }
+
+    // Step 5: Cultural-specific indicators
+    const culturalResult =
+      this.culturalAnalyzer.checkCulturalSpecificIndicators(
+        name,
+        text,
+        culturalOrigin
+      );
+    if (culturalResult.maleScore > 0 || culturalResult.femaleScore > 0) {
+      const culturalBonus = this.#calculateCulturalBonus(culturalOrigin, 1);
+      maleScore += culturalResult.maleScore + culturalBonus;
+      femaleScore += culturalResult.femaleScore + culturalBonus;
+
+      if (culturalResult.evidence) {
+        evidence.push(`cultural: ${culturalResult.evidence}`);
+      }
+    }
+
+    // Step 6: Relationship analysis
     const relationshipPattern = this.relationshipAnalyzer.checkRelationships(
       name,
       text,
@@ -98,73 +147,23 @@ class GenderUtils {
       }
     }
 
-    // Step 4: Enhanced name pattern analysis
-    const namePatternResult = this.nameAnalyzer.checkNamePatterns(
+    // Step 7: Character role analysis
+    const roleResult = this.relationshipAnalyzer.analyzeCharacterRole(
       name,
+      text,
       culturalOrigin
     );
-    if (namePatternResult.gender !== "unknown") {
-      const nameScore = this.#calculateCulturalBonus(culturalOrigin, 2);
-      if (namePatternResult.gender === "male") {
-        maleScore += nameScore;
-        evidence.push(`name pattern: ${namePatternResult.evidence}`);
-      } else {
-        femaleScore += nameScore;
-        evidence.push(`name pattern: ${namePatternResult.evidence}`);
+    if (roleResult.maleScore > 0 || roleResult.femaleScore > 0) {
+      const roleBonus = this.#calculateCulturalBonus(culturalOrigin, 1);
+      maleScore += roleResult.maleScore + roleBonus;
+      femaleScore += roleResult.femaleScore + roleBonus;
+
+      if (roleResult.evidence) {
+        evidence.push(`role: ${roleResult.evidence}`);
       }
     }
 
-    // Step 5: Advanced pronoun analysis with inconsistency detection
-    const pronounResult = this.pronounAnalyzer.analyzePronounContext(
-      name,
-      text
-    );
-    if (pronounResult.maleScore > 0 || pronounResult.femaleScore > 0) {
-      maleScore += pronounResult.maleScore;
-      femaleScore += pronounResult.femaleScore;
-
-      if (pronounResult.maleScore > 0) {
-        evidence.push(`pronouns: ${pronounResult.maleScore} male references`);
-      }
-      if (pronounResult.femaleScore > 0) {
-        evidence.push(
-          `pronouns: ${pronounResult.femaleScore} female references`
-        );
-      }
-    }
-
-    // Step 6: Translation error correction
-    const inconsistencyResult =
-      this.pronounAnalyzer.detectPronounInconsistencies(name, text);
-    if (inconsistencyResult.correction) {
-      const correctionScore = this.#calculateCulturalBonus(culturalOrigin, 4);
-      if (inconsistencyResult.correctedGender === "male") {
-        maleScore += correctionScore;
-        evidence.push(`correction: ${inconsistencyResult.correction}`);
-      } else if (inconsistencyResult.correctedGender === "female") {
-        femaleScore += correctionScore;
-        evidence.push(`correction: ${inconsistencyResult.correction}`);
-      }
-    }
-
-    // Step 7: Enhanced cultural-specific indicators
-    const culturalResult =
-      this.culturalAnalyzer.checkCulturalSpecificIndicators(
-        name,
-        text,
-        culturalOrigin
-      );
-    if (culturalResult.maleScore > 0 || culturalResult.femaleScore > 0) {
-      const culturalBonus = this.#calculateCulturalBonus(culturalOrigin, 1);
-      maleScore += culturalResult.maleScore + culturalBonus;
-      femaleScore += culturalResult.femaleScore + culturalBonus;
-
-      if (culturalResult.evidence) {
-        evidence.push(`cultural: ${culturalResult.evidence}`);
-      }
-    }
-
-    // Step 8: Enhanced appearance analysis
+    // Step 8: Appearance analysis
     const appearanceResult =
       this.appearanceAnalyzer.analyzeAppearanceDescriptions(name, text);
     if (appearanceResult.maleScore > 0 || appearanceResult.femaleScore > 0) {
@@ -190,23 +189,7 @@ class GenderUtils {
       }
     }
 
-    // Step 10: Enhanced character role analysis with cultural context
-    const roleResult = this.relationshipAnalyzer.analyzeCharacterRole(
-      name,
-      text,
-      culturalOrigin
-    );
-    if (roleResult.maleScore > 0 || roleResult.femaleScore > 0) {
-      const roleBonus = this.#calculateCulturalBonus(culturalOrigin, 1);
-      maleScore += roleResult.maleScore + roleBonus;
-      femaleScore += roleResult.femaleScore + roleBonus;
-
-      if (roleResult.evidence) {
-        evidence.push(`role: ${roleResult.evidence}`);
-      }
-    }
-
-    // Step 11: Cross-character inference (when character map is available)
+    // Step 10: Cross-character inference
     if (Object.keys(characterMap).length > 0) {
       const inferenceResult = this.relationshipAnalyzer.inferGenderFromRelated(
         name,
@@ -223,7 +206,7 @@ class GenderUtils {
       }
     }
 
-    // Step 12: Advanced final decision with cultural adaptation
+    // Final decision with cultural adaptation
     let gender = "unknown";
     let confidence = 0;
 

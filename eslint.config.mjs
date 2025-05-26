@@ -34,7 +34,8 @@ export default defineConfig([
         SharedUtils: "readonly",
         Constants: "readonly",
         BaseGenderAnalyzer: "readonly",
-        ContentElementCache: "readonly"
+        ContentElementCache: "readonly",
+        MultiCharacterContextAnalyzer: "readonly"
       }
     },
     rules: {

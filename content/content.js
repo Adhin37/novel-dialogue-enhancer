@@ -693,7 +693,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       };
     }
 
-    // Async operation - return true to keep channel open
     enhancePage()
       .then((result) => {
         const stats = contentEnhancerIntegration.statsUtils.getStats();

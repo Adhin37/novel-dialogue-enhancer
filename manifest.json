@@ -59,6 +59,7 @@
         "assets/js/gender/relationship-analyzer.js",
         "assets/js/gender/name-analyzer.js",
         "assets/js/gender/appearance-analyzer.js",
+        "assets/js/gender/multi-character-context-analyzer.js",
         "assets/js/llm/text-processor.js",
         "assets/js/llm/prompt-generator.js",
         "assets/js/llm/ollama-client.js",

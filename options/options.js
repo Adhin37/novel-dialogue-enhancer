@@ -553,15 +553,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!container || !novelData || !novelData.chars) return;
 
     const characters = Object.values(novelData.chars);
+    const novelId = container
+      .closest(".novel-container")
+      .querySelector(".novel-item").dataset.novelId;
 
     characters.sort((a, b) => (b.appearances || 0) - (a.appearances || 0));
 
     let html = '<div class="character-list">';
 
-    characters.forEach((char) => {
+    characters.forEach((char, index) => {
       const name = char.name || "Unknown";
       const appearances = char.appearances || 0;
       const confidence = parseFloat(char.confidence) || 0;
+      const isManualOverride = char.manualOverride || false;
 
       let gender = "unknown";
       if (char.gender === "m") gender = "male";
@@ -571,14 +575,44 @@ document.addEventListener("DOMContentLoaded", () => {
       if (confidence >= 0.7) confidenceClass = "confidence-high";
       else if (confidence >= 0.4) confidenceClass = "confidence-medium";
 
+      // Create unique ID for this character
+      const charId = Object.keys(novelData.chars).find(
+        (id) => novelData.chars[id] === char
+      );
+
       html += `
-      <div class="character-card">
+      <div class="character-card" data-novel-id="${novelId}" data-char-id="${charId}">
         <div class="gender-badge gender-${gender}">${gender}</div>
         <div class="character-name">${escapeHtml(name)}</div>
         <div class="character-info">
-          <div><span class="confidence-indicator ${confidenceClass}"></span> Confidence: ${Math.round(
-        confidence * 100
-      )}%</div>
+          <div class="character-gender-controls">
+            <label class="gender-select-label">Gender:</label>
+            <select class="gender-select" data-current-gender="${gender}" ${
+        isManualOverride ? 'data-manual="true"' : ""
+      }>
+              <option value="auto" ${
+                !isManualOverride ? "selected" : ""
+              }>Auto-detect</option>
+              <option value="male" ${
+                isManualOverride && gender === "male" ? "selected" : ""
+              }>Male</option>
+              <option value="female" ${
+                isManualOverride && gender === "female" ? "selected" : ""
+              }>Female</option>
+              <option value="unknown" ${
+                isManualOverride && gender === "unknown" ? "selected" : ""
+              }>Unknown</option>
+            </select>
+          </div>
+          <div class="confidence-info">
+            <span class="confidence-indicator ${confidenceClass}"></span> 
+            Confidence: ${Math.round(confidence * 100)}%
+            ${
+              isManualOverride
+                ? '<span class="manual-override-badge">Manual</span>'
+                : ""
+            }
+          </div>
           <div class="character-appearances">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 4.5C7 4.5 2.73 7.61 1 12C2.73 16.39 7 19.5 12 19.5C17 19.5 21.27 16.39 23 12C21.27 7.61 17 4.5 12 4.5ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17ZM12 9C10.34 9 9 10.34 9 12C9 13.66 10.34 15 12 15C13.66 15 15 13.66 15 12C15 10.34 13.66 9 12 9Z" fill="currentColor"/>
@@ -592,6 +626,125 @@ document.addEventListener("DOMContentLoaded", () => {
 
     html += "</div>";
     container.innerHTML = html;
+
+    // Add event listeners for gender selection changes
+    container.querySelectorAll(".gender-select").forEach((select) => {
+      select.addEventListener("change", handleGenderChange);
+    });
+  }
+
+  /**
+   * Handles manual gender changes for characters
+   * @param {Event} event - The change event from the select element
+   */
+  function handleGenderChange(event) {
+    const select = event.target;
+    const characterCard = select.closest(".character-card");
+    const novelId = characterCard.dataset.novelId;
+    const charId = characterCard.dataset.charId;
+    const newGender = select.value;
+
+    if (!novelId || !charId) {
+      console.error("Missing novel ID or character ID");
+      window.feedbackManager.show("Error updating character gender", "error");
+      return;
+    }
+
+    // Show loading state
+    select.disabled = true;
+    const originalText = select.parentElement.querySelector(
+      ".gender-select-label"
+    ).textContent;
+    select.parentElement.querySelector(".gender-select-label").textContent =
+      "Updating...";
+
+    // Prepare the update data
+    const updateData = {
+      action: "updateCharacterGender",
+      novelId: novelId,
+      charId: charId,
+      newGender: newGender,
+      isManualOverride: newGender !== "auto"
+    };
+
+    chrome.runtime.sendMessage(updateData, (response) => {
+      // Re-enable the select
+      select.disabled = false;
+      select.parentElement.querySelector(".gender-select-label").textContent =
+        originalText;
+
+      if (chrome.runtime.lastError) {
+        console.error("Runtime error:", chrome.runtime.lastError);
+        window.feedbackManager.show(
+          "Error communicating with extension",
+          "error"
+        );
+        // Revert the select value
+        select.value = select.dataset.currentGender;
+        return;
+      }
+
+      if (response && response.status === "ok") {
+        // Update the current gender data attribute
+        select.dataset.currentGender =
+          newGender === "auto"
+            ? response.detectedGender || "unknown"
+            : newGender;
+
+        // Update manual override indication
+        if (newGender === "auto") {
+          select.removeAttribute("data-manual");
+        } else {
+          select.setAttribute("data-manual", "true");
+        }
+
+        // Update the gender badge
+        const genderBadge = characterCard.querySelector(".gender-badge");
+        const displayGender =
+          newGender === "auto"
+            ? response.detectedGender || "unknown"
+            : newGender;
+        genderBadge.className = `gender-badge gender-${displayGender}`;
+        genderBadge.textContent = displayGender;
+
+        // Update manual override badge
+        const confidenceInfo = characterCard.querySelector(".confidence-info");
+        const existingBadge = confidenceInfo.querySelector(
+          ".manual-override-badge"
+        );
+
+        if (newGender !== "auto") {
+          if (!existingBadge) {
+            confidenceInfo.insertAdjacentHTML(
+              "beforeend",
+              '<span class="manual-override-badge">Manual</span>'
+            );
+          }
+        } else {
+          if (existingBadge) {
+            existingBadge.remove();
+          }
+        }
+
+        const message =
+          newGender === "auto"
+            ? "Gender detection re-enabled for character"
+            : `Character gender manually set to ${newGender}`;
+
+        window.feedbackManager.show(message, "success");
+        console.log(
+          `Character gender updated: ${novelId}/${charId} -> ${newGender}`
+        );
+      } else {
+        console.error("Failed to update character gender:", response);
+        window.feedbackManager.show(
+          response?.message || "Failed to update character gender",
+          "error"
+        );
+        // Revert the select value
+        select.value = select.dataset.currentGender;
+      }
+    });
   }
 
   /**
