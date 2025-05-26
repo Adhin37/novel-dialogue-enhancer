@@ -1,8 +1,8 @@
-// enhanced-error-handler.js
+// error-handler.js
 /**
- * Enhanced error handling system with user feedback
+ * Error handling system with user feedback
  */
-class EnhancedErrorHandler {
+class ErrorHandler {
     constructor(toaster) {
       this.toaster = toaster;
       this.errorHistory = [];
@@ -509,7 +509,7 @@ class EnhancedErrorHandler {
    */
   class EnhancedContentScript {
     constructor() {
-      this.errorHandler = new EnhancedErrorHandler(toaster);
+      this.errorHandler = new ErrorHandler(toaster);
       this.retryAttempts = new Map();
       this.maxRetries = 3;
     }
@@ -922,8 +922,8 @@ class EnhancedErrorHandler {
   
   // Export for use in content.js
   if (typeof module !== "undefined") {
-    module.exports = { EnhancedErrorHandler, EnhancedContentScript };
+    module.exports = { EnhancedErrorHandler: ErrorHandler, EnhancedContentScript };
   } else {
-    window.EnhancedErrorHandler = EnhancedErrorHandler;
+    window.EnhancedErrorHandler = ErrorHandler;
     window.EnhancedContentScript = EnhancedContentScript;
   }

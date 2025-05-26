@@ -35,7 +35,8 @@ export default defineConfig([
         Constants: "readonly",
         BaseGenderAnalyzer: "readonly",
         ContentElementCache: "readonly",
-        MultiCharacterContextAnalyzer: "readonly"
+        MultiCharacterContextAnalyzer: "readonly",
+        ErrorHandler: "readonly"
       }
     },
     rules: {

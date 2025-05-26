@@ -16,8 +16,8 @@ let contentEnhancerIntegration;
 let ollamaClient;
 let toaster;
 let isCurrentSiteWhitelisted = false;
-const maxRetries = 3;
 let elementCache;
+let errorHandler;
 
 /**
  * Gets the element cache instance
@@ -51,6 +51,7 @@ function findContentElement() {
   // Find largest text block as fallback
   return findLargestTextBlock();
 }
+
 /**
  * Initializes the extension
  */
@@ -58,11 +59,14 @@ function init() {
   toaster = new Toaster();
   toaster.createToaster();
 
+  // Initialize enhanced error handling
+  errorHandler = new ErrorHandler(toaster);
+
   checkSitePermissions()
     .then((isWhitelisted) => {
-      // Use isWhitelisted parameter
       if (typeof isWhitelisted !== "boolean") {
-        console.warn("Invalid whitelist result:", isWhitelisted);
+        const error = new Error("Invalid whitelist result received");
+        errorHandler.handleError(error, "initialization");
         isCurrentSiteWhitelisted = false;
       } else {
         isCurrentSiteWhitelisted = isWhitelisted;
@@ -73,61 +77,41 @@ function init() {
         return;
       }
 
-      console.log("Site is whitelisted, activating extension features");
-
       return loadSettings().then((loadedSettings) => {
-        // Use loadedSettings parameter
         if (!loadedSettings || typeof loadedSettings !== "object") {
-          console.warn("Invalid settings loaded:", loadedSettings);
-        } else {
-          console.log("Using loaded settings:", loadedSettings);
+          const error = new Error("Failed to load extension settings");
+          errorHandler.handleError(error, "initialization", {
+            recoveryFunction: () => {
+              settings = {
+                isExtensionPaused: false,
+                preserveNames: true,
+                fixPronouns: true
+              };
+            }
+          });
         }
 
         setTimeout(async () => {
           if (!settings.isExtensionPaused) {
-            console.log("Extension is enabled, checking Ollama availability");
             try {
               const isAvailable = await checkOllamaStatus();
-              // Use isAvailable parameter
-              if (typeof isAvailable !== "boolean") {
-                console.warn("Invalid Ollama status result:", isAvailable);
-              } else if (isAvailable) {
-                console.log("Ollama is available, starting page enhancement");
+              if (isAvailable) {
                 const enhanceResult = await enhancePage();
-                // Use enhanceResult parameter
                 if (enhanceResult) {
                   console.log(
                     "Initial page enhancement completed successfully"
                   );
-                } else {
-                  console.log("Initial page enhancement failed");
                 }
-              } else {
-                console.log(
-                  "Ollama is not available, page enhancement skipped"
-                );
               }
             } catch (error) {
-              console.error("Error checking Ollama status:", error);
-              toaster.showError(`Ollama check failed: ${error.message}`);
+              errorHandler.handleError(error, "initialization");
             }
-          } else {
-            console.log("Extension is paused in settings");
           }
         }, 800);
       });
     })
     .catch((error) => {
-      // Use error parameter with validation
-      if (!error) {
-        console.error("Unknown error during initialization");
-        toaster.showError("Unknown error during initialization");
-      } else {
-        console.error("Error during initialization:", error.message || error);
-        toaster.showError(
-          `Extension initialization failed: ${error.message || "Unknown error"}`
-        );
-      }
+      errorHandler.handleError(error, "initialization");
     });
 }
 
@@ -141,42 +125,65 @@ function loadSettings() {
       ["isExtensionPaused", "preserveNames", "fixPronouns"],
       (data) => {
         if (chrome.runtime.lastError) {
-          console.warn("Error loading settings:", chrome.runtime.lastError);
-          // Use defaults if settings can't be loaded
-          const defaultSettings = {
-            isExtensionPaused: false,
-            preserveNames: true,
-            fixPronouns: true
-          };
-          settings = defaultSettings;
-          reject(chrome.runtime.lastError);
-        } else {
-          // Validate data parameter
-          if (!data || typeof data !== "object") {
-            console.warn("Invalid settings data received:", data);
-            const defaultSettings = {
-              isExtensionPaused: false,
-              preserveNames: true,
-              fixPronouns: true
-            };
-            settings = defaultSettings;
-            resolve(defaultSettings);
-            return;
-          }
-
-          const loadedSettings = {
-            isExtensionPaused: !!data.isExtensionPaused,
-            preserveNames: data.preserveNames !== false,
-            fixPronouns: data.fixPronouns !== false
-          };
-
-          settings = loadedSettings;
-          console.log("Settings loaded successfully:", loadedSettings);
-          resolve(loadedSettings);
+          const settingsError = new Error(
+            `Settings load failed: ${chrome.runtime.lastError.message}`
+          );
+          errorHandler.handleError(settingsError, "settings_load", {
+            recoveryFunction: () => {
+              const defaultSettings = {
+                isExtensionPaused: false,
+                preserveNames: true,
+                fixPronouns: true
+              };
+              settings = defaultSettings;
+              resolve(defaultSettings);
+            }
+          });
+          return;
         }
+
+        if (!data || typeof data !== "object") {
+          const validationError = new Error(
+            "Invalid settings data format received"
+          );
+          errorHandler.handleError(validationError, "settings_validation", {
+            recoveryFunction: () => {
+              const defaultSettings = {
+                isExtensionPaused: false,
+                preserveNames: true,
+                fixPronouns: true
+              };
+              settings = defaultSettings;
+              resolve(defaultSettings);
+            }
+          });
+          return;
+        }
+
+        const loadedSettings = {
+          isExtensionPaused: validateBooleanSetting(
+            data.isExtensionPaused,
+            false
+          ),
+          preserveNames: validateBooleanSetting(data.preserveNames, true),
+          fixPronouns: validateBooleanSetting(data.fixPronouns, true)
+        };
+
+        settings = loadedSettings;
+        console.log("Settings loaded successfully:", loadedSettings);
+        resolve(loadedSettings);
       }
     );
   });
+}
+
+function validateBooleanSetting(value, defaultValue) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value.toLowerCase() === "true";
+  console.warn(
+    `Invalid boolean setting: ${value}, using default: ${defaultValue}`
+  );
+  return defaultValue;
 }
 
 /**
@@ -186,39 +193,49 @@ function loadSettings() {
 function checkSitePermissions() {
   return new Promise((resolve) => {
     const permissionTimeout = setTimeout(() => {
-      console.warn("Whitelist check timed out");
-      resolve(false);
-    }, 5000);
+      const timeoutError = new Error("Whitelist check timed out");
+      errorHandler.handleError(timeoutError, "permission_timeout", {
+        recoveryFunction: () => resolve(false)
+      });
+    }, 8000);
 
-    chrome.runtime.sendMessage(
-      { action: "checkSitePermission", url: window.location.href },
-      (response) => {
-        clearTimeout(permissionTimeout);
+    try {
+      chrome.runtime.sendMessage(
+        { action: "checkSitePermission", url: window.location.href },
+        (response) => {
+          clearTimeout(permissionTimeout);
 
-        if (chrome.runtime.lastError) {
-          console.warn(
-            "Error checking site permission:",
-            chrome.runtime.lastError
-          );
-          resolve(false);
-          return;
+          if (chrome.runtime.lastError) {
+            const permissionError = new Error(
+              `Permission check failed: ${chrome.runtime.lastError.message}`
+            );
+            errorHandler.handleError(permissionError, "permission_check", {
+              recoveryFunction: () => resolve(false)
+            });
+            return;
+          }
+
+          if (!response || typeof response !== "object") {
+            const responseError = new Error(
+              "Invalid response from site permission check"
+            );
+            errorHandler.handleError(responseError, "permission_response", {
+              recoveryFunction: () => resolve(false)
+            });
+            return;
+          }
+
+          const hasPermission = Boolean(response.hasPermission);
+          console.log(`Site permission check result: ${hasPermission}`);
+          resolve(hasPermission);
         }
-
-        // Use response parameter with validation
-        if (!response || typeof response !== "object") {
-          console.warn(
-            "Invalid response from site permission check:",
-            response
-          );
-          resolve(false);
-          return;
-        }
-
-        const hasPermission = Boolean(response.hasPermission);
-        console.log(`Site permission check result: ${hasPermission}`);
-        resolve(hasPermission);
-      }
-    );
+      );
+    } catch (error) {
+      clearTimeout(permissionTimeout);
+      errorHandler.handleError(error, "permission_check_exception", {
+        recoveryFunction: () => resolve(false)
+      });
+    }
   });
 }
 
@@ -239,38 +256,30 @@ function getOllamaClient() {
  */
 async function checkOllamaStatus() {
   console.debug("Checking Ollama status...");
-  let retries = 0;
-  let status = null;
 
-  while (retries < maxRetries) {
-    try {
-      status = await getOllamaClient().checkOllamaAvailability();
-      break;
-    } catch (err) {
-      console.warn(
-        `Ollama check failed (attempt ${retries + 1}/${maxRetries}):`,
-        err
+  try {
+    const status = await getOllamaClient().checkOllamaAvailability();
+
+    if (status && status.available) {
+      console.log(`Ollama is running (v${status.version})`);
+      toaster.showSuccess(`Ollama is running (v${status.version})`);
+      return true;
+    } else {
+      const ollamaError = new Error(
+        status?.reason || "Ollama service unavailable"
       );
-      retries++;
-
-      if (retries < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * retries));
-      }
+      errorHandler.handleError(ollamaError, "ollama_check", {
+        retryFunction: () => checkOllamaStatus(),
+        maxRetries: 3,
+        retryDelay: 2000
+      });
+      return false;
     }
-  }
-
-  if (status && status.available) {
-    console.log(`Ollama is running (v${status.version})`);
-    toaster.showSuccess(`Ollama is running (v${status.version})`);
-    return true;
-  } else {
-    const reason = status
-      ? window.DOMPurify.sanitize(status.reason || "Unknown error")
-      : "Unknown error";
-    console.info(`Ollama is not available: ${reason}`);
-    toaster.showError(`Ollama is not available: ${reason}`);
-
-    // If we reached the maximum retries or got a definitive "not available" response
+  } catch (error) {
+    errorHandler.handleNetworkError(error, {
+      service: "Ollama",
+      endpoint: "availability check"
+    });
     return false;
   }
 }
@@ -341,18 +350,12 @@ async function enhancePage() {
   contentElement = findContentElement();
 
   if (!contentElement) {
-    console.log("Novel Dialogue Enhancer: Couldn't find content element");
+    const contentError = new Error(
+      "Couldn't find content element for enhancement"
+    );
+    errorHandler.handleError(contentError, "content_detection");
     toaster.showError("Couldn't find content to enhance");
     isEnhancing = false;
-
-    if (typeof observer !== "undefined" && observer) {
-      setTimeout(
-        () =>
-          observer.observe(contentElement, { childList: true, subtree: true }),
-        100
-      );
-    }
-
     console.timeEnd("enhancePage");
     return false;
   }
@@ -361,18 +364,11 @@ async function enhancePage() {
     const ollamaStatus = await getOllamaClient().checkOllamaAvailability();
 
     if (!ollamaStatus || typeof ollamaStatus !== "object") {
-      const errorMsg = "Invalid Ollama status response";
-      console.error(errorMsg);
-      toaster.showError(errorMsg);
-      throw new Error(errorMsg);
+      throw new Error("Invalid Ollama status response");
     }
 
     if (!ollamaStatus.available) {
-      const safeReason = window.DOMPurify.sanitize(
-        ollamaStatus.reason || "Unknown error"
-      );
-      toaster.showError(`Ollama not available: ${safeReason}`);
-      throw new Error(`Ollama not available: ${safeReason}`);
+      throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
     }
 
     toaster.showLoading("Analyzing characters...");
@@ -417,10 +413,11 @@ async function enhancePage() {
 
     return enhancementSuccessful;
   } catch (error) {
-    console.error("Novel Dialogue Enhancer: Enhancement error", error);
-    toaster.showError(
-      `Enhancement failed: ${window.DOMPurify.sanitize(error.message)}`
-    );
+    errorHandler.handleEnhancementError(error, {
+      enhancementId: `enh_${Date.now()}`,
+      currentChunk: 0,
+      totalChunks: 0
+    });
     return false;
   } finally {
     if (typeof observer !== "undefined" && observer) {
@@ -682,33 +679,63 @@ async function processParagraphBatch(
  * Handles termination requests from the background script
  */
 function handleTerminationRequest() {
-  if (isEnhancing) {
-    console.log("Termination requested while enhancement in progress");
-    terminateRequested = true;
+  try {
+    if (isEnhancing) {
+      console.log("Termination requested while enhancement in progress");
+      terminateRequested = true;
 
-    toaster.showMessage("Terminating enhancement...", "warn", 2000);
+      toaster.showMessage("Terminating enhancement...", "warn", 2000);
 
-    chrome.runtime.sendMessage({
-      action: "terminateAllRequests"
-    });
+      chrome.runtime.sendMessage(
+        {
+          action: "terminateAllRequests"
+        },
+        (response) => {
+          if (chrome.runtime.lastError) {
+            const terminationError = new Error(
+              `Termination failed: ${chrome.runtime.lastError.message}`
+            );
+            errorHandler.handleError(terminationError, "termination");
+          }
+        }
+      );
 
-    setTimeout(() => {
-      if (isEnhancing) {
-        console.warn(
-          "Enhancement process didn't terminate properly, forcing reset"
-        );
-        isEnhancing = false;
-        pendingEnhancement = false;
+      setTimeout(() => {
+        if (isEnhancing) {
+          console.warn(
+            "Enhancement process didn't terminate properly, forcing reset"
+          );
 
-        toaster.showError("Enhancement process forced to terminate");
-      }
-    }, 2000);
-  } else {
-    console.log("Termination requested but no enhancement in progress");
-    terminateRequested = false;
-    pendingEnhancement = false;
+          isEnhancing = false;
+          pendingEnhancement = false;
+          terminateRequested = false;
+
+          if (window.enhancementTimer) {
+            clearTimeout(window.enhancementTimer);
+            window.enhancementTimer = null;
+          }
+
+          toaster.showError("Enhancement process forced to terminate");
+
+          const forcedTerminationError = new Error(
+            "Enhancement process required forced termination"
+          );
+          errorHandler.handleError(
+            forcedTerminationError,
+            "forced_termination"
+          );
+        }
+      }, 3000);
+    } else {
+      console.log("Termination requested but no enhancement in progress");
+      terminateRequested = false;
+      pendingEnhancement = false;
+    }
+  } catch (error) {
+    errorHandler.handleError(error, "termination_handler");
   }
 }
+
 /**
  * Verify that text was successfully updated in the DOM
  * @param {HTMLElement} element - Element to verify
@@ -778,103 +805,134 @@ function verifyAndHandleDOMUpdate(element, originalText, enhancedText) {
 
 // Message handler for communication with popup and background
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (!request || typeof request !== "object" || !request.action) {
-    console.error("Invalid message format received");
-    sendResponse({ status: "error", error: "Invalid message format" });
-    return false;
-  }
-
-  if (request.action === "ping") {
-    sendResponse({ status: "active", whitelisted: isCurrentSiteWhitelisted });
-    return false; // Synchronous response
-  } else if (request.action === "checkCurrentSiteWhitelist") {
-    isCurrentSiteWhitelisted = request.isWhitelisted;
-    console.log(`Site whitelist status updated: ${isCurrentSiteWhitelisted}`);
-    sendResponse({ status: "updated" });
-    return false; // Synchronous response
-  } else if (request.action === "enhanceNow") {
-    // First check if site is whitelisted
-    if (!isCurrentSiteWhitelisted) {
-      toaster.showWarning(
-        "This site is not whitelisted. Please whitelist it first."
-      );
-      sendResponse({
-        status: "failed",
-        error: "This site is not whitelisted. Please whitelist it first."
-      });
+  try {
+    if (!request || typeof request !== "object" || !request.action) {
+      const messageError = new Error("Invalid message format received");
+      errorHandler.handleError(messageError, "message_handling");
+      sendResponse({ status: "error", error: "Invalid message format" });
       return false;
     }
 
-    // Validate settings object before applying
-    if (request.settings && typeof request.settings === "object") {
-      // Use safe defaults if properties are missing
-      settings = {
-        isExtensionPaused: Boolean(
-          request.settings.isExtensionPaused ?? settings.isExtensionPaused
-        ),
-        preserveNames: Boolean(
-          request.settings.preserveNames ?? settings.preserveNames
-        ),
-        fixPronouns: Boolean(
-          request.settings.fixPronouns ?? settings.fixPronouns
-        )
-      };
+    if (request.action === "ping") {
+      sendResponse({ status: "active", whitelisted: isCurrentSiteWhitelisted });
+      return false;
     }
 
-    enhancePage()
-      .then((result) => {
-        // Use the result parameter to determine actual success/failure
-        if (result) {
-          const stats = contentEnhancerIntegration.statsUtils.getStats();
-          sendResponse({
-            status: "enhanced",
-            stats: stats
-          });
-        } else {
-          sendResponse({
-            status: "failed",
-            error: "Enhancement process completed but returned false"
-          });
-        }
-      })
-      .catch((error) => {
-        console.error("Enhancement failed:", error);
+    if (request.action === "checkCurrentSiteWhitelist") {
+      isCurrentSiteWhitelisted = request.isWhitelisted;
+      console.log(`Site whitelist status updated: ${isCurrentSiteWhitelisted}`);
+      sendResponse({ status: "updated" });
+      return false;
+    }
+
+    if (request.action === "enhanceNow") {
+      if (!isCurrentSiteWhitelisted) {
+        const permissionError = new Error(
+          "Site not whitelisted for enhancement"
+        );
+        errorHandler.handleError(permissionError, "permission_check");
+        sendResponse({
+          status: "failed",
+          error: "This site is not whitelisted. Please whitelist it first."
+        });
+        return false;
+      }
+
+      if (request.settings && typeof request.settings === "object") {
         try {
-          sendResponse({
-            status: "failed",
-            error: error.message
-          });
-        } catch (err) {
-          console.warn(
-            "Failed to send error response, port may be closed:",
-            err
-          );
+          settings = {
+            isExtensionPaused: validateBooleanSetting(
+              request.settings.isExtensionPaused,
+              settings.isExtensionPaused
+            ),
+            preserveNames: validateBooleanSetting(
+              request.settings.preserveNames,
+              settings.preserveNames
+            ),
+            fixPronouns: validateBooleanSetting(
+              request.settings.fixPronouns,
+              settings.fixPronouns
+            )
+          };
+        } catch (settingsError) {
+          errorHandler.handleError(settingsError, "settings_update");
         }
-      });
+      }
 
-    return true; // Keep message channel open for async response
-  } else if (request.action === "terminateOperations") {
-    console.log("Termination request received from popup");
-    handleTerminationRequest();
-    sendResponse({ status: "terminating" });
-    return false; // Synchronous response
-  } else if (request.action === "updatePageStatus") {
-    console.log(`Page status updated: disabled=${Boolean(request.disabled)}`);
+      enhancePage()
+        .then((result) => {
+          if (result) {
+            const stats =
+              contentEnhancerIntegration?.statsUtils?.getStats() || {};
+            sendResponse({ status: "enhanced", stats: stats });
+          } else {
+            sendResponse({
+              status: "failed",
+              error: "Enhancement process completed but returned false"
+            });
+          }
+        })
+        .catch((error) => {
+          errorHandler.handleEnhancementError(error, {
+            enhancementId: `msg_${Date.now()}`,
+            currentChunk: 0,
+            totalChunks: 0
+          });
 
-    // Update whitelist status
-    isCurrentSiteWhitelisted = !request.disabled;
+          try {
+            sendResponse({ status: "failed", error: error.message });
+          } catch (responseError) {
+            console.warn(
+              "Failed to send error response, port may be closed:",
+              responseError
+            );
+          }
+        });
 
-    if (request.disabled) {
-      handleTerminationRequest();
+      return true;
     }
 
-    sendResponse({ status: "updated" });
-    return false; // Synchronous response
-  }
+    if (request.action === "terminateOperations") {
+      console.log("Termination request received from popup");
+      handleTerminationRequest();
+      sendResponse({ status: "terminating" });
+      return false;
+    }
 
-  // Default for unhandled actions
-  sendResponse({ status: "error", error: "Unknown action" });
-  return false;
+    if (request.action === "updatePageStatus") {
+      console.log(`Page status updated: disabled=${Boolean(request.disabled)}`);
+      isCurrentSiteWhitelisted = !request.disabled;
+
+      if (request.disabled) {
+        handleTerminationRequest();
+      }
+
+      sendResponse({ status: "updated" });
+      return false;
+    }
+
+    if (request.action === "getErrorStats") {
+      const errorStats = errorHandler ? errorHandler.getErrorStats() : {};
+      sendResponse({ status: "ok", errorStats: errorStats });
+      return false;
+    }
+
+    sendResponse({ status: "error", error: "Unknown action" });
+    return false;
+  } catch (handlerError) {
+    if (errorHandler) {
+      errorHandler.handleError(handlerError, "message_handler");
+    } else {
+      console.error("Critical error in message handler:", handlerError);
+    }
+
+    try {
+      sendResponse({ status: "error", error: "Internal handler error" });
+    } catch (responseError) {
+      console.error("Failed to send error response:", responseError);
+    }
+    return false;
+  }
 });
 
 // Create a MutationObserver to detect page changes
