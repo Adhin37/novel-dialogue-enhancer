@@ -330,6 +330,7 @@ async function enhancePage() {
 
   isEnhancing = true;
   terminateRequested = false;
+  let enhancementSuccessful = false;
 
   toaster.showLoading("Starting enhancement process...");
 
@@ -359,7 +360,6 @@ async function enhancePage() {
   try {
     const ollamaStatus = await getOllamaClient().checkOllamaAvailability();
 
-    // Use ollamaStatus parameter with validation
     if (!ollamaStatus || typeof ollamaStatus !== "object") {
       const errorMsg = "Invalid Ollama status response";
       console.error(errorMsg);
@@ -379,7 +379,6 @@ async function enhancePage() {
     const contextResult =
       await contentEnhancerIntegration.setupCharacterContext();
 
-    // Use contextResult parameter
     if (!contextResult || typeof contextResult !== "object") {
       console.warn("Invalid character context result:", contextResult);
     } else {
@@ -393,30 +392,36 @@ async function enhancePage() {
     const paragraphs = contentElement.querySelectorAll("p");
 
     if (paragraphs.length === 0) {
-      await processSingleContentBlock();
+      enhancementSuccessful = await processSingleContentBlock();
     } else {
-      await processMultipleParagraphs(paragraphs);
+      enhancementSuccessful = await processMultipleParagraphs(paragraphs);
     }
 
-    // Send final comprehensive stats to background
-    const finalStats = contentEnhancerIntegration.statsUtils.getStats();
-    chrome.runtime.sendMessage({
-      action: "updateFinalEnhancementStats",
-      stats: finalStats,
-      enhancementSession: true
-    });
+    if (enhancementSuccessful) {
+      const finalStats = contentEnhancerIntegration.statsUtils.getStats();
+      chrome.runtime.sendMessage({
+        action: "updateFinalEnhancementStats",
+        stats: finalStats,
+        enhancementSession: true
+      });
 
-    const stats = contentEnhancerIntegration.statsUtils.getStats();
-    console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
-    toaster.showSuccess("Enhancement complete!");
+      const stats = contentEnhancerIntegration.statsUtils.getStats();
+      console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
+      toaster.showSuccess("Enhancement complete!");
+    } else {
+      console.warn(
+        "Novel Dialogue Enhancer: Enhancement completed with issues"
+      );
+      toaster.showWarning("Enhancement completed with some issues");
+    }
 
-    return true; // Use this return value in callers
+    return enhancementSuccessful;
   } catch (error) {
     console.error("Novel Dialogue Enhancer: Enhancement error", error);
     toaster.showError(
       `Enhancement failed: ${window.DOMPurify.sanitize(error.message)}`
     );
-    return false; // Use this return value in callers
+    return false;
   } finally {
     if (typeof observer !== "undefined" && observer) {
       setTimeout(
@@ -445,7 +450,7 @@ async function processSingleContentBlock() {
   if (terminateRequested) {
     console.log("Enhancement terminated by user before processing");
     toaster.showWarning("Enhancement terminated by user");
-    return;
+    return false;
   }
 
   console.log("Processing full content as a single block");
@@ -470,11 +475,26 @@ async function processSingleContentBlock() {
     if (terminateRequested) {
       console.log("Enhancement terminated by user after processing");
       toaster.showWarning("Enhancement terminated by user");
-      return;
+      return false;
     }
 
+    // Apply the enhancement with verification
     contentElement.innerHTML = window.DOMPurify.sanitize(enhancedText);
-    console.log(`Content updated with ${enhancedText.length} characters`);
+
+    // Verify the update was successful
+    const updateVerified = verifyAndHandleDOMUpdate(
+      contentElement,
+      originalText,
+      enhancedText
+    );
+
+    if (!updateVerified) {
+      throw new Error("Text update verification failed");
+    }
+
+    console.log(
+      `Content updated and verified with ${enhancedText.length} characters`
+    );
     toaster.updateProgress(1, 1);
 
     // Report paragraph statistics
@@ -486,6 +506,8 @@ async function processSingleContentBlock() {
       paragraphCount: paragraphCount,
       processingTime: stats.processingTime || 0
     });
+
+    return true;
   } catch (error) {
     console.error("Failed to enhance content block:", error);
     throw error;
@@ -542,10 +564,7 @@ async function processParagraphBatch(
     `Enhancement progress: ${startIndex}/${paragraphs.length} paragraphs`
   );
 
-  // Update progress bar first
   toaster.updateProgress(startIndex, totalParagraphs);
-
-  // Then update the message text with batch info (persistent, duration=0)
   toaster.showLoading(
     `Processing paragraphs ${startIndex + 1}-${Math.min(
       startIndex + chunkSize,
@@ -557,8 +576,8 @@ async function processParagraphBatch(
     startIndex,
     startIndex + chunkSize
   );
-
   const batchText = batch.map((p) => p.textContent).join("\n\n");
+  const originalTexts = batch.map((p) => p.textContent); // Store original texts
 
   try {
     console.log(
@@ -581,14 +600,53 @@ async function processParagraphBatch(
         }`
       );
       toaster.showWarning("Enhancement terminated by user");
-      return;
+      return false;
     }
 
     const enhancedParagraphs = enhancedText.split("\n\n");
+    let successfulUpdates = 0;
 
+    // Apply enhancements with verification
     for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
-      batch[j].innerHTML = window.DOMPurify.sanitize(enhancedParagraphs[j]);
+      try {
+        batch[j].innerHTML = window.DOMPurify.sanitize(enhancedParagraphs[j]);
+
+        // Verify each paragraph update
+        const updateVerified = verifyAndHandleDOMUpdate(
+          batch[j],
+          originalTexts[j],
+          enhancedParagraphs[j]
+        );
+
+        if (updateVerified) {
+          successfulUpdates++;
+        } else {
+          console.warn(
+            `Failed to verify update for paragraph ${startIndex + j}`
+          );
+        }
+      } catch (updateError) {
+        console.error(
+          `Failed to update paragraph ${startIndex + j}:`,
+          updateError
+        );
+        // Try to restore original text
+        try {
+          batch[j].innerHTML = window.DOMPurify.sanitize(originalTexts[j]);
+        } catch (restoreError) {
+          console.error(
+            `Failed to restore paragraph ${startIndex + j}:`,
+            restoreError
+          );
+        }
+      }
     }
+
+    console.log(
+      `Batch ${startIndex}-${
+        startIndex + batch.length - 1
+      }: ${successfulUpdates}/${batch.length} paragraphs updated successfully`
+    );
 
     toaster.updateProgress(
       Math.min(startIndex + batch.length, totalParagraphs),
@@ -598,9 +656,12 @@ async function processParagraphBatch(
     // Report paragraph statistics for this batch with actual processing time
     chrome.runtime.sendMessage({
       action: "updateParagraphStats",
-      paragraphCount: batch.length,
+      paragraphCount: successfulUpdates, // Report actual successful updates
       processingTime: batchProcessingTime
     });
+
+    // Return true if at least some paragraphs were updated successfully
+    return successfulUpdates > 0;
   } catch (error) {
     console.error(
       `Enhancement failed for batch ${startIndex}-${startIndex + chunkSize}:`,
@@ -613,6 +674,7 @@ async function processParagraphBatch(
       "warn",
       4000
     );
+    return false;
   }
 }
 
@@ -646,6 +708,72 @@ function handleTerminationRequest() {
     terminateRequested = false;
     pendingEnhancement = false;
   }
+}
+/**
+ * Verify that text was successfully updated in the DOM
+ * @param {HTMLElement} element - Element to verify
+ * @param {string} expectedText - Expected text content
+ * @return {boolean} - Whether update was successful
+ */
+function verifyTextUpdate(element, expectedText) {
+  if (!element || !expectedText) {
+    console.warn("Invalid parameters for text verification");
+    return false;
+  }
+
+  try {
+    const actualText = element.textContent || element.innerText || "";
+    const expectedTextClean = expectedText.replace(/<[^>]*>/g, "").trim();
+    const actualTextClean = actualText.trim();
+
+    // Check if the text was meaningfully updated (not just whitespace changes)
+    const textWasUpdated =
+      actualTextClean.length > 0 &&
+      actualTextClean !== expectedTextClean &&
+      Math.abs(actualTextClean.length - expectedTextClean.length) > 10;
+
+    if (!textWasUpdated) {
+      console.warn("Text update verification failed:", {
+        expectedLength: expectedTextClean.length,
+        actualLength: actualTextClean.length,
+        element: element.tagName
+      });
+      return false;
+    }
+
+    console.log("Text update verified successfully");
+    return true;
+  } catch (error) {
+    console.error("Error during text verification:", error);
+    return false;
+  }
+}
+
+/**
+ * Verify DOM update and handle failures
+ * @param {HTMLElement} element - Element that was updated
+ * @param {string} originalText - Original text before enhancement
+ * @param {string} enhancedText - Enhanced text that was applied
+ * @return {boolean} - Whether verification passed
+ */
+function verifyAndHandleDOMUpdate(element, originalText, enhancedText) {
+  const updateSuccessful = verifyTextUpdate(element, enhancedText);
+
+  if (!updateSuccessful) {
+    console.warn("DOM update verification failed, attempting recovery");
+
+    // Try to restore original text if enhancement failed
+    try {
+      element.innerHTML = window.DOMPurify.sanitize(originalText);
+      console.log("Restored original text after failed enhancement");
+      return false;
+    } catch (restoreError) {
+      console.error("Failed to restore original text:", restoreError);
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // Message handler for communication with popup and background
@@ -695,11 +823,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     enhancePage()
       .then((result) => {
-        const stats = contentEnhancerIntegration.statsUtils.getStats();
-        sendResponse({
-          status: "enhanced",
-          stats: stats
-        });
+        // Use the result parameter to determine actual success/failure
+        if (result) {
+          const stats = contentEnhancerIntegration.statsUtils.getStats();
+          sendResponse({
+            status: "enhanced",
+            stats: stats
+          });
+        } else {
+          sendResponse({
+            status: "failed",
+            error: "Enhancement process completed but returned false"
+          });
+        }
       })
       .catch((error) => {
         console.error("Enhancement failed:", error);
