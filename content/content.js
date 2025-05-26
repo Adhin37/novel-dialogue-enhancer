@@ -301,7 +301,7 @@ function findLargestTextBlock() {
 async function enhancePage() {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
   console.time("enhancePage");
-  
+
   if (isEnhancing) {
     pendingEnhancement = true;
     console.log("Enhancement already in progress, queuing request");
@@ -342,8 +342,7 @@ async function enhancePage() {
   }
 
   try {
-    const ollamaStatus =
-      await getOllamaClient().checkOllamaAvailability();
+    const ollamaStatus = await getOllamaClient().checkOllamaAvailability();
 
     // Use ollamaStatus parameter with validation
     if (!ollamaStatus || typeof ollamaStatus !== "object") {
@@ -362,7 +361,8 @@ async function enhancePage() {
     }
 
     toaster.showLoading("Analyzing characters...");
-    const contextResult = await contentEnhancerIntegration.setupCharacterContext();
+    const contextResult =
+      await contentEnhancerIntegration.setupCharacterContext();
 
     // Use contextResult parameter
     if (!contextResult || typeof contextResult !== "object") {
@@ -382,6 +382,14 @@ async function enhancePage() {
     } else {
       await processMultipleParagraphs(paragraphs);
     }
+
+    // Send final comprehensive stats to background
+    const finalStats = contentEnhancerIntegration.statsUtils.getStats();
+    chrome.runtime.sendMessage({
+      action: "updateFinalEnhancementStats",
+      stats: finalStats,
+      enhancementSession: true
+    });
 
     const stats = contentEnhancerIntegration.statsUtils.getStats();
     console.log("Novel Dialogue Enhancer: Enhancement complete", stats);
@@ -430,7 +438,9 @@ async function processSingleContentBlock() {
   toaster.showLoading("Processing content...");
 
   try {
-    const enhancedText = await contentEnhancerIntegration.enhanceText(originalText);
+    const enhancedText = await contentEnhancerIntegration.enhanceText(
+      originalText
+    );
 
     if (!enhancedText || typeof enhancedText !== "string") {
       console.warn("Invalid enhanced text received:", typeof enhancedText);
@@ -542,7 +552,12 @@ async function processParagraphBatch(
       } chars)`
     );
 
-    const enhancedText = await contentEnhancerIntegration.enhanceText(batchText);
+    const batchStartTime = performance.now();
+    const enhancedText = await contentEnhancerIntegration.enhanceText(
+      batchText
+    );
+    const batchEndTime = performance.now();
+    const batchProcessingTime = batchEndTime - batchStartTime;
 
     if (terminateRequested) {
       console.log(
@@ -565,11 +580,11 @@ async function processParagraphBatch(
       totalParagraphs
     );
 
-    // Report paragraph statistics for this batch
+    // Report paragraph statistics for this batch with actual processing time
     chrome.runtime.sendMessage({
       action: "updateParagraphStats",
       paragraphCount: batch.length,
-      processingTime: 0
+      processingTime: batchProcessingTime
     });
   } catch (error) {
     console.error(

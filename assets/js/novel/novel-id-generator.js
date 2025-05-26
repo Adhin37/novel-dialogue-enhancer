@@ -21,40 +21,55 @@ class NovelIdGenerator {
       const urlObj = new URL(url);
       const domain = urlObj.hostname.replace(/^www\./, "");
 
-      // Extract novel name from title or URL
       const novelName = this.#extractNovelName(title, urlObj);
 
       if (!novelName) {
         console.warn("Could not extract novel name from title or URL");
-        // Use domain and path as fallback
         const pathSegment =
           urlObj.pathname.split("/").filter((s) => s.length > 0)[0] ||
           "unknown";
-        const fallbackNovelId = `${domain}__${pathSegment}`
-          .toLowerCase()
-          .replace(/[^\w]/g, "_")
-          .replace(/_+/g, "_")
-          .replace(/^_|_$/g, "")
-          .substring(0, 50);
+        const fallbackNovelId = this.#createCleanId(domain, pathSegment);
 
         console.warn(`Using fallback novel ID: ${fallbackNovelId}`);
         this.novelId = fallbackNovelId;
         return fallbackNovelId;
       }
 
-      // Create clean novel ID
-      this.novelId = `${domain}__${novelName}`
-        .toLowerCase()
-        .replace(/[^\w]/g, "_")
-        .replace(/_+/g, "_")
-        .replace(/^_|_$/g, "")
-        .substring(0, 50);
+      this.novelId = this.#createCleanId(domain, novelName);
 
       return this.novelId;
     } catch (error) {
       console.error("Error generating novel ID:", error);
       return null;
     }
+  }
+
+  /**
+   * Create a clean novel ID from domain and novel name
+   * @param {string} domain - Domain name
+   * @param {string} novelName - Novel name
+   * @return {string} - Clean novel ID
+   * @private
+   */
+  #createCleanId(domain, novelName) {
+    const clean = (str) =>
+      str
+        .toLowerCase()
+        .replace(/[^\w]/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_|_$/g, "");
+
+    const cleanDomain = clean(domain);
+    let cleanNovelName = clean(novelName);
+    let novelId = `${cleanDomain}__${cleanNovelName}`;
+
+    if (novelId.length > 50) {
+      const initials = novelName.match(/\b\w/g)?.join("").toLowerCase() || "x";
+      cleanNovelName = initials;
+      novelId = `${cleanDomain}__${cleanNovelName}`;
+    }
+
+    return novelId;
   }
 
   /**
@@ -84,7 +99,6 @@ class NovelIdGenerator {
    * @private
    */
   #cleanTitleForNovelName(title) {
-    // Remove common chapter indicators and separators
     let cleaned = title
       .replace(/\s*[-–—|:]\s*(chapter|ch\.?|episode|part)\s*\d+.*$/i, "")
       .replace(/\s*[-–—|:]\s*.*$/, "")
@@ -98,7 +112,6 @@ class NovelIdGenerator {
       cleaned = chapterMatch[2].trim();
     }
 
-    // Remove common suffixes
     cleaned = cleaned
       .replace(
         /\s*[-–—|:]\s*(read online|free|novel|story|web novel|light novel).*$/i,
@@ -147,7 +160,6 @@ class NovelIdGenerator {
       return true;
     }
 
-    // If domains are different, definitely different novels
     const currentDomain = currentNovelId.split("__")[0];
     const storedDomain = storedNovelId.split("__")[0];
 
@@ -155,7 +167,6 @@ class NovelIdGenerator {
       return true;
     }
 
-    // If novel names are different, different novels
     return currentNovelId !== storedNovelId;
   }
 

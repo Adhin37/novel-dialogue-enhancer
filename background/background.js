@@ -3,7 +3,7 @@ const activeRequestControllers = new Map();
 const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 let isBackgroundReady = false;
-let initializationPromise = null; // Prevent multiple simultaneous initializations
+let initializationPromise = null;
 let globalStats = {
   totalParagraphsEnhanced: 0,
   totalChaptersEnhanced: 0,
@@ -11,13 +11,16 @@ let globalStats = {
   totalProcessingTime: 0,
   totalCharactersDetected: 0,
   enhancementSessions: 0,
+  totalErrorCount: 0,
   lastEnhancementDate: null,
   firstEnhancementDate: null
 };
 const whitelistCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
-// Single initialization function
+/**
+ * Initializes the background script
+ */
 function initializeBackground() {
   if (initializationPromise) {
     return initializationPromise;
@@ -60,7 +63,10 @@ function initializeBackground() {
   return initializationPromise;
 }
 
-// Add this function after the existing helper functions
+/**
+ * Updates global statistics
+ * @param {object} statsUpdate - Object containing statistics to update
+ */
 function updateGlobalStats(statsUpdate) {
   const now = Date.now();
 
@@ -80,6 +86,11 @@ function updateGlobalStats(statsUpdate) {
     globalStats.totalProcessingTime += statsUpdate.processingTime;
   }
 
+  // Add error count tracking
+  if (statsUpdate.errorCount) {
+    globalStats.totalErrorCount += statsUpdate.errorCount;
+  }
+
   if (statsUpdate.enhancementSession) {
     globalStats.enhancementSessions += 1;
     globalStats.lastEnhancementDate = now;
@@ -89,7 +100,6 @@ function updateGlobalStats(statsUpdate) {
     }
   }
 
-  // Calculate unique novels
   const uniqueNovels = new Set();
   Object.keys(novelCharacterMaps).forEach((novelId) => {
     if (
@@ -101,10 +111,20 @@ function updateGlobalStats(statsUpdate) {
   });
   globalStats.uniqueNovelsProcessed = uniqueNovels.size;
 
-  // Store updated stats
-  chrome.storage.local.set({ globalStats: globalStats });
+  chrome.storage.local.set({ globalStats: globalStats }, () => {
+    if (chrome.runtime.lastError) {
+      console.error("Error storing global stats:", chrome.runtime.lastError);
+    } else {
+      console.log("Global stats updated:", globalStats);
+    }
+  });
 }
 
+/**
+ * Gets the next available character ID
+ * @param {object} charMap - Character map to check
+ * @return {number} - Next available character ID
+ */
 function getNextCharacterId(charMap) {
   if (!charMap || typeof charMap !== "object") return 0;
 
@@ -117,6 +137,12 @@ function getNextCharacterId(charMap) {
   return Math.max(...existingIds) + 1;
 }
 
+/**
+ * Purges old novels from the character maps
+ * @param {object} maps - Character maps to purge
+ * @param {number} maxAge - Maximum age of novels to keep (in milliseconds)
+ * @return {object} - Purged character maps
+ */
 function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
   if (!maps || typeof maps !== "object") return {};
 
@@ -1045,6 +1071,37 @@ function handleMessage(request, sender, sendResponse) {
       }
     });
     return true; // Keep message channel open for async response
+  } else if (request.action === "updateFinalEnhancementStats") {
+    const finalStats = request.stats || {};
+
+    // Create comprehensive stats update from the final enhancement stats
+    const statsUpdate = {
+      enhancementSession: request.enhancementSession || true,
+      processingTime: finalStats.processingTime || 0,
+      // Note: paragraphs and characters are already tracked via other messages
+      // but we can update error counts here
+      errorCount: finalStats.errorCount || 0
+    };
+
+    // Update compression ratio if available
+    if (finalStats.compressionRatio && finalStats.compressionRatio !== 1.0) {
+      console.log(
+        `Enhancement compression ratio: ${finalStats.compressionRatio}`
+      );
+    }
+
+    updateGlobalStats(statsUpdate);
+
+    console.log("Final enhancement stats processed:", {
+      processingTime: finalStats.processingTime,
+      totalDialoguesEnhanced: finalStats.totalDialoguesEnhanced,
+      totalCharactersDetected: finalStats.totalCharactersDetected,
+      totalWordsProcessed: finalStats.totalWordsProcessed,
+      errorCount: finalStats.errorCount
+    });
+
+    sendResponse({ status: "ok" });
+    return false;
   } else if (request.action === "ollamaRequest") {
     // Async operation - return true to keep channel open
     handleOllamaRequest(request, sendResponse);

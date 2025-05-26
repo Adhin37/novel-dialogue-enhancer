@@ -1,5 +1,3 @@
-// content-enhancer-integration.js
-
 /**
  * Enhanced integration module for Novel Dialogue Enhancer
  * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
@@ -15,6 +13,10 @@ class ContentEnhancerIntegration {
     this.statsUtils = new StatsUtils();
     this.textProcessor = new TextProcessor();
     this.promptGenerator = new PromptGenerator();
+
+    // Add flag to track if character analysis was already done for this session
+    this.characterAnalysisComplete = false;
+    this.sessionCharacterMap = {};
 
     console.debug(
       "Novel Dialogue Enhancer: Integration module initialized with LLM support"
@@ -39,8 +41,8 @@ class ContentEnhancerIntegration {
       const originalWordCount = this.#countWords(sanitizedText);
       this.statsUtils.setTotalWordsProcessed(originalWordCount);
 
-      // Extract character information using novelUtils
-      const characterMap = await this.extractCharacterInfo(sanitizedText);
+      // Extract character information only once per session or use existing data
+      const characterMap = await this.#getOrExtractCharacterInfo(sanitizedText);
 
       // Get dialogue patterns for statistics
       const dialoguePatterns =
@@ -98,6 +100,62 @@ class ContentEnhancerIntegration {
   }
 
   /**
+   * Get or extract character information - only extract once per session
+   * @param {string} text - The text to analyze
+   * @return {Promise<object>} - Character map
+   * @private
+   */
+  async #getOrExtractCharacterInfo(text) {
+    // If we already have character data for this session, return it
+    if (
+      this.characterAnalysisComplete &&
+      Object.keys(this.sessionCharacterMap).length > 0
+    ) {
+      console.log("Using existing character data from session");
+      return this.sessionCharacterMap;
+    }
+
+    // Extract character information for the first time
+    console.log("Extracting character information...");
+    const characterMap = await this.novelUtils.extractCharacterNames(text);
+
+    const startCharCount = Object.keys(characterMap).length;
+    console.log(`Starting with ${startCharCount} characters`);
+
+    // If the current chapter was already enhanced, we might be using cached data
+    if (!this.novelUtils.isCurrentChapterEnhanced) {
+      // Apply gender detection to any characters with unknown gender
+      const updatedCharacterMap = await this.determineCharacterGenders(
+        characterMap,
+        text
+      );
+      this.sessionCharacterMap = updatedCharacterMap;
+    } else {
+      this.sessionCharacterMap = characterMap;
+    }
+
+    // Mark character analysis as complete for this session
+    this.characterAnalysisComplete = true;
+
+    // Track new characters found - use 0 as baseline since characterMap includes all characters
+    const finalCharCount = Object.keys(this.sessionCharacterMap).length;
+    const newCharCount = Math.max(0, finalCharCount - 0); // Always use 0 as baseline
+    this.statsUtils.setTotalCharactersDetected(newCharCount);
+
+    console.log(
+      `Processed ${finalCharCount} characters for novel ${
+        this.novelUtils.novelId
+      }${
+        this.novelUtils.chapterInfo?.chapterNumber
+          ? ", chapter " + this.novelUtils.chapterInfo.chapterNumber
+          : ""
+      }`
+    );
+
+    return this.sessionCharacterMap;
+  }
+
+  /**
    * Count words in text
    * @param {string} text - Text to count words in
    * @return {number} - Number of words
@@ -143,43 +201,6 @@ class ContentEnhancerIntegration {
   }
 
   /**
-   * Extract character information using novelUtils and apply gender detection
-   * @param {string} text - The text to analyze
-   * @return {Promise<object>} - Updated character map
-   */
-  async extractCharacterInfo(text) {
-    console.log("Extracting character information...");
-
-    // Let novelUtils extract the character names (now async)
-    let characterMap = await this.novelUtils.extractCharacterNames(text);
-
-    const startCharCount = Object.keys(characterMap).length;
-    console.log(`Starting with ${startCharCount} characters`);
-
-    // If the current chapter was already enhanced, we might be using cached data
-    if (!this.novelUtils.isCurrentChapterEnhanced) {
-      // Apply gender detection to any characters with unknown gender
-      characterMap = await this.determineCharacterGenders(characterMap, text);
-    }
-
-    // Track new characters found - use 0 as baseline since characterMap includes all characters
-    const finalCharCount = Object.keys(characterMap).length;
-    const newCharCount = Math.max(0, finalCharCount - 0); // Always use 0 as baseline
-    this.statsUtils.setTotalCharactersDetected(newCharCount);
-
-    console.log(
-      `Processed ${finalCharCount} characters for novel ${
-        this.novelUtils.novelId
-      }${
-        this.novelUtils.chapterInfo?.chapterNumber
-          ? ", chapter " + this.novelUtils.chapterInfo.chapterNumber
-          : ""
-      }`
-    );
-    return characterMap;
-  }
-
-  /**
    * Apply gender detection to characters with unknown gender
    * @param {object} characterMap - The character map to update
    * @param {string} text - The text to analyze
@@ -221,7 +242,7 @@ class ContentEnhancerIntegration {
   async setupCharacterContext() {
     // Get text from the content element
     const text = document.body.textContent;
-    return await this.extractCharacterInfo(text);
+    return await this.#getOrExtractCharacterInfo(text);
   }
 
   /**

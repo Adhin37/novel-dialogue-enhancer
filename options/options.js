@@ -661,11 +661,16 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.runtime.sendMessage({ action: "getGlobalStats" }, (response) => {
       if (chrome.runtime.lastError) {
         console.error("Error loading stats:", chrome.runtime.lastError);
+        window.feedbackManager.show("Error loading statistics", "error");
         return;
       }
 
       if (response && response.status === "ok" && response.stats) {
         renderGlobalStats(response.stats);
+        console.log("Global stats loaded successfully");
+      } else {
+        console.warn("Invalid stats response:", response);
+        window.feedbackManager.show("Invalid statistics response", "warning");
       }
     });
   }
@@ -699,6 +704,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("stat-first-date").textContent = firstDate;
     document.getElementById("stat-last-date").textContent = lastDate;
+
+    const errorCountElement = document.getElementById("stat-error-count");
+    if (errorCountElement && stats.totalErrorCount !== undefined) {
+      errorCountElement.textContent = stats.totalErrorCount || 0;
+    }
+
+    console.log("Stats rendered successfully:", stats);
   }
 
   /**
