@@ -371,6 +371,414 @@ class ContentEnhancerIntegration {
 
     return enhancedChunks;
   }
+
+  // Enhanced methods for ContentEnhancerIntegration to better utilize MultiCharacterContextAnalyzer
+
+  /**
+   * Enhanced method to determine character genders with better multi-character analysis
+   * This method should be added to the ContentEnhancerIntegration class
+   */
+  async determineCharacterGendersEnhanced(characterMap, text) {
+    const updatedCharacterMap = { ...characterMap };
+    const characterNames = Object.keys(updatedCharacterMap);
+
+    const unknownGenderCharacters = [];
+
+    for (const [name, data] of Object.entries(updatedCharacterMap)) {
+      const needsGenderDetermination =
+        data.gender === Constants.GENDER.UNKNOWN ||
+        !data.confidence ||
+        data.confidence < 0.7;
+
+      if (needsGenderDetermination) {
+        unknownGenderCharacters.push(name);
+      }
+    }
+
+    console.log(
+      `Analyzing ${unknownGenderCharacters.length} characters with unknown/low-confidence gender`
+    );
+
+    if (characterNames.length >= 3 && unknownGenderCharacters.length > 0) {
+      console.log(
+        "Using enhanced multi-character analysis for complex character set"
+      );
+
+      const interactionInsights = this.#analyzeCharacterInteractionNetwork(
+        characterNames,
+        text,
+        updatedCharacterMap
+      );
+
+      this.#applyInteractionInsights(updatedCharacterMap, interactionInsights);
+    }
+
+    for (const name of unknownGenderCharacters) {
+      const genderInfo = this.genderUtils.guessGender(
+        name,
+        text,
+        updatedCharacterMap
+      );
+
+      updatedCharacterMap[name] = {
+        ...updatedCharacterMap[name],
+        gender: genderInfo.gender,
+        confidence: genderInfo.confidence,
+        evidence: genderInfo.evidence
+      };
+
+      console.log(
+        `Enhanced analysis for ${name}: ${SharedUtils.expandGender(
+          genderInfo.gender
+        )} (confidence: ${Math.round(genderInfo.confidence * 100)}%)`
+      );
+    }
+
+    if (characterNames.length >= 4) {
+      this.#performCharacterSetCrossValidation(updatedCharacterMap, text);
+    }
+    this.genderUtils.multiCharacterAnalyzer.optimizeCaches();
+
+    this.novelUtils.syncCharacterMap(updatedCharacterMap);
+    return updatedCharacterMap;
+  }
+
+  /**
+   * Analyze character interaction networks to provide better context
+   * @param {Array} characterNames - All character names
+   * @param {string} text - Text context
+   * @param {object} characterMap - Current character map
+   * @return {object} - Interaction insights
+   * @private
+   */
+  #analyzeCharacterInteractionNetwork(characterNames, text, characterMap) {
+    const interactions = {
+      relationships: new Map(),
+      dialoguePatterns: new Map(),
+      coOccurrences: new Map(),
+      genderClues: new Map()
+    };
+
+    for (const name1 of characterNames) {
+      for (const name2 of characterNames) {
+        if (name1 === name2) continue;
+
+        const pairKey = [name1, name2].sort().join("|");
+
+        const coOccurrencePattern = new RegExp(
+          `[^.!?]*\\b${SharedUtils.escapeRegExp(
+            name1
+          )}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(name2)}\\b[^.!?]*[.!?]`,
+          "gi"
+        );
+
+        const coOccurrences = (text.match(coOccurrencePattern) || []).length;
+        if (coOccurrences > 0) {
+          interactions.coOccurrences.set(pairKey, coOccurrences);
+        }
+
+        const relationshipAnalysis =
+          this.genderUtils.relationshipAnalyzer.inferGenderFromRelated(
+            name1,
+            text,
+            { [name2]: characterMap[name2] || { gender: "u", confidence: 0 } }
+          );
+
+        if (relationshipAnalysis.evidence) {
+          interactions.relationships.set(pairKey, relationshipAnalysis);
+        }
+      }
+    }
+
+    console.log(
+      `Interaction analysis: ${interactions.coOccurrences.size} co-occurrences, ${interactions.relationships.size} relationships`
+    );
+
+    return interactions;
+  }
+
+  /**
+   * Apply interaction insights to improve character analysis context
+   * @param {object} characterMap - Character map to enhance
+   * @param {object} interactions - Interaction insights
+   * @private
+   */
+  #applyInteractionInsights(characterMap, interactions) {
+    for (const [pairKey, relationshipData] of interactions.relationships) {
+      const [name1, name2] = pairKey.split("|");
+
+      const char1 = characterMap[name1];
+      const char2 = characterMap[name2];
+
+      if (!char1 || !char2) continue;
+
+      const char1HasKnownGender =
+        char1.gender !== Constants.GENDER.UNKNOWN &&
+        (char1.confidence || 0) >= 0.7;
+      const char2HasKnownGender =
+        char2.gender !== Constants.GENDER.UNKNOWN &&
+        (char2.confidence || 0) >= 0.7;
+
+      if (relationshipData.maleScore > 2 || relationshipData.femaleScore > 2) {
+        if (char1HasKnownGender && !char2HasKnownGender) {
+          if (!char2.relationshipHints) char2.relationshipHints = [];
+          char2.relationshipHints.push({
+            relatedCharacter: name1,
+            relatedGender: char1.gender,
+            evidence: relationshipData.evidence,
+            strength: Math.max(
+              relationshipData.maleScore,
+              relationshipData.femaleScore
+            )
+          });
+        } else if (char2HasKnownGender && !char1HasKnownGender) {
+          // Use char2's gender to inform char1's analysis
+          if (!char1.relationshipHints) char1.relationshipHints = [];
+          char1.relationshipHints.push({
+            relatedCharacter: name2,
+            relatedGender: char2.gender,
+            evidence: relationshipData.evidence,
+            strength: Math.max(
+              relationshipData.maleScore,
+              relationshipData.femaleScore
+            )
+          });
+        }
+      }
+    }
+
+    // Apply co-occurrence patterns for dialogue attribution improvement
+    for (const [pairKey, count] of interactions.coOccurrences) {
+      if (count >= 3) {
+        // Frequent co-occurrence
+        const [name1, name2] = pairKey.split("|");
+        const char1 = characterMap[name1];
+        const char2 = characterMap[name2];
+
+        if (char1) {
+          if (!char1.frequentCoOccurrences) char1.frequentCoOccurrences = [];
+          char1.frequentCoOccurrences.push({ name: name2, count });
+        }
+
+        if (char2) {
+          if (!char2.frequentCoOccurrences) char2.frequentCoOccurrences = [];
+          char2.frequentCoOccurrences.push({ name: name1, count });
+        }
+      }
+    }
+  }
+
+  /**
+   * Perform cross-validation of character gender assignments
+   * @param {object} characterMap - Character map to validate
+   * @param {string} text - Text context
+   * @private
+   */
+  #performCharacterSetCrossValidation(characterMap, text) {
+    const characterNames = Object.keys(characterMap);
+    let validationAdjustments = 0;
+
+    console.log("Performing character set cross-validation...");
+
+    for (const [name, data] of Object.entries(characterMap)) {
+      if ((data.confidence || 0) < 0.9) {
+        // Only validate uncertain characters
+
+        // Use multi-character analyzer for cross-validation
+        const crossValidationResult =
+          this.genderUtils.multiCharacterAnalyzer.crossValidateAnalysis(
+            name,
+            text,
+            characterMap,
+            {
+              maleScore: data.gender === Constants.GENDER.MALE ? 5 : 0,
+              femaleScore: data.gender === Constants.GENDER.FEMALE ? 5 : 0,
+              evidence: data.evidence ? data.evidence.join("; ") : null
+            }
+          );
+
+        // Check for significant disagreement
+        const currentGender = data.gender;
+        const validatedGender =
+          crossValidationResult.maleScore > crossValidationResult.femaleScore
+            ? Constants.GENDER.MALE
+            : crossValidationResult.femaleScore >
+              crossValidationResult.maleScore
+            ? Constants.GENDER.FEMALE
+            : Constants.GENDER.UNKNOWN;
+
+        if (
+          currentGender !== validatedGender &&
+          validatedGender !== Constants.GENDER.UNKNOWN
+        ) {
+          const validationConfidence =
+            Math.abs(
+              crossValidationResult.maleScore -
+                crossValidationResult.femaleScore
+            ) / 10;
+
+          if (validationConfidence > (data.confidence || 0) + 0.2) {
+            console.log(
+              `Cross-validation adjustment for ${name}: ${SharedUtils.expandGender(
+                currentGender
+              )} → ${SharedUtils.expandGender(validatedGender)}`
+            );
+
+            characterMap[name] = {
+              ...data,
+              gender: validatedGender,
+              confidence: Math.min(0.95, validationConfidence),
+              evidence: [
+                ...(data.evidence || []),
+                `cross-validated: ${
+                  crossValidationResult.evidence || "multi-character analysis"
+                }`
+              ].slice(0, Constants.STORAGE.MAX_EVIDENCE_ENTRIES)
+            };
+
+            validationAdjustments++;
+          }
+        }
+      }
+    }
+
+    if (validationAdjustments > 0) {
+      console.log(`Cross-validation made ${validationAdjustments} adjustments`);
+    }
+  }
+
+  /**
+   * Enhanced setup character context method that leverages multi-character analysis
+   * This method should replace the existing setupCharacterContext in ContentEnhancerIntegration
+   */
+  async setupCharacterContextEnhanced() {
+    const text = document.body.textContent;
+
+    // Get initial character context
+    const characterMap = await this.#getOrExtractCharacterInfo(text);
+
+    // If we have multiple characters, perform enhanced analysis
+    if (Object.keys(characterMap).length >= 2) {
+      console.log(
+        "Performing enhanced character context setup with multi-character analysis"
+      );
+
+      // Use enhanced multi-character analysis
+      const enhancedCharacterMap = await this.determineCharacterGendersEnhanced(
+        characterMap,
+        text
+      );
+
+      // Detect and resolve any character name ambiguities
+      this.#resolveCharacterAmbiguities(enhancedCharacterMap, text);
+
+      // Get performance metrics
+      const analysisMetrics =
+        this.genderUtils.multiCharacterAnalyzer.getAnalysisMetrics();
+      console.log("Multi-character analysis metrics:", {
+        totalAnalyses: analysisMetrics.totalAnalyses,
+        complexAnalyses: analysisMetrics.complexContextAnalyses,
+        cacheEfficiency:
+          Math.round(analysisMetrics.cacheEfficiency * 100) + "%",
+        memoryUsage: Math.round(analysisMetrics.memoryUsage / 1024) + "KB"
+      });
+
+      return enhancedCharacterMap;
+    }
+
+    // Fallback to standard analysis for simple character sets
+    return await this.#getOrExtractCharacterInfo(text);
+  }
+
+  /**
+   * Resolve character name ambiguities in multi-character contexts
+   * @param {object} characterMap - Character map to analyze
+   * @param {string} text - Text context
+   * @private
+   */
+  #resolveCharacterAmbiguities(characterMap, text) {
+    const characterNames = Object.keys(characterMap);
+
+    if (characterNames.length < 2) return; // No ambiguities possible with < 2 characters
+
+    for (const characterName of characterNames) {
+      const ambiguityResult =
+        this.genderUtils.multiCharacterAnalyzer.resolveCharacterAmbiguities(
+          characterName,
+          text,
+          characterNames
+        );
+
+      if (
+        ambiguityResult.metadata &&
+        ambiguityResult.metadata.ambiguityScore > 0
+      ) {
+        console.log(`Detected potential name ambiguity for ${characterName}:`, {
+          ambiguityScore: ambiguityResult.metadata.ambiguityScore,
+          resolutionConfidence:
+            Math.round(ambiguityResult.metadata.resolutionConfidence * 100) +
+            "%",
+          similarNames: ambiguityResult.metadata.similarNames
+        });
+
+        // Store ambiguity information for future reference
+        if (characterMap[characterName]) {
+          characterMap[characterName].ambiguityData = {
+            score: ambiguityResult.metadata.ambiguityScore,
+            confidence: ambiguityResult.metadata.resolutionConfidence,
+            similarNames: ambiguityResult.metadata.similarNames
+          };
+        }
+      }
+    }
+  }
+
+  /**
+   * Get enhanced statistics including multi-character analysis metrics
+   * This method should be added to ContentEnhancerIntegration
+   */
+  getEnhancedAnalysisStats() {
+    const baseStats = this.statsUtils.getStats();
+    const genderStats = this.genderUtils.getEnhancedStats();
+    const multiCharStats =
+      this.genderUtils.multiCharacterAnalyzer.getAnalysisMetrics();
+
+    return {
+      ...baseStats,
+      genderAnalysis: genderStats,
+      multiCharacterAnalysis: {
+        totalAnalyses: multiCharStats.totalAnalyses,
+        complexContextAnalyses: multiCharStats.complexContextAnalyses,
+        crossValidations: multiCharStats.crossValidations,
+        cacheEfficiency: multiCharStats.cacheEfficiency,
+        cacheHitRate:
+          multiCharStats.cacheHits / Math.max(1, multiCharStats.totalAnalyses),
+        memoryUsage: multiCharStats.memoryUsage
+      }
+    };
+  }
+
+  /**
+   * Performance optimization method to clear caches when character context changes significantly
+   * This method should be called when moving between different novels or chapters
+   */
+  optimizePerformance() {
+    this.genderUtils.multiCharacterAnalyzer.optimizeCaches();
+
+    const currentCharacterMapSize = Object.keys(
+      this.sessionCharacterMap || {}
+    ).length;
+
+    if (
+      currentCharacterMapSize === 0 ||
+      currentCharacterMapSize !== this.lastCharacterMapSize
+    ) {
+      this.genderUtils.clearAnalysisCaches();
+      this.lastCharacterMapSize = currentCharacterMapSize;
+
+      console.log("Cleared analysis caches due to character map changes");
+    }
+  }
 }
 
 if (typeof module !== "undefined") {

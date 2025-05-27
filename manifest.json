@@ -49,6 +49,7 @@
         "assets/js/utils/stats-utils.js",
         "assets/js/utils/shared-utils.js",
         "assets/js/utils/constants.js",
+        "assets/js/utils/error-handler.js",
         "assets/js/novel/novel-id-generator.js",
         "assets/js/novel/novel-style-analyzer.js",
         "assets/js/novel/novel-character-extractor.js",
