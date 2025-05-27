@@ -1,3 +1,4 @@
+// content-enhancer-integration.js
 /**
  * Enhanced integration module for Novel Dialogue Enhancer
  * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
