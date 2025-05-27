@@ -2,7 +2,7 @@
 
 ## Project Architecture Overview
 
-Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Ollama) to enhance translated novel dialogues. The architecture emphasizes privacy, performance, and maintainability through modular design patterns.
+Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Ollama) to enhance translated novel dialogues. The architecture emphasizes privacy, performance, and maintainability through modular design patterns with strict coding standards and comprehensive error handling.
 
 ### Core Design Patterns
 
@@ -12,6 +12,7 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - LLM operations handled by dedicated classes (`OllamaClient`, `PromptGenerator`, `TextProcessor`)
 - Utility classes for specific domains (`NovelUtils`, `StatsUtils`, `GenderUtils`)
 - UI components separated by function (`popup`, `options`, `content`, `background`)
+- Enhanced multi-character context analysis (`MultiCharacterContextAnalyzer`)
 
 **Base Class Inheritance Pattern**: Common functionality extracted to base classes:
 
@@ -29,7 +30,59 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 
 - Character detection still works without AI enhancement
 - Whitelist functionality remains active
-- User gets clear feedback about service availability
+- User gets clear feedback about service availability through enhanced error handling
+
+### File Structure & Organization
+
+```markdown
+├── manifest.json              # Extension manifest (Manifest V3)
+├── background/
+│   └── background.js          # Service worker with data management
+├── content/
+│   └── content.js             # Content script orchestration
+├── popup/
+│   ├── popup.html            # Quick controls interface
+│   ├── popup.js              # Popup logic with dark mode
+│   └── popup.css             # Popup styling
+├── options/
+│   ├── options.html          # Comprehensive settings page
+│   ├── options.js            # Settings management
+│   └── options.css           # Options styling
+├── assets/js/
+│   ├── gender/               # Gender analysis system
+│   │   ├── base-gender-analyzer.js
+│   │   ├── cultural-analyzer.js
+│   │   ├── name-analyzer.js
+│   │   ├── pronoun-analyzer.js
+│   │   ├── relationship-analyzer.js
+│   │   ├── appearance-analyzer.js
+│   │   └── multi-character-context-analyzer.js
+│   ├── llm/                  # AI integration
+│   │   ├── ollama-client.js
+│   │   ├── prompt-generator.js
+│   │   └── text-processor.js
+│   ├── novel/                # Novel processing modules
+│   │   ├── novel-character-extractor.js
+│   │   ├── novel-chapter-detector.js
+│   │   ├── novel-id-generator.js
+│   │   ├── novel-storage-manager.js
+│   │   └── novel-style-analyzer.js
+│   ├── content/              # Content script components
+│   │   ├── content-enhancer-integration.js
+│   │   └── content-element-cache.js
+│   ├── utils/                # Shared utilities
+│   │   ├── shared-utils.js
+│   │   ├── constants.js
+│   │   ├── error-handler.js
+│   │   ├── stats-utils.js
+│   │   ├── gender-utils.js
+│   │   ├── novel-utils.js
+│   │   ├── dark-mode-manager.js
+│   │   └── feedback-manager.js
+│   └── toaster.js            # User notification system
+├── docs/                     # Documentation
+└── eslint.config.mjs         # Coding standards enforcement
+```
 
 ### Data Storage Strategy
 
@@ -39,12 +92,13 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 {
   [novelId]: {
     chars: {
-      [numericId]: {              // Numeric IDs instead of names
+      [numericId]: {              // Numeric IDs instead of names as keys
         name: string,             // Character name
         gender: "m"|"f"|"u",      // Compressed gender codes
         confidence: number,       // Confidence score (0-1)
         appearances: number,      // Number of appearances
-        evidences: string[]       // Supporting evidence (max 5 items)
+        evidences: string[],      // Supporting evidence (max 5 items)
+        manualOverride?: boolean  // Optional: true when manually set via options
       }
     },
     chaps: [number],              // Just chapter numbers (not objects)
@@ -73,6 +127,7 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - Preserves paragraph boundaries when possible
 - Handles extremely long paragraphs by sentence splitting
 - Maintains optimal chunk sizes for model context windows
+- Real-time progress feedback with `Toaster` system
 
 **Context Preservation**: Surrounding text provided for coherence between chunks:
 
@@ -91,11 +146,11 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - **Retry Logic**: Failed chunks skipped, processing continues
 - **Request Caching**: Responses cached by content hash to avoid duplicate processing
 - **Timeout Management**: Configurable timeouts with cleanup
-- **Error Recovery**: Graceful handling of individual chunk failures
+- **Error Recovery**: Graceful handling of individual chunk failures via `ErrorHandler`
 
-### Gender Detection System
+### Enhanced Gender Detection System
 
-**Multi-Analyzer Approach**: Five specialized analyzers working together:
+**Multi-Analyzer Approach**: Five specialized analyzers working together with enhanced multi-character context:
 
 1. **Cultural Origin Detection**: Identifies western/chinese/japanese/korean contexts
    - Character pattern recognition (Unicode ranges)
@@ -122,38 +177,35 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
    - Clothing and appearance term detection
    - Cultural beauty standard recognition
 
+6. **Multi-Character Context Analysis**: Advanced analyzer for complex character interactions
+   - Character interaction network analysis
+   - Cross-validation between multiple characters
+   - Ambiguity resolution in multi-character scenes
+   - Performance-optimized caching system
+
 **Advanced Features**:
 
 - **Confidence Scoring**: Weighted scoring system with cultural adjustments
 - **Evidence Collection**: Up to 5 pieces of evidence per character for transparency
 - **Translation Error Correction**: Detects and corrects common machine translation mistakes
 - **Cultural Adaptation**: Analysis adapts to detected cultural origin
+- **Cross-Validation**: Multi-character scenes used to validate individual character analysis
 
-### Error Handling Patterns
+### Error Handling & User Feedback
+
+**Enhanced Error Handling System**: Comprehensive error management via `ErrorHandler`:
+
+- **Categorized Errors**: Network, Ollama unavailable, processing, permission, timeout, etc.
+- **User-Friendly Messages**: Technical errors translated to actionable user guidance
+- **Recovery Mechanisms**: Automatic retry for transient errors
+- **Error Suppression**: Prevents error spam while maintaining user awareness
+- **Contextual Suggestions**: Specific guidance based on error type
 
 **Graceful Degradation**: Core functionality continues even if sub-components fail:
 
 - Individual analyzer failures don't stop gender detection
 - LLM unavailability doesn't prevent character tracking
 - Network errors handled with appropriate user feedback
-
-**User Feedback**: Comprehensive user notification system via `Toaster`:
-
-- Real-time progress updates during processing
-- Clear error messages with actionable advice
-- Success confirmation with statistics
-
-**Timeout Management**: Configurable timeouts for all async operations:
-
-- LLM requests with cleanup on timeout
-- Permission checks with fallback logic
-- Storage operations with retry mechanisms
-
-**Input Validation**: Comprehensive validation at all input points:
-
-- Character name validation with sanitization
-- Settings validation with safe defaults
-- URL validation for whitelist operations
 
 ### Performance Optimizations
 
@@ -163,12 +215,13 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - LLM client initialized when AI features requested
 - UI components loaded progressively
 
-**Caching Strategies**: Multi-level caching for performance:
+**Advanced Caching Strategies**: Multi-level caching for performance:
 
-- **Whitelist status**: Cached for 5 minutes to reduce background checks
-- **Character data**: Cached across sessions with automatic cleanup
-- **LLM responses**: Cached by content hash to avoid duplicate processing
-- **DOM elements**: Cached with TTL to reduce query overhead
+- **Whitelist Status**: Cached for 5 minutes to reduce background checks
+- **Character Data**: Cached across sessions with automatic cleanup
+- **LLM Responses**: Cached by content hash to avoid duplicate processing
+- **DOM Elements**: Cached with TTL to reduce query overhead via `ContentElementCache`
+- **Multi-Character Analysis**: Sophisticated caching in `MultiCharacterContextAnalyzer`
 
 **Batch Processing**: Optimized text processing:
 
@@ -202,7 +255,7 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - Options page scales appropriately
 - Touch-friendly interaction targets
 
-**Dark Mode Support**: Complete theming system:
+**Dark Mode Support**: Complete theming system via `DarkModeManager`:
 
 - CSS custom properties for theme switching
 - System preference detection and override capability
@@ -233,6 +286,23 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - All processing happens locally via Ollama
 - No analytics or tracking
 - Character data stored locally only
+
+### Coding Standards & Quality
+
+**Key Principles**:
+
+- **No Parameter Mutation**: Functions never modify input parameters
+- **ES6+ Features**: Arrow functions, destructuring, template literals, private fields
+- **Immutability**: Always create new data structures
+- **Self-Documenting Code**: No inline comments in function bodies
+- **JSDoc**: Comprehensive documentation for all public methods
+
+**Architecture Enforcement**:
+
+- Base class inheritance for shared functionality
+- Modular design with single responsibility
+- Centralized constants and configuration
+- Shared utilities for common operations
 
 ### Extension Lifecycle Management
 
@@ -274,7 +344,7 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - Fallback to defaults for corrupted data
 - User notification of migration events
 
-### Testing Approach
+### Testing & Development
 
 **Manual Testing**: Comprehensive testing workflows:
 
@@ -294,26 +364,12 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - Memory usage monitoring
 - User experience metrics
 
-### Development Workflow
-
-**Code Standards**: Enforced via ESLint configuration:
-
-- ES6+ features encouraged (arrow functions, destructuring)
-- No parameter mutation rule enforced
-- Private methods using ES6 private fields (#method)
-- Consistent code style and formatting
-
-**Debugging Support**: Comprehensive debugging tools:
-
-- Console logging with appropriate levels
-- Extension popup provides status information
-- Options page includes connection testing
-
-**Build Process**: Simple development workflow:
+**Development Workflow**:
 
 - Load unpacked for development testing
 - Refresh extension after changes
 - Target page refresh for content script updates
+- ESLint integration for code quality
 
 ### Browser Compatibility
 
@@ -335,30 +391,4 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - Proper lifecycle management
 - Message passing optimization
 
-### Deployment Considerations
-
-**Development Mode**: Optimized for testing:
-
-- Load unpacked functionality
-- Debug mode indicators
-- Development logging enabled
-
-**Production Build**: Prepared for distribution:
-
-- Asset optimization
-- Debug logging disabled
-- Security review compliance
-
-**Version Management**: Semantic versioning with migration support:
-
-- Clear version progression
-- Migration path documentation
-- User communication for breaking changes
-
-**Distribution**: Prepared for Chrome Web Store:
-
-- Manifest compliance checking
-- Asset optimization
-- Privacy policy alignment
-
-This architecture provides a robust, scalable, and maintainable foundation for novel dialogue enhancement while prioritizing user privacy, performance, and security.
+This architecture provides a robust, scalable, and maintainable foundation for novel dialogue enhancement while prioritizing user privacy, performance, security, and code quality through comprehensive error handling and strict coding standards.
