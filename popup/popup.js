@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const enhanceNowBtn = document.getElementById("enhance-now-btn");
   const statusMessage = document.getElementById("status-message");
   const currentSite = document.getElementById("current-site");
+  const logger = window.logger;
 
   let currentTabUrl = "";
   let currentTabHostname = "";
