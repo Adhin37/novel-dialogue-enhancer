@@ -9,9 +9,11 @@ class NovelUtils {
    * @param {string} url - URL of the novel page
    * @param {string} title - Title of the novel page
    */
+  // In the constructor
   constructor(url, title) {
     this.url = url;
     this.title = title || document.title || "";
+    this.logger = window.logger;
 
     // Initialize specialized modules
     this.idGenerator = new NovelIdGenerator();
@@ -30,7 +32,7 @@ class NovelUtils {
     this.enhancedChapters = [];
     this.isCurrentChapterEnhanced = false;
 
-    console.debug("Novel Dialogue Enhancer: Novel Utils initialized");
+    this.logger.debug("Novel Dialogue Enhancer: Novel Utils initialized");
   }
 
   /**
@@ -43,7 +45,7 @@ class NovelUtils {
     const novelId = this.idGenerator.generateNovelId(url, title);
 
     if (novelId !== this.novelId) {
-      console.log(`Generated novel ID: ${novelId}`);
+      this.logger.info(`Generated novel ID: ${novelId}`);
       this.novelId = novelId;
     }
 
@@ -69,14 +71,14 @@ class NovelUtils {
       wordCount: this.estimateWordCount(textContent)
     };
 
-    console.log(
+    this.logger.info(
       `Extracted metadata for novel: ${metadata.title} (${metadata.wordCount} words)`
     );
     return metadata;
   }
 
   /**
-   * Extract simple platform info from URL
+   * Detect simple platform info from URL
    * @param {string} url - URL of the novel page
    * @return {string} - Simple domain name
    */
@@ -87,7 +89,7 @@ class NovelUtils {
       const hostname = new URL(url).hostname.toLowerCase();
       return hostname.replace(/^www\./, "").split(".")[0];
     } catch (error) {
-      console.error("Error detecting platform:", error);
+      this.logger.error("Error detecting platform:", error);
       return "unknown";
     }
   }

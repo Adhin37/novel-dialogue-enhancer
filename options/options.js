@@ -29,6 +29,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const refreshStatsBtn = document.getElementById("refresh-stats");
   const resetStatsBtn = document.getElementById("reset-stats");
   const logger = window.logger;
+  const darkModeManager = window.darkModeManager;
+
+  if (darkModeManager) {
+    darkModeManager.init();
+  }
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
@@ -107,11 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
     domain = domain.split("/")[0];
 
     if (domain.startsWith("chrome")) {
-      window.feedbackManager.show(
-        "Chrome internal pages cannot be added to whitelist",
-        "warning"
-      );
-
+      logger.userWarning("Chrome internal pages cannot be added to whitelist");
       siteModal.style.display = "none";
       siteUrlInput.value = "";
       return;
@@ -124,11 +125,8 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Runtime error:", chrome.runtime.lastError);
-          window.feedbackManager.show(
-            "Error communicating with extension",
-            "warning"
-          );
+          logger.error("Runtime error:", chrome.runtime.lastError);
+          logger.userError("Error communicating with extension");
           siteModal.style.display = "none";
           siteUrlInput.value = "";
           return;
@@ -138,14 +136,10 @@ document.addEventListener("DOMContentLoaded", () => {
           siteModal.style.display = "none";
           siteUrlInput.value = "";
 
-          window.feedbackManager.show(response.message, "success");
+          logger.userSuccess(response.message);
           loadWhitelist();
         } else {
-          window.feedbackManager.show(
-            response?.message || "Error adding site",
-            "warning"
-          );
-
+          logger.userWarning(response?.message || "Error adding site");
           siteModal.style.display = "none";
           siteUrlInput.value = "";
         }
@@ -164,25 +158,16 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Runtime error:", chrome.runtime.lastError);
-          window.feedbackManager.show(
-            "Error communicating with extension",
-            "warning"
-          );
+          logger.error("Runtime error:", chrome.runtime.lastError);
+          logger.userError("Error communicating with extension");
           return;
         }
 
         if (response && response.success) {
-          window.feedbackManager.show(
-            `Removed ${site} from whitelist`,
-            "success"
-          );
+          logger.userSuccess(`Removed ${site} from whitelist`);
           loadWhitelist();
         } else {
-          window.feedbackManager.show(
-            response?.message || "Error removing site",
-            "warning"
-          );
+          logger.userWarning(response?.message || "Error removing site");
         }
       }
     );
@@ -210,14 +195,14 @@ document.addEventListener("DOMContentLoaded", () => {
   themeSwitch.addEventListener("change", () => {
     chrome.storage.sync.set({ darkMode: themeSwitch.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "Error saving dark mode setting:",
           chrome.runtime.lastError
         );
       } else {
         darkModeManager.setTheme(themeSwitch.checked);
         updateAllSliderBackgrounds();
-        console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+        logger.debug(`Dark mode setting updated: ${themeSwitch.checked}`);
       }
     });
   });
@@ -235,7 +220,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("change", (e) => {
       chrome.storage.sync.get("darkMode", (data) => {
         if (chrome.runtime.lastError) {
-          console.error(
+          logger.error(
             "Error checking dark mode setting:",
             chrome.runtime.lastError
           );
@@ -290,7 +275,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadWhitelist() {
     chrome.storage.sync.get("whitelistedSites", (data) => {
       if (chrome.runtime.lastError) {
-        console.error("Error loading whitelist:", chrome.runtime.lastError);
+        logger.error("Error loading whitelist:", chrome.runtime.lastError);
         renderWhitelistedSites([]);
         clearAllBtn.disabled = true;
       } else {
@@ -343,7 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (errorMessage && errorElement) {
       errorElement.textContent = errorMessage;
       errorElement.style.display = "block";
-      console.warn(errorMessage);
+      logger.warn(errorMessage);
 
       setTimeout(() => {
         errorElement.style.display = "none";
@@ -364,9 +349,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (url.protocol.startsWith("chrome")) {
             focusModal("Chrome pages can't be added to the whitelist");
-            window.feedbackManager.show(
-              "Chrome pages can't be added. Enter a site manually.",
-              "warning"
+            logger.userWarning(
+              "Chrome pages can't be added. Enter a site manually."
             );
             return;
           }
@@ -400,8 +384,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       chrome.storage.sync.set(defaultSettings, () => {
         if (chrome.runtime.lastError) {
-          console.error("Error resetting settings:", chrome.runtime.lastError);
-          window.feedbackManager.show("Error resetting settings", "error");
+          logger.error("Error resetting settings:", chrome.runtime.lastError);
+          logger.userError("Error resetting settings");
         } else {
           modelNameInput.value = defaultSettings.modelName;
           maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
@@ -415,8 +399,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
           updateAllSliderBackgrounds();
 
-          window.feedbackManager.show("Settings Reset to Defaults!", "success");
-          console.log("Settings reset to defaults successfully");
+          logger.userSuccess("Settings Reset to Defaults!");
+          logger.success("Settings reset to defaults successfully");
         }
       });
     }
@@ -614,8 +598,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const newGender = select.value;
 
     if (!novelId || !charId) {
-      console.error("Missing novel ID or character ID");
-      window.feedbackManager.show("Error updating character gender", "error");
+      logger.error("Missing novel ID or character ID");
+      logger.userError("Error updating character gender");
       return;
     }
 
@@ -643,11 +627,8 @@ document.addEventListener("DOMContentLoaded", () => {
         originalText;
 
       if (chrome.runtime.lastError) {
-        console.error("Runtime error:", chrome.runtime.lastError);
-        window.feedbackManager.show(
-          "Error communicating with extension",
-          "error"
-        );
+        logger.error("Runtime error:", chrome.runtime.lastError);
+        logger.userError("Error communicating with extension");
         // Revert the select value
         select.value = select.dataset.currentGender;
         return;
@@ -700,15 +681,14 @@ document.addEventListener("DOMContentLoaded", () => {
             ? "Gender detection re-enabled for character"
             : `Character gender manually set to ${newGender}`;
 
-        window.feedbackManager.show(message, "success");
-        console.log(
+        logger.userSuccess(message);
+        logger.success(
           `Character gender updated: ${novelId}/${charId} -> ${newGender}`
         );
       } else {
-        console.error("Failed to update character gender:", response);
-        window.feedbackManager.show(
-          response?.message || "Failed to update character gender",
-          "error"
+        logger.error("Failed to update character gender:", response);
+        logger.userError(
+          response?.message || "Failed to update character gender"
         );
         // Revert the select value
         select.value = select.dataset.currentGender;
@@ -782,17 +762,17 @@ document.addEventListener("DOMContentLoaded", () => {
   function loadGlobalStats() {
     chrome.runtime.sendMessage({ action: "getGlobalStats" }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error("Error loading stats:", chrome.runtime.lastError);
-        window.feedbackManager.show("Error loading statistics", "error");
+        logger.error("Error loading stats:", chrome.runtime.lastError);
+        logger.userError("Error loading statistics");
         return;
       }
 
       if (response && response.status === "ok" && response.stats) {
         renderGlobalStats(response.stats);
-        console.log("Global stats loaded successfully");
+        logger.success("Global stats loaded successfully");
       } else {
-        console.warn("Invalid stats response:", response);
-        window.feedbackManager.show("Invalid statistics response", "warning");
+        logger.warn("Invalid stats response:", response);
+        logger.userWarning("Invalid statistics response");
       }
     });
   }
@@ -832,7 +812,7 @@ document.addEventListener("DOMContentLoaded", () => {
       errorCountElement.textContent = stats.totalErrorCount || 0;
     }
 
-    console.log("Stats rendered successfully:", stats);
+    logger.debug("Stats rendered successfully:", stats);
   }
 
   /**
@@ -863,16 +843,13 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
       chrome.runtime.sendMessage({ action: "resetGlobalStats" }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Error resetting stats:", chrome.runtime.lastError);
-          window.feedbackManager.show("Error resetting statistics", "error");
+          logger.error("Error resetting stats:", chrome.runtime.lastError);
+          logger.userError("Error resetting statistics");
           return;
         }
 
         if (response && response.status === "ok") {
-          window.feedbackManager.show(
-            "Statistics reset successfully!",
-            "success"
-          );
+          logger.userSuccess("Statistics reset successfully!");
           loadGlobalStats();
         }
       });
@@ -891,27 +868,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const debugModeCheckbox = document.getElementById("debug-mode");
 
     // Load debug mode setting
-    chrome.storage.sync.get('debugMode', (data) => {
+    chrome.storage.sync.get("debugMode", (data) => {
       debugModeCheckbox.checked = data.debugMode || false;
       logger.setDebugMode(data.debugMode || false);
     });
 
     // Save debug mode setting
-    debugModeCheckbox.addEventListener('change', () => {
+    debugModeCheckbox.addEventListener("change", () => {
       const debugMode = debugModeCheckbox.checked;
       chrome.storage.sync.set({ debugMode }, () => {
         logger.setDebugMode(debugMode);
         logger.debug("Debug mode toggled", { enabled: debugMode });
-        window.feedbackManager.show(
-          `Debug logging ${debugMode ? 'enabled' : 'disabled'}`,
-          'success'
+        logger.userSuccess(
+          `Debug logging ${debugMode ? "enabled" : "disabled"}`
         );
       });
     });
 
     chrome.storage.sync.get("darkMode", (data) => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "Error loading dark mode setting:",
           chrome.runtime.lastError
         );
@@ -939,14 +915,14 @@ document.addEventListener("DOMContentLoaded", () => {
     themeSwitch.addEventListener("change", () => {
       chrome.storage.sync.set({ darkMode: themeSwitch.checked }, () => {
         if (chrome.runtime.lastError) {
-          console.error(
+          logger.error(
             "Error saving dark mode setting:",
             chrome.runtime.lastError
           );
         } else {
           darkModeManager.setTheme(themeSwitch.checked);
           updateAllSliderBackgrounds();
-          console.log(`Dark mode setting updated: ${themeSwitch.checked}`);
+          logger.debug(`Dark mode setting updated: ${themeSwitch.checked}`);
         }
       });
     });
@@ -956,7 +932,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .addEventListener("change", (e) => {
         chrome.storage.sync.get("darkMode", (data) => {
           if (chrome.runtime.lastError) {
-            console.error(
+            logger.error(
               "Error checking dark mode setting:",
               chrome.runtime.lastError
             );
@@ -993,18 +969,12 @@ document.addEventListener("DOMContentLoaded", () => {
       ) {
         chrome.storage.sync.set({ whitelistedSites: [] }, () => {
           if (chrome.runtime.lastError) {
-            console.error(
-              "Error clearing whitelist:",
-              chrome.runtime.lastError
-            );
-            window.feedbackManager.show("Error clearing whitelist", "error");
+            logger.error("Error clearing whitelist:", chrome.runtime.lastError);
+            logger.userError("Error clearing whitelist");
           } else {
             loadWhitelist();
-            window.feedbackManager.show(
-              "All sites removed from whitelist",
-              "success"
-            );
-            console.log("Whitelist cleared successfully");
+            logger.userSuccess("All sites removed from whitelist");
+            logger.success("Whitelist cleared successfully");
           }
         });
       }
@@ -1024,7 +994,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ["modelName", "maxChunkSize", "timeout", "temperature", "topP"],
         (data) => {
           if (chrome.runtime.lastError) {
-            console.error("Error loading settings:", chrome.runtime.lastError);
+            logger.error("Error loading settings:", chrome.runtime.lastError);
             // Use fallback values
             modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
             maxChunkSizeSlider.value = Constants.DEFAULTS.MAX_CHUNK_SIZE;
@@ -1052,14 +1022,14 @@ document.addEventListener("DOMContentLoaded", () => {
             topPSlider.value = data.topP || Constants.DEFAULTS.TOP_P;
             topPValue.textContent = data.topP || Constants.DEFAULTS.TOP_P;
 
-            console.log("Initial settings loaded successfully:", data);
+            logger.success("Initial settings loaded successfully:", data);
           }
 
           updateAllSliderBackgrounds();
         }
       );
     } catch (error) {
-      console.error("Error loading initial settings:", error);
+      logger.error("Error loading initial settings:", error);
     }
 
     saveButton.addEventListener("click", () => {
@@ -1078,14 +1048,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
       chrome.storage.sync.set(settingsToSave, () => {
         if (chrome.runtime.lastError) {
-          console.error("Error saving settings:", chrome.runtime.lastError);
-          window.feedbackManager.show("Error saving settings", "error");
+          logger.error("Error saving settings:", chrome.runtime.lastError);
+          logger.userError("Error saving settings");
         } else {
-          window.feedbackManager.show(
-            "Settings Saved Successfully!",
-            "success"
-          );
-          console.log("Settings saved successfully:", settingsToSave);
+          logger.userSuccess("Settings Saved Successfully!");
+          logger.success("Settings saved successfully:", settingsToSave);
         }
       });
     });

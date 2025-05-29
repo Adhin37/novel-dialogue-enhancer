@@ -7,6 +7,7 @@ class ContentEnhancerIntegration {
   /**
    * Creates a new ContentEnhancerIntegration instance
    */
+  // In the constructor, add logger reference
   constructor() {
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();
@@ -14,21 +15,18 @@ class ContentEnhancerIntegration {
     this.statsUtils = new StatsUtils();
     this.textProcessor = new TextProcessor();
     this.promptGenerator = new PromptGenerator();
+    this.logger = window.logger;
 
     // Add flag to track if character analysis was already done for this session
     this.characterAnalysisComplete = false;
     this.sessionCharacterMap = {};
 
-    console.debug(
+    this.logger.debug(
       "Novel Dialogue Enhancer: Integration module initialized with LLM support"
     );
   }
 
-  /**
-   * Main enhancement function for text using LLM
-   * @param {string} text - The text to enhance
-   * @return {Promise<string>} - Enhanced text
-   */
+  // Replace console.log calls throughout
   async enhanceText(text) {
     const startTime = performance.now();
 
@@ -71,7 +69,7 @@ class ContentEnhancerIntegration {
       // Check LLM availability
       const ollamaStatus = await this.ollamaClient.checkOllamaAvailability();
       if (!ollamaStatus.available) {
-        console.error(`LLM not available: ${ollamaStatus.reason}`);
+        this.logger.error(`LLM not available: ${ollamaStatus.reason}`);
         this.statsUtils.incrementErrorCount();
         return text;
       }
@@ -91,7 +89,7 @@ class ContentEnhancerIntegration {
 
       return enhancedText;
     } catch (error) {
-      console.error("Error enhancing text:", error);
+      this.logger.error("Error enhancing text:", error);
       this.statsUtils.incrementErrorCount();
       return text;
     } finally {
@@ -294,7 +292,7 @@ class ContentEnhancerIntegration {
 
       return this.textProcessor.cleanLLMResponse(enhancedText);
     } catch (error) {
-      console.error("LLM enhancement error:", error);
+      this.logger.error("LLM enhancement error:", error);
       throw error;
     }
   }
@@ -354,7 +352,7 @@ class ContentEnhancerIntegration {
 
         enhancedChunks.push(enhancedChunk);
       } catch (chunkError) {
-        console.warn("Failed to enhance chunk, using original:", chunkError);
+        this.logger.warn("Failed to enhance chunk, using original:", chunkError);
         enhancedChunks.push(chunk);
         errorCount++;
         this.statsUtils.incrementErrorCount();
@@ -367,7 +365,7 @@ class ContentEnhancerIntegration {
     }
 
     if (errorCount > 0) {
-      console.warn(`Processing completed with ${errorCount} chunk errors`);
+      this.logger.warn(`Processing completed with ${errorCount} chunk errors`);
     }
 
     return enhancedChunks;
