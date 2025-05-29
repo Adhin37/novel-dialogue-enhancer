@@ -28,7 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statsTab = document.querySelector('.tab-btn[data-tab="stats"]');
   const refreshStatsBtn = document.getElementById("refresh-stats");
   const resetStatsBtn = document.getElementById("reset-stats");
-  const logger = logger;
+  const logger = window.logger;
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
