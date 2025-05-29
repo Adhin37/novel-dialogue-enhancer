@@ -18,7 +18,6 @@ export default defineConfig([
         StatsUtils: "readonly",
         OllamaClient: "readonly",
         ContentEnhancerIntegration: "readonly",
-        Toaster: "readonly",
         TextProcessor: "readonly",
         PromptGenerator: "readonly",
         DOMPurify: "readonly",
@@ -36,7 +35,9 @@ export default defineConfig([
         BaseGenderAnalyzer: "readonly",
         ContentElementCache: "readonly",
         MultiCharacterContextAnalyzer: "readonly",
-        ErrorHandler: "readonly"
+        ErrorHandler: "readonly",
+        Logger: "readonly",
+        Toaster: "readonly"
       }
     },
     rules: {

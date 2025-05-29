@@ -18,6 +18,7 @@ let toaster;
 let isCurrentSiteWhitelisted = false;
 let elementCache;
 let errorHandler;
+const logger = window.logger;
 
 /**
  * Gets the element cache instance
@@ -53,81 +54,345 @@ function findContentElement() {
 }
 
 /**
- * Initializes the extension
+ * Initializes the extension with comprehensive logging and error handling
  */
 function init() {
-  toaster = new Toaster();
-  toaster.createToaster();
+  logger.debug("Starting Novel Dialogue Enhancer initialization");
 
-  // Initialize enhanced error handling
-  errorHandler = new ErrorHandler(toaster);
+  try {
+    // Initialize toaster first
+    toaster = new Toaster();
+    toaster.createToaster();
+    logger.debug("Toaster initialized successfully");
 
-  checkSitePermissions()
-    .then((isWhitelisted) => {
-      if (typeof isWhitelisted !== "boolean") {
-        const error = new Error("Invalid whitelist result received");
-        errorHandler.handleError(error, "initialization");
-        isCurrentSiteWhitelisted = false;
+    // Connect logger to toaster for user messages
+    logger.setToaster(toaster);
+    logger.debug("Logger connected to toaster");
+
+    // Load debug mode setting
+    chrome.storage.sync.get("debugMode", (data) => {
+      if (chrome.runtime.lastError) {
+        logger.warn(
+          "Failed to load debug mode setting",
+          chrome.runtime.lastError
+        );
+        // Continue with default (debug mode off)
       } else {
-        isCurrentSiteWhitelisted = isWhitelisted;
+        const debugMode = data.debugMode || false;
+        logger.setDebugMode(debugMode);
+        logger.debug(`Debug mode set to: ${debugMode}`);
       }
+    });
 
-      if (!isCurrentSiteWhitelisted) {
-        console.log("Site not whitelisted, extension inactive");
-        return;
-      }
+    // Initialize enhanced error handling
+    errorHandler = new ErrorHandler(toaster);
+    logger.debug("Error handler initialized");
 
-      return loadSettings().then((loadedSettings) => {
-        if (!loadedSettings || typeof loadedSettings !== "object") {
-          const error = new Error("Failed to load extension settings");
+    // Start the main initialization flow
+    checkSitePermissions()
+      .then((isWhitelisted) => {
+        logger.debug("Site permission check completed", {
+          isWhitelisted,
+          url: window.location.href
+        });
+
+        if (typeof isWhitelisted !== "boolean") {
+          const error = new Error("Invalid whitelist result received");
+          logger.error("Site permission check returned invalid result", {
+            result: isWhitelisted,
+            type: typeof isWhitelisted
+          });
+
           errorHandler.handleError(error, "initialization", {
             recoveryFunction: () => {
-              settings = {
-                isExtensionPaused: false,
-                preserveNames: true,
-                fixPronouns: true
-              };
+              logger.debug("Recovering from invalid whitelist result");
+              isCurrentSiteWhitelisted = false;
             }
           });
+
+          isCurrentSiteWhitelisted = false;
+        } else {
+          isCurrentSiteWhitelisted = isWhitelisted;
         }
 
-        setTimeout(async () => {
-          if (!settings.isExtensionPaused) {
-            try {
-              const isAvailable = await checkOllamaStatus();
-              if (isAvailable) {
-                const enhanceResult = await enhancePage();
-                if (enhanceResult) {
-                  console.log(
-                    "Initial page enhancement completed successfully"
-                  );
-                }
-              }
-            } catch (error) {
-              errorHandler.handleError(error, "initialization");
+        if (!isCurrentSiteWhitelisted) {
+          logger.debug(
+            "Site not whitelisted, extension will remain inactive",
+            {
+              hostname: window.location.hostname,
+              href: window.location.href
             }
+          );
+
+          // Don't show user message here - they haven't requested anything yet
+          logger.success(
+            "Extension loaded but inactive (site not whitelisted)"
+          );
+          return Promise.resolve();
+        }
+
+        logger.info(
+          "Site is whitelisted, proceeding with full initialization",
+          {
+            hostname: window.location.hostname
           }
-        }, 800);
+        );
+
+        return loadSettings()
+          .then((loadedSettings) => {
+            logger.debug(
+              "Settings loaded, checking validity",
+              loadedSettings
+            );
+
+            if (!loadedSettings || typeof loadedSettings !== "object") {
+              const error = new Error("Failed to load extension settings");
+              logger.error("Invalid settings object received", {
+                settings: loadedSettings,
+                type: typeof loadedSettings
+              });
+
+              errorHandler.handleError(error, "initialization", {
+                recoveryFunction: () => {
+                  logger.debug("Applying fallback settings");
+                  settings = {
+                    isExtensionPaused: false,
+                    preserveNames: true,
+                    fixPronouns: true
+                  };
+                  logger.debug("Fallback settings applied", settings);
+                }
+              });
+
+              // Continue with fallback settings rather than failing
+              return Promise.resolve();
+            }
+
+            logger.success("Extension settings loaded successfully", {
+              isPaused: loadedSettings.isExtensionPaused,
+              preserveNames: loadedSettings.preserveNames,
+              fixPronouns: loadedSettings.fixPronouns
+            });
+
+            // Auto-enhancement after initialization delay
+            if (!loadedSettings.isExtensionPaused) {
+              logger.debug(
+                "Extension not paused, scheduling auto-enhancement check"
+              );
+
+              setTimeout(async () => {
+                logger.debug("Starting auto-enhancement check");
+
+                try {
+                  // Check if content is suitable for enhancement
+                  const contentElement = findContentElement();
+                  if (!contentElement) {
+                    logger.debug(
+                      "No suitable content found for auto-enhancement"
+                    );
+                    return;
+                  }
+
+                  const contentLength = contentElement.textContent?.length || 0;
+                  logger.debug(
+                    "Content found for potential enhancement",
+                    {
+                      contentLength,
+                      elementTag: contentElement.tagName,
+                      hasText: contentLength > 0
+                    }
+                  );
+
+                  if (contentLength < 500) {
+                    logger.debug(
+                      "Content too short for auto-enhancement",
+                      {
+                        contentLength,
+                        minimumRequired: 500
+                      }
+                    );
+                    return;
+                  }
+
+                  // Check Ollama availability
+                  logger.debug(
+                    "Checking AI service availability for auto-enhancement"
+                  );
+                  const isAvailable = await checkOllamaStatus();
+
+                  if (isAvailable) {
+                    logger.info(
+                      "AI service available, starting auto-enhancement"
+                    );
+
+                    const enhanceResult = await enhancePage();
+
+                    if (enhanceResult) {
+                      logger.success(
+                        "Auto-enhancement completed successfully"
+                      );
+                    } else {
+                      logger.warn(
+                        "Auto-enhancement completed but returned false result"
+                      );
+                    }
+                  } else {
+                    logger.debug(
+                      "AI service not available, skipping auto-enhancement"
+                    );
+                    // Note: checkOllamaStatus already handles user messaging for AI service issues
+                  }
+                } catch (error) {
+                  logger.error(
+                    "Auto-enhancement failed during initialization",
+                    {
+                      error: error.message,
+                      stack: error.stack
+                    }
+                  );
+
+                  errorHandler.handleError(error, "initialization", {
+                    attemptRecovery: false // Don't retry auto-enhancement
+                  });
+
+                  // Don't show user error for auto-enhancement failure
+                  // User hasn't explicitly requested enhancement
+                }
+              }, 800);
+            } else {
+              logger.debug(
+                "Extension is paused, skipping auto-enhancement"
+              );
+              logger.info("Extension loaded successfully (paused mode)");
+            }
+
+            return Promise.resolve();
+          })
+          .catch((settingsError) => {
+            logger.error("Critical error during settings loading", {
+              error: settingsError.message,
+              stack: settingsError.stack
+            });
+
+            errorHandler.handleError(settingsError, "initialization", {
+              recoveryFunction: () => {
+                logger.debug("Applying emergency fallback settings");
+                settings = {
+                  isExtensionPaused: false,
+                  preserveNames: true,
+                  fixPronouns: true
+                };
+              }
+            });
+
+            return Promise.resolve(); // Continue despite settings error
+          });
+      })
+      .catch((permissionError) => {
+        logger.error("Critical error during site permission check", {
+          error: permissionError.message,
+          stack: permissionError.stack,
+          url: window.location.href
+        });
+
+        errorHandler.handleError(permissionError, "initialization", {
+          recoveryFunction: () => {
+            logger.debug("Recovering from permission check failure");
+            isCurrentSiteWhitelisted = false;
+          }
+        });
+
+        // Continue initialization even if permission check fails
+        logger.warn(
+          "Extension initialized with limited functionality due to permission check failure"
+        );
+      })
+      .finally(() => {
+        const initEndTime = performance.now();
+        logger.timing(
+          "Extension initialization",
+          initEndTime - (window.initStartTime || initEndTime)
+        );
+        logger.success("Extension initialization completed", {
+          siteWhitelisted: isCurrentSiteWhitelisted,
+          isPaused: settings.isExtensionPaused || false,
+          timestamp: new Date().toISOString()
+        });
       });
-    })
-    .catch((error) => {
-      errorHandler.handleError(error, "initialization");
+  } catch (criticalError) {
+    // Handle any synchronous errors during initialization
+    logger.error("Critical synchronous error during initialization", {
+      error: criticalError.message,
+      stack: criticalError.stack
     });
+
+    // Try to show user error if possible
+    try {
+      if (toaster) {
+        toaster.showError("Extension failed to initialize properly");
+      } else {
+        console.error(
+          "Novel Dialogue Enhancer: Critical initialization failure",
+          criticalError
+        );
+      }
+    } catch (displayError) {
+      console.error(
+        "Novel Dialogue Enhancer: Failed to display error message",
+        displayError
+      );
+    }
+
+    // Set safe fallback state
+    isCurrentSiteWhitelisted = false;
+    settings = {
+      isExtensionPaused: true, // Pause extension if initialization fails
+      preserveNames: true,
+      fixPronouns: true
+    };
+
+    logger.error(
+      "Extension initialization failed, set to safe fallback state",
+      {
+        fallbackSettings: settings
+      }
+    );
+  }
 }
 
 /**
  * Load extension settings from storage
  * @return {Promise} - Promise resolving with loaded settings
  */
+/**
+ * Enhanced settings loading with detailed validation and logging
+ * @return {Promise<object>} - Promise resolving with loaded settings
+ */
 function loadSettings() {
+  logger.debug("Starting settings load process");
+
   return new Promise((resolve, reject) => {
+    const settingsTimeout = setTimeout(() => {
+      const timeoutError = new Error("Settings load timed out after 5 seconds");
+      logger.error("Settings load timeout", { timeoutMs: 5000 });
+      reject(timeoutError);
+    }, 5000);
+
     chrome.storage.sync.get(
       ["isExtensionPaused", "preserveNames", "fixPronouns"],
       (data) => {
+        clearTimeout(settingsTimeout);
+
         if (chrome.runtime.lastError) {
           const settingsError = new Error(
             `Settings load failed: ${chrome.runtime.lastError.message}`
           );
+
+          logger.error("Chrome storage error during settings load", {
+            error: chrome.runtime.lastError.message,
+            requestedKeys: ["isExtensionPaused", "preserveNames", "fixPronouns"]
+          });
+
           errorHandler.handleError(settingsError, "settings_load", {
             recoveryFunction: () => {
               const defaultSettings = {
@@ -136,6 +401,10 @@ function loadSettings() {
                 fixPronouns: true
               };
               settings = defaultSettings;
+              logger.debug(
+                "Applied default settings after storage error",
+                defaultSettings
+              );
               resolve(defaultSettings);
             }
           });
@@ -146,6 +415,14 @@ function loadSettings() {
           const validationError = new Error(
             "Invalid settings data format received"
           );
+
+          logger.error("Invalid settings data format", {
+            data: data,
+            type: typeof data,
+            isNull: data === null,
+            isUndefined: data === undefined
+          });
+
           errorHandler.handleError(validationError, "settings_validation", {
             recoveryFunction: () => {
               const defaultSettings = {
@@ -154,54 +431,118 @@ function loadSettings() {
                 fixPronouns: true
               };
               settings = defaultSettings;
+              logger.debug(
+                "Applied default settings after validation error",
+                defaultSettings
+              );
               resolve(defaultSettings);
             }
           });
           return;
         }
 
+        // Validate and normalize each setting
         const loadedSettings = {
           isExtensionPaused: validateBooleanSetting(
             data.isExtensionPaused,
-            false
+            false,
+            "isExtensionPaused"
           ),
-          preserveNames: validateBooleanSetting(data.preserveNames, true),
-          fixPronouns: validateBooleanSetting(data.fixPronouns, true)
+          preserveNames: validateBooleanSetting(
+            data.preserveNames,
+            true,
+            "preserveNames"
+          ),
+          fixPronouns: validateBooleanSetting(
+            data.fixPronouns,
+            true,
+            "fixPronouns"
+          )
         };
 
         settings = loadedSettings;
-        console.log("Settings loaded successfully:", loadedSettings);
+
+        logger.debug("Settings validation completed", {
+          original: data,
+          validated: loadedSettings,
+          hasChanges: JSON.stringify(data) !== JSON.stringify(loadedSettings)
+        });
+
+        logger.success(
+          "Settings loaded and validated successfully",
+          loadedSettings
+        );
         resolve(loadedSettings);
       }
     );
   });
 }
 
-function validateBooleanSetting(value, defaultValue) {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "string") return value.toLowerCase() === "true";
-  console.warn(
-    `Invalid boolean setting: ${value}, using default: ${defaultValue}`
-  );
+/**
+ * Enhanced boolean setting validation with detailed logging
+ * @param {*} value - Value to validate
+ * @param {boolean} defaultValue - Default value if invalid
+ * @param {string} settingName - Name of setting for logging
+ * @return {boolean} - Validated boolean value
+ */
+function validateBooleanSetting(value, defaultValue, settingName) {
+  if (typeof value === "boolean") {
+    logger.debug(`Setting ${settingName} is valid boolean`, { value });
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const boolValue = value.toLowerCase() === "true";
+    logger.debug(`Setting ${settingName} converted from string`, {
+      original: value,
+      converted: boolValue
+    });
+    return boolValue;
+  }
+
+  logger.warn(`Invalid ${settingName} setting, using default`, {
+    invalidValue: value,
+    type: typeof value,
+    defaultValue: defaultValue
+  });
+
   return defaultValue;
 }
 
 /**
- * Check site permissions with a timeout
+ * Enhanced site permission check with comprehensive logging
  * @return {Promise<boolean>} - Whether the site is whitelisted
  */
 function checkSitePermissions() {
+  const url = window.location.href;
+  const hostname = window.location.hostname;
+
+  logger.debug("Starting site permission check", {
+    url: url,
+    hostname: hostname
+  });
+
   return new Promise((resolve) => {
     const permissionTimeout = setTimeout(() => {
       const timeoutError = new Error("Whitelist check timed out");
+      logger.error("Site permission check timeout", {
+        timeoutMs: 8000,
+        url: url
+      });
+
       errorHandler.handleError(timeoutError, "permission_timeout", {
-        recoveryFunction: () => resolve(false)
+        recoveryFunction: () => {
+          logger.debug(
+            "Recovering from permission timeout with false result"
+          );
+          resolve(false);
+        }
       });
     }, 8000);
 
     try {
       chrome.runtime.sendMessage(
-        { action: "checkSitePermission", url: window.location.href },
+        { action: "checkSitePermission", url: url },
         (response) => {
           clearTimeout(permissionTimeout);
 
@@ -209,8 +550,22 @@ function checkSitePermissions() {
             const permissionError = new Error(
               `Permission check failed: ${chrome.runtime.lastError.message}`
             );
+
+            logger.error(
+              "Chrome runtime error during permission check",
+              {
+                error: chrome.runtime.lastError.message,
+                url: url
+              }
+            );
+
             errorHandler.handleError(permissionError, "permission_check", {
-              recoveryFunction: () => resolve(false)
+              recoveryFunction: () => {
+                logger.debug(
+                  "Recovering from runtime error with false result"
+                );
+                resolve(false);
+              }
             });
             return;
           }
@@ -219,21 +574,57 @@ function checkSitePermissions() {
             const responseError = new Error(
               "Invalid response from site permission check"
             );
+
+            logger.error("Invalid permission check response", {
+              response: response,
+              type: typeof response,
+              url: url
+            });
+
             errorHandler.handleError(responseError, "permission_response", {
-              recoveryFunction: () => resolve(false)
+              recoveryFunction: () => {
+                logger.debug(
+                  "Recovering from invalid response with false result"
+                );
+                resolve(false);
+              }
             });
             return;
           }
 
           const hasPermission = Boolean(response.hasPermission);
-          console.log(`Site permission check result: ${hasPermission}`);
+
+          logger.debug("Site permission check completed successfully", {
+            hasPermission: hasPermission,
+            response: response,
+            hostname: hostname
+          });
+
+          if (hasPermission) {
+            logger.success(`Site ${hostname} is whitelisted`);
+          } else {
+            logger.info(`Site ${hostname} is not whitelisted`);
+          }
+
           resolve(hasPermission);
         }
       );
     } catch (error) {
       clearTimeout(permissionTimeout);
+
+      logger.error("Exception during permission check", {
+        error: error.message,
+        stack: error.stack,
+        url: url
+      });
+
       errorHandler.handleError(error, "permission_check_exception", {
-        recoveryFunction: () => resolve(false)
+        recoveryFunction: () => {
+          logger.debug(
+            "Recovering from permission check exception with false result"
+          );
+          resolve(false);
+        }
       });
     }
   });
@@ -254,32 +645,161 @@ function getOllamaClient() {
  * Checks the availability of Ollama with timeout
  * @return {Promise<boolean>}
  */
+/**
+ * Checks the availability of Ollama with timeout and proper logging
+ * @return {Promise<boolean>} - Whether Ollama is available
+ */
 async function checkOllamaStatus() {
-  console.debug("Checking Ollama status...");
+  logger.debug("Checking Ollama status...");
 
   try {
     const status = await getOllamaClient().checkOllamaAvailability();
 
-    if (status && status.available) {
-      console.log(`Ollama is running (v${status.version})`);
-      toaster.showSuccess(`Ollama is running (v${status.version})`);
+    if (!status || typeof status !== "object") {
+      const error = new Error("Invalid Ollama status response received");
+      logger.error("Invalid Ollama status response", {
+        response: status,
+        type: typeof status
+      });
+
+      errorHandler.handleError(error, "ollama_check", {
+        retryFunction: () => checkOllamaStatus(),
+        maxRetries: 2,
+        retryDelay: 3000
+      });
+
+      logger.userError("Unable to connect to AI service");
+      return false;
+    }
+
+    if (status.available) {
+      const version = status.version || "unknown";
+      const modelCount = status.models ? status.models.length : 0;
+
+      logger.success(`Ollama is running (v${version})`, {
+        version: version,
+        modelCount: modelCount,
+        models: status.models || []
+      });
+
+      // User-friendly success message
+      if (modelCount > 0) {
+        logger.userSuccess(
+          `AI service ready (${modelCount} models available)`
+        );
+      } else {
+        logger.userSuccess(`AI service connected (v${version})`);
+        logger.warn("No models detected in Ollama", status);
+      }
+
       return true;
     } else {
-      const ollamaError = new Error(
-        status?.reason || "Ollama service unavailable"
-      );
-      errorHandler.handleError(ollamaError, "ollama_check", {
-        retryFunction: () => checkOllamaStatus(),
-        maxRetries: 3,
-        retryDelay: 2000
+      const reason = status.reason || "Unknown reason";
+
+      logger.warn("Ollama not available", {
+        reason: reason,
+        fullStatus: status
       });
+
+      // Create appropriate error for error handler
+      const ollamaError = new Error(`Ollama service unavailable: ${reason}`);
+
+      // Determine if this is a retryable error
+      const retryableReasons = [
+        "connection refused",
+        "network error",
+        "timeout",
+        "temporarily unavailable"
+      ];
+
+      const isRetryable = retryableReasons.some((retryableReason) =>
+        reason.toLowerCase().includes(retryableReason)
+      );
+
+      if (isRetryable) {
+        logger.debug(
+          "Ollama error appears retryable, setting up retry",
+          {
+            reason: reason,
+            isRetryable: true
+          }
+        );
+
+        errorHandler.handleError(ollamaError, "ollama_check", {
+          retryFunction: () => checkOllamaStatus(),
+          maxRetries: 3,
+          retryDelay: 2000
+        });
+
+        logger.userWarning(
+          "AI service temporarily unavailable, retrying..."
+        );
+      } else {
+        logger.debug("Ollama error not retryable", {
+          reason: reason,
+          isRetryable: false
+        });
+
+        errorHandler.handleError(ollamaError, "ollama_check");
+
+        // Provide specific user guidance based on the error
+        if (reason.includes("connection") || reason.includes("refused")) {
+          logger.userError(
+            "AI service not running. Please start Ollama and try again."
+          );
+        } else if (reason.includes("model") || reason.includes("models")) {
+          logger.userError(
+            "No AI models found. Please install a model using Ollama."
+          );
+        } else {
+          logger.userError(
+            "AI service unavailable. Check Ollama installation."
+          );
+        }
+      }
+
       return false;
     }
   } catch (error) {
-    errorHandler.handleNetworkError(error, {
-      service: "Ollama",
-      endpoint: "availability check"
+    logger.error("Exception during Ollama status check", {
+      error: error.message,
+      stack: error.stack,
+      name: error.name
     });
+
+    // Handle different types of errors appropriately
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      logger.debug("Network-related error detected", error);
+
+      errorHandler.handleNetworkError(error, {
+        service: "Ollama",
+        endpoint: "availability check",
+        retryFunction: () => checkOllamaStatus(),
+        maxRetries: 2,
+        retryDelay: 3000
+      });
+
+      logger.userError("Network error connecting to AI service");
+    } else if (
+      error.name === "AbortError" ||
+      error.message.includes("timeout")
+    ) {
+      logger.debug("Timeout error detected", error);
+
+      errorHandler.handleError(error, "ollama_timeout", {
+        retryFunction: () => checkOllamaStatus(),
+        maxRetries: 1,
+        retryDelay: 5000
+      });
+
+      logger.userWarning("AI service check timed out, retrying...");
+    } else {
+      logger.debug("Unexpected error during Ollama check", error);
+
+      errorHandler.handleError(error, "ollama_check");
+      logger.userError("Unexpected error checking AI service");
+    }
+
     return false;
   }
 }

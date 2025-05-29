@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statsTab = document.querySelector('.tab-btn[data-tab="stats"]');
   const refreshStatsBtn = document.getElementById("refresh-stats");
   const resetStatsBtn = document.getElementById("reset-stats");
+  const logger = logger;
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
@@ -63,6 +64,32 @@ document.addEventListener("DOMContentLoaded", () => {
       addSiteManually();
     }
   });
+
+  chrome.storage.sync.get("debugMode", (data) => {
+    logger.setDebugMode(data.debugMode || false);
+  });
+
+  function testOllamaConnection() {
+    logger.debug("Testing Ollama connection from options page");
+
+    ollamaStatus.textContent = "Testing Ollama connection...";
+    ollamaStatus.className = "status-message pending";
+
+    chrome.runtime.sendMessage(
+      { action: "checkOllamaAvailability" },
+      (response) => {
+        if (response.available) {
+          logger.success("Ollama connection test successful", response);
+          ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
+          ollamaStatus.className = "status-message success";
+        } else {
+          logger.warn("Ollama connection test failed", response);
+          ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
+          ollamaStatus.className = "status-message error";
+        }
+      }
+    );
+  }
 
   /**
    * Adds a site manually to the whitelist
@@ -159,64 +186,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
     );
-  }
-
-  /**
-   * Test Ollama connection with proper error handling
-   */
-  function testOllamaConnection() {
-    ollamaStatus.textContent = "Testing Ollama connection...";
-    ollamaStatus.className = "status-message pending";
-    ollamaStatus.style.display = "block";
-
-    const timeoutId = setTimeout(() => {
-      ollamaStatus.textContent = "Connection test timed out";
-      ollamaStatus.className = "status-message error";
-    }, 10000);
-
-    try {
-      chrome.runtime.sendMessage(
-        {
-          action: "checkOllamaAvailability"
-        },
-        (response) => {
-          clearTimeout(timeoutId);
-
-          if (chrome.runtime.lastError) {
-            console.error("Runtime error:", chrome.runtime.lastError);
-            ollamaStatus.textContent = `Error: ${chrome.runtime.lastError.message}`;
-            ollamaStatus.className = "status-message error";
-            return;
-          }
-
-          if (!response) {
-            ollamaStatus.textContent = "No response from Ollama service";
-            ollamaStatus.className = "status-message error";
-            return;
-          }
-
-          if (response.available) {
-            ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
-            if (response.models && response.models.length > 0) {
-              ollamaStatus.textContent += `\nAvailable models: ${response.models.join(
-                ", "
-              )}`;
-            }
-            ollamaStatus.className = "status-message success";
-          } else {
-            ollamaStatus.textContent = `Ollama not available: ${
-              response.reason || "Unknown reason"
-            }`;
-            ollamaStatus.className = "status-message error";
-          }
-        }
-      );
-    } catch (err) {
-      clearTimeout(timeoutId);
-      console.error("Exception in testOllamaConnection:", err);
-      ollamaStatus.textContent = `Error: ${err.message}`;
-      ollamaStatus.className = "status-message error";
-    }
   }
 
   testOllamaButton.addEventListener("click", testOllamaConnection);
@@ -918,6 +887,27 @@ document.addEventListener("DOMContentLoaded", () => {
     loadNovelCharacterMaps();
     setupNovelSearch();
     syncThemeSwitchWithState();
+
+    const debugModeCheckbox = document.getElementById("debug-mode");
+
+    // Load debug mode setting
+    chrome.storage.sync.get('debugMode', (data) => {
+      debugModeCheckbox.checked = data.debugMode || false;
+      logger.setDebugMode(data.debugMode || false);
+    });
+
+    // Save debug mode setting
+    debugModeCheckbox.addEventListener('change', () => {
+      const debugMode = debugModeCheckbox.checked;
+      chrome.storage.sync.set({ debugMode }, () => {
+        logger.setDebugMode(debugMode);
+        logger.debug("Debug mode toggled", { enabled: debugMode });
+        window.feedbackManager.show(
+          `Debug logging ${debugMode ? 'enabled' : 'disabled'}`,
+          'success'
+        );
+      });
+    });
 
     chrome.storage.sync.get("darkMode", (data) => {
       if (chrome.runtime.lastError) {
