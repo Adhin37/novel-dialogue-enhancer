@@ -9,8 +9,11 @@ class TextProcessor {
    * @param {number} options.maxChunkSize - Maximum chunk size in characters (default: 4000)
    */
   constructor(options = {}) {
-    this.maxChunkSize = options.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
-    console.debug(
+    this.maxChunkSize =
+      options.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
+    this.logger = window.logger;
+
+    this.logger.debug(
       `Novel Dialogue Enhancer: Text Processor initialized (max chunk size: ${this.maxChunkSize})`
     );
   }
@@ -65,7 +68,7 @@ class TextProcessor {
       chunks.push(currentChunk.trim());
     }
 
-    console.log(
+    this.logger.info(
       `Split text into ${chunks.length} chunks (avg size: ${Math.round(
         text.length / chunks.length
       )})`

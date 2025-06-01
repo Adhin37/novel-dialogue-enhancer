@@ -7,7 +7,6 @@ class ContentEnhancerIntegration {
   /**
    * Creates a new ContentEnhancerIntegration instance
    */
-  // In the constructor, add logger reference
   constructor() {
     this.genderUtils = new GenderUtils();
     this.ollamaClient = new OllamaClient();

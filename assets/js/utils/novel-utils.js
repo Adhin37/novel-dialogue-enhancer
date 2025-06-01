@@ -9,7 +9,6 @@ class NovelUtils {
    * @param {string} url - URL of the novel page
    * @param {string} title - Title of the novel page
    */
-  // In the constructor
   constructor(url, title) {
     this.url = url;
     this.title = title || document.title || "";
@@ -36,10 +35,10 @@ class NovelUtils {
   }
 
   /**
-   * Update the novel identifier based on URL and title
-   * @param {string} url - URL of the novel
-   * @param {string} title - Title of the novel
-   * @return {string} - Unique novel identifier
+   * Updates the novel ID based on the provided URL and title
+   * @param {string} url - URL of the novel page
+   * @param {string} title - Title of the novel page
+   * @returns {string} - Generated novel ID
    */
   updateNovelId(url, title) {
     const novelId = this.idGenerator.generateNovelId(url, title);
@@ -53,34 +52,9 @@ class NovelUtils {
   }
 
   /**
-   * Extract novel metadata from the page
+   * Detects the platform of the novel based on the URL
    * @param {string} url - URL of the novel page
-   * @param {string} title - Title of the novel page
-   * @return {object} - Novel metadata
-   */
-  extractNovelMetadata(url, title) {
-    const textContent = document.body.textContent || "";
-    const workingTitle = title || document.title;
-    const generatedNovelId = this.updateNovelId(url, workingTitle);
-
-    const metadata = {
-      novelId: this.novelId || generatedNovelId || "unknown_novel",
-      title: workingTitle,
-      platform: this.detectPlatform(url),
-      chapterInfo: this.detectChapterInfo(workingTitle, textContent),
-      wordCount: this.estimateWordCount(textContent)
-    };
-
-    this.logger.info(
-      `Extracted metadata for novel: ${metadata.title} (${metadata.wordCount} words)`
-    );
-    return metadata;
-  }
-
-  /**
-   * Detect simple platform info from URL
-   * @param {string} url - URL of the novel page
-   * @return {string} - Simple domain name
+   * @returns {string} - Detected platform (e.g., "novel", "chapter")
    */
   detectPlatform(url) {
     if (!url) return "unknown";
@@ -95,42 +69,10 @@ class NovelUtils {
   }
 
   /**
-   * Detect chapter information from title and content
-   * @param {string} title - Page title
-   * @param {string} content - Page content
-   * @return {object} - Chapter information
-   */
-  detectChapterInfo(title, content) {
-    return this.chapterDetector.detectChapterInfo(title, content, this.url);
-  }
-
-  /**
-   * Estimate word count of the content
-   * @param {string} content - Page content
-   * @return {number} - Estimated word count
-   */
-  estimateWordCount(content) {
-    if (!content) return 0;
-
-    const sampleContent = content.substring(0, 50000);
-    const cleanContent = sampleContent.replace(/<[^>]*>/g, " ");
-    const words = cleanContent
-      .trim()
-      .split(/\s+/)
-      .filter((word) => word.length > 0);
-
-    if (content.length > 50000) {
-      return Math.round(words.length * (content.length / 50000));
-    }
-
-    return words.length;
-  }
-
-  /**
-   * Analyze novel style and genre from text
-   * @param {string} text - Text to analyze
-   * @param {string} [novelId] - Optional novel identifier for fetching existing style info
-   * @return {Promise<object>} - Novel style information
+   * Analyzes the novel style based on the provided text
+   * @param {string} text - Text of the novel page
+   * @param {string} novelId - ID of the novel (optional)
+   * @returns {object} - Analyzed novel style
    */
   async analyzeNovelStyle(text, novelId = this.novelId) {
     if (
@@ -156,7 +98,7 @@ class NovelUtils {
           return response.style;
         }
       } catch (err) {
-        console.warn("Failed to fetch existing novel style:", err);
+        this.logger.warn("Failed to fetch existing novel style:", err);
         // Continue to analyze instead of failing
       }
     }
@@ -173,13 +115,13 @@ class NovelUtils {
   }
 
   /**
-   * Extract character names from text
-   * @param {string} text - Text to analyze
-   * @param {object} existingCharacterMap - Existing character data
-   * @return {Promise<object>} - Updated character map
+   * Extracts character names from the provided text
+   * @param {string} text - Text of the novel page
+   * @param {object} existingCharacterMap - Existing character map (optional)
+   * @returns {object} - Extracted character map
    */
   async extractCharacterNames(text, existingCharacterMap = {}) {
-    console.log("Extracting character names...");
+    this.logger.info("Extracting character names...");
     let characterMap = this.#optimizeCharacterMap(existingCharacterMap);
 
     // Initialize novel ID and chapter info
@@ -222,21 +164,22 @@ class NovelUtils {
   }
 
   /**
-   * Initialize novel ID and chapter info if not already set
-   * @return {boolean} - Whether initialization was successful
-   * @private
+   * Initializes the novel context by updating the novel ID and chapter info
+   * @returns {boolean} - True if initialization was successful, false otherwise
    */
   #initializeNovelContext() {
     if (!this.novelId) {
       const currentTitle = this.title || document.title || "";
       if (!currentTitle.trim()) {
-        console.warn("No valid title available for novel ID generation");
+        this.logger.warn("No valid title available for novel ID generation");
         const urlTitle = this.#extractTitleFromUrl(this.url);
         if (urlTitle) {
           this.title = urlTitle;
           this.updateNovelId(this.url, urlTitle);
         } else {
-          console.error("Could not generate novel ID - no valid title found");
+          this.logger.error(
+            "Could not generate novel ID - no valid title found"
+          );
           return false;
         }
       } else {
@@ -255,10 +198,9 @@ class NovelUtils {
   }
 
   /**
-   * Extract a potential title from URL as fallback
-   * @param {string} url - The URL to extract from
-   * @return {string|null} - Extracted title or null
-   * @private
+   * Extracts the title from the provided URL
+   * @param {string} url - URL of the novel page
+   * @returns {string} - Extracted title
    */
   #extractTitleFromUrl(url) {
     try {
@@ -285,16 +227,15 @@ class NovelUtils {
 
       return potentialTitle;
     } catch (error) {
-      console.warn("Failed to extract title from URL:", error);
+      this.logger.warn("Failed to extract title from URL:", error);
       return null;
     }
   }
 
   /**
-   * Check if the current chapter has already been enhanced
-   * @param {object} characterMap - Current character map to update
-   * @return {Promise<boolean>} - Whether the chapter was already enhanced
-   * @private
+   * Checks if the current chapter has already been enhanced
+   * @param {object} characterMap - Character map
+   * @returns {boolean} - True if the chapter has already been enhanced, false otherwise
    */
   async #checkChapterEnhancementStatus(characterMap) {
     if (!this.novelId) {
@@ -326,7 +267,7 @@ class NovelUtils {
       }
 
       if (this.isCurrentChapterEnhanced) {
-        console.log(
+        this.logger.info(
           `Chapter ${currentChapter} was previously enhanced, using existing character data (${
             Object.keys(mergedCharacterMap).length
           } characters)`
@@ -340,15 +281,17 @@ class NovelUtils {
   }
 
   /**
-   * Load existing character data from background
-   * @param {object} characterMap - Current character map
-   * @return {Promise<object>} - Updated character map with existing data
+   * Loads existing character data from the background script
+   * @param {object} characterMap - Character map
+   * @returns {object} - Merged character map
    */
   async loadExistingCharacterData(characterMap) {
     // Check if background is responsive first
     const isConnected = await this.#checkBackgroundConnection();
     if (!isConnected) {
-      console.warn("Background script not responsive, using local data only");
+      this.logger.warn(
+        "Background script not responsive, using local data only"
+      );
       return characterMap;
     }
 
@@ -366,8 +309,8 @@ class NovelUtils {
   }
 
   /**
-   * Load existing novel data from background
-   * @return {Promise<object>} - Novel data object
+   * Loads existing novel data from the background script
+   * @returns {object} - Novel data
    */
   async loadExistingNovelData() {
     if (!this.novelId) {
@@ -387,18 +330,18 @@ class NovelUtils {
         };
       }
 
-      console.warn("Invalid response from background:", response);
+      this.logger.warn("Invalid response from background:", response);
       return { characterMap: {}, enhancedChapters: [] };
     } catch (error) {
-      console.error("Error loading novel data:", error);
+      this.logger.error("Error loading novel data:", error);
       return { characterMap: {}, enhancedChapters: [] };
     }
   }
 
   /**
-   * Verify if a chapter has been enhanced
-   * @param {number} chapterNumber - Chapter number to check
-   * @return {Promise<boolean>} - Whether the chapter was enhanced
+   * Verifies the enhancement status of a specific chapter
+   * @param {number} chapterNumber - Number of the chapter to verify
+   * @returns {boolean} - True if the chapter has been enhanced, false otherwise
    */
   async verifyChapterEnhancementStatus(chapterNumber) {
     if (!this.novelId || !chapterNumber) {
@@ -417,13 +360,13 @@ class NovelUtils {
         ? Boolean(response.isChapterEnhanced)
         : false;
     } catch (error) {
-      console.warn("Error checking chapter status:", error);
+      this.logger.warn("Error checking chapter status:", error);
       return false;
     }
   }
 
   /**
-   * Sync character map with background storage
+   * Syncs the character map to the background script
    * @param {object} characterMap - Character map to sync
    */
   syncCharacterMap(characterMap) {
@@ -432,7 +375,7 @@ class NovelUtils {
       SharedUtils.validateObject(characterMap) &&
       Object.keys(characterMap).length > 0
     ) {
-      console.log("Syncing character map to background:", characterMap);
+      this.logger.info("Syncing character map to background:", characterMap);
 
       const optimizedChars = this.#createOptimizedCharacterData(characterMap);
 
@@ -444,21 +387,20 @@ class NovelUtils {
       })
         .then((response) => {
           if (response && response.status === "ok") {
-            console.log("Character map synced successfully");
+            this.logger.success("Character map synced successfully");
           } else {
-            console.warn("Failed to sync character map:", response);
+            this.logger.warn("Failed to sync character map:", response);
           }
         })
         .catch((error) => {
-          console.warn("Error syncing character map:", error);
+          this.logger.warn("Error syncing character map:", error);
         });
     }
   }
 
   /**
-   * Check if background script is responsive
-   * @return {Promise<boolean>} - Whether background is responsive
-   * @private
+   * Checks the connection to the background script
+   * @returns {boolean} - True if the connection is successful, false otherwise
    */
   async #checkBackgroundConnection() {
     try {
@@ -468,15 +410,15 @@ class NovelUtils {
       );
       return response && response.status;
     } catch (error) {
-      console.warn("Background connection check failed:", error);
+      this.logger.warn("Background connection check failed:", error);
       return false;
     }
   }
 
   /**
-   * Sync novel style with background storage
-   * @param {string} novelId - The novel ID to sync
-   * @param {object} styleInfo - The style information to sync
+   * Syncs the novel style to the background script
+   * @param {string} novelId - ID of the novel
+   * @param {object} styleInfo - Style information to sync
    */
   syncNovelStyle(novelId, styleInfo) {
     this.#sendBackgroundMessage({
@@ -486,22 +428,21 @@ class NovelUtils {
     })
       .then((response) => {
         if (response && response.status === "ok") {
-          console.log("Novel style synced successfully");
+          this.logger.success("Novel style synced successfully");
         } else {
-          console.warn("Failed to sync novel style:", response);
+          this.logger.warn("Failed to sync novel style:", response);
         }
       })
       .catch((error) => {
-        console.warn("Error syncing novel style:", error);
+        this.logger.warn("Error syncing novel style:", error);
       });
   }
 
   /**
-   * Send message to background script with improved retry logic
+   * Sends a message to the background script
    * @param {object} message - Message to send
-   * @param {number} retries - Number of retries remaining
-   * @return {Promise<object>} - Response from background
-   * @private
+   * @param {number} retries - Number of retries to attempt
+   * @returns {Promise} - Promise that resolves with the response from the background script
    */
   async #sendBackgroundMessage(message, retries = 3) {
     return new Promise((resolve, reject) => {
@@ -536,7 +477,7 @@ class NovelUtils {
 
         timeoutId = setTimeout(() => {
           if (!resolved && retries > 0) {
-            console.warn(`Message timeout, retrying... (${retries} left)`);
+            this.logger.warn(`Message timeout, retrying... (${retries} left)`);
             setTimeout(() => {
               this.#sendBackgroundMessage(message, retries - 1)
                 .then(safeResolve)
@@ -556,7 +497,10 @@ class NovelUtils {
             cleanup();
 
             if (chrome.runtime.lastError) {
-              console.warn("Chrome runtime error:", chrome.runtime.lastError);
+              this.logger.warn(
+                "Chrome runtime error:",
+                chrome.runtime.lastError
+              );
 
               // Check for specific error types
               const errorMessage = chrome.runtime.lastError.message || "";
@@ -566,7 +510,9 @@ class NovelUtils {
                 errorMessage.includes("receiving end does not exist");
 
               if (isConnectionError && retries > 0) {
-                console.warn(`Connection error, retrying... (${retries} left)`);
+                this.logger.warn(
+                  `Connection error, retrying... (${retries} left)`
+                );
                 setTimeout(() => {
                   this.#sendBackgroundMessage(message, retries - 1)
                     .then(safeResolve)
@@ -580,7 +526,9 @@ class NovelUtils {
 
             if (!response) {
               if (retries > 0) {
-                console.warn(`Empty response, retrying... (${retries} left)`);
+                this.logger.warn(
+                  `Empty response, retrying... (${retries} left)`
+                );
                 setTimeout(() => {
                   this.#sendBackgroundMessage(message, retries - 1)
                     .then(safeResolve)
@@ -598,7 +546,7 @@ class NovelUtils {
           cleanup();
 
           if (retries > 0) {
-            console.warn(
+            this.logger.warn(
               `Exception during message send, retrying... (${retries} left)`,
               error
             );
@@ -615,6 +563,63 @@ class NovelUtils {
 
       attemptSend();
     });
+  }
+
+  /**
+   * Extract novel metadata from the page
+   * @param {string} url - URL of the novel page
+   * @param {string} title - Title of the novel page
+   * @return {object} - Novel metadata
+   */
+  extractNovelMetadata(url, title) {
+    const textContent = document.body.textContent || "";
+    const workingTitle = title || document.title;
+    const generatedNovelId = this.updateNovelId(url, workingTitle);
+
+    const metadata = {
+      novelId: this.novelId || generatedNovelId || "unknown_novel",
+      title: workingTitle,
+      platform: this.detectPlatform(url),
+      chapterInfo: this.detectChapterInfo(workingTitle, textContent),
+      wordCount: this.estimateWordCount(textContent)
+    };
+
+    this.logger.info(
+      `Extracted metadata for novel: ${metadata.title} (${metadata.wordCount} words)`
+    );
+    return metadata;
+  }
+
+  /**
+   * Detect chapter information from title and content
+   * @param {string} title - Page title
+   * @param {string} content - Page content
+   * @return {object} - Chapter information
+   */
+  detectChapterInfo(title, content) {
+    return this.chapterDetector.detectChapterInfo(title, content, this.url);
+  }
+
+  /**
+   * Estimate word count of the content
+   * @param {string} content - Page content
+   * @return {number} - Estimated word count
+   */
+  estimateWordCount(content) {
+    if (!content) return 0;
+
+    const sampleContent = content.substring(0, 50000);
+    const cleanContent = sampleContent.replace(/<[^>]*>/g, " ");
+    const words = cleanContent
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length > 0);
+
+    if (content.length > 50000) {
+      return Math.round(words.length * (content.length / 50000));
+    }
+
+    return words.length;
   }
 
   /**

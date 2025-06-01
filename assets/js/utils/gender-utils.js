@@ -9,7 +9,9 @@ class GenderUtils {
    * Initializes all specialized analyzers with enhanced multi-character context integration
    */
   constructor() {
-    console.debug(
+    this.logger = window.logger;
+
+    this.logger.debug(
       "Novel Dialogue Enhancer: Gender Utils initialized with enhanced multi-character analysis"
     );
 
@@ -39,6 +41,199 @@ class GenderUtils {
     this.multiCharacterAnalyzer = new MultiCharacterContextAnalyzer();
     this.lastCharacterMapHash = null;
     this.characterInteractionCache = new Map();
+  }
+
+  /**
+   * Performs advanced multi-character analysis for gender detection
+   * @param {string} name - The character name
+   * @param {string} text - Surrounding text context
+   * @param {object} characterMap - Existing character data
+   * @param {string} culturalOrigin - Cultural origin of the character
+   * @returns {object} - Detailed gender information with confidence
+   */
+  #performAdvancedMultiCharacterAnalysis(
+    name,
+    text,
+    characterMap,
+    culturalOrigin
+  ) {
+    let totalMaleScore = 0;
+    let totalFemaleScore = 0;
+    const evidenceList = [];
+
+    // 1. Comprehensive multi-character context analysis
+    const contextResult =
+      this.multiCharacterAnalyzer.analyzeWithMultiCharacterContext(
+        name,
+        text,
+        characterMap
+      );
+    totalMaleScore += contextResult.maleScore * 1.5; // Higher weight
+    totalFemaleScore += contextResult.femaleScore * 1.5;
+    if (contextResult.evidence) {
+      evidenceList.push(`context: ${contextResult.evidence}`);
+    }
+
+    // 2. Enhanced dialogue attribution analysis
+    const allCharacterNames = Object.keys(characterMap).concat([name]);
+    const dialogueResult =
+      this.multiCharacterAnalyzer.analyzeDialogueAttribution(
+        name,
+        text,
+        allCharacterNames
+      );
+    totalMaleScore += dialogueResult.maleScore * 1.3; // Dialogue is reliable
+    totalFemaleScore += dialogueResult.femaleScore * 1.3;
+    if (dialogueResult.evidence) {
+      evidenceList.push(`dialogue: ${dialogueResult.evidence}`);
+    }
+
+    // 3. Character interaction pattern analysis
+    const interactionResult = this.#analyzeCharacterInteractionPatterns(
+      name,
+      text,
+      characterMap
+    );
+    totalMaleScore += interactionResult.maleScore * 1.2;
+    totalFemaleScore += interactionResult.femaleScore * 1.2;
+    if (interactionResult.evidence) {
+      evidenceList.push(`interaction: ${interactionResult.evidence}`);
+    }
+
+    // 4. Relationship-based gender inference
+    const relationshipInference =
+      this.relationshipAnalyzer.inferGenderFromRelated(
+        name,
+        text,
+        characterMap
+      );
+    totalMaleScore += relationshipInference.maleScore * 1.4; // Relationships are strong indicators
+    totalFemaleScore += relationshipInference.femaleScore * 1.4;
+    if (relationshipInference.evidence) {
+      evidenceList.push(`relationship: ${relationshipInference.evidence}`);
+    }
+
+    // 5. Pronoun disambiguation in multi-character context
+    const pronounDisambiguation = this.#performPronounDisambiguation(
+      name,
+      text,
+      allCharacterNames
+    );
+    totalMaleScore += pronounDisambiguation.maleScore;
+    totalFemaleScore += pronounDisambiguation.femaleScore;
+    if (pronounDisambiguation.evidence) {
+      evidenceList.push(`pronoun: ${pronounDisambiguation.evidence}`);
+    }
+
+    return {
+      maleScore: totalMaleScore,
+      femaleScore: totalFemaleScore,
+      evidence: evidenceList.join("; ")
+    };
+  }
+
+  /**
+   * Performs cross-validation between traditional and multi-character analysis
+   * @param {string} name - The character name
+   * @param {string} text - Surrounding text context
+   * @param {object} characterMap - Existing character data
+   * @param {object} preliminaryScores - Preliminary gender scores
+   * @param {object} multiCharResult - Multi-character analysis result
+   * @returns {object} - Cross-validation result with adjusted scores and evidence
+   */
+  #performCrossValidation(
+    name,
+    text,
+    characterMap,
+    preliminaryScores,
+    multiCharResult
+  ) {
+    let { maleScore, femaleScore } = preliminaryScores;
+    let evidenceAdjustment = null;
+    let adjustmentMade = false;
+
+    // Check for inconsistencies between traditional and multi-character analysis
+    const traditionalLeaning =
+      maleScore > femaleScore
+        ? "male"
+        : femaleScore > maleScore
+        ? "female"
+        : "neutral";
+    const multiCharLeaning =
+      multiCharResult.maleScore > multiCharResult.femaleScore
+        ? "male"
+        : multiCharResult.femaleScore > multiCharResult.maleScore
+        ? "female"
+        : "neutral";
+
+    // If there's a strong disagreement, use multi-character analysis to resolve
+    if (
+      traditionalLeaning !== multiCharLeaning &&
+      traditionalLeaning !== "neutral" &&
+      multiCharLeaning !== "neutral"
+    ) {
+      const multiCharConfidence = Math.abs(
+        multiCharResult.maleScore - multiCharResult.femaleScore
+      );
+      const traditionalConfidence = Math.abs(maleScore - femaleScore);
+
+      // If multi-character analysis is more confident, adjust scores
+      if (multiCharConfidence > traditionalConfidence * 1.2) {
+        const adjustmentFactor = 0.3;
+        const adjustment = multiCharConfidence * adjustmentFactor;
+
+        if (multiCharLeaning === "male") {
+          maleScore += adjustment;
+          femaleScore = Math.max(0, femaleScore - adjustment * 0.5);
+        } else {
+          femaleScore += adjustment;
+          maleScore = Math.max(0, maleScore - adjustment * 0.5);
+        }
+
+        evidenceAdjustment = `cross-validated with multi-char analysis (${multiCharLeaning})`;
+        adjustmentMade = true;
+      }
+    }
+
+    // Check for pronoun inconsistencies and correct them
+    const inconsistencyResult =
+      this.pronounAnalyzer.detectPronounInconsistencies(name, text);
+    if (inconsistencyResult.correction && inconsistencyResult.correctedGender) {
+      const correctionWeight = 2;
+
+      if (inconsistencyResult.correctedGender === "male") {
+        maleScore += correctionWeight;
+        femaleScore = Math.max(0, femaleScore - correctionWeight * 0.5);
+      } else if (inconsistencyResult.correctedGender === "female") {
+        femaleScore += correctionWeight;
+        maleScore = Math.max(0, maleScore - correctionWeight * 0.5);
+      }
+
+      if (evidenceAdjustment) {
+        evidenceAdjustment += `; ${inconsistencyResult.correction}`;
+      } else {
+        evidenceAdjustment = inconsistencyResult.correction;
+      }
+      adjustmentMade = true;
+    }
+
+    return {
+      maleScore,
+      femaleScore,
+      evidenceAdjustment,
+      adjustmentMade
+    };
+  }
+
+  /**
+   * Clears analysis caches due to character map changes
+   */
+  clearAnalysisCaches() {
+    this.multiCharacterAnalyzer.clearCaches();
+    this.characterInteractionCache.clear();
+    this.lastCharacterMapHash = null;
+
+    this.logger.debug("Analysis caches cleared due to character map changes");
   }
 
   /**
@@ -170,96 +365,6 @@ class GenderUtils {
   }
 
   /**
-   * Perform advanced multi-character analysis using all sophisticated methods
-   * @param {string} name - Character name
-   * @param {string} text - Text context
-   * @param {object} characterMap - Character map
-   * @param {string} culturalOrigin - Cultural origin
-   * @return {object} - Enhanced analysis results
-   * @private
-   */
-  #performAdvancedMultiCharacterAnalysis(
-    name,
-    text,
-    characterMap,
-    culturalOrigin
-  ) {
-    let totalMaleScore = 0;
-    let totalFemaleScore = 0;
-    const evidenceList = [];
-
-    // 1. Comprehensive multi-character context analysis
-    const contextResult =
-      this.multiCharacterAnalyzer.analyzeWithMultiCharacterContext(
-        name,
-        text,
-        characterMap
-      );
-    totalMaleScore += contextResult.maleScore * 1.5; // Higher weight
-    totalFemaleScore += contextResult.femaleScore * 1.5;
-    if (contextResult.evidence) {
-      evidenceList.push(`context: ${contextResult.evidence}`);
-    }
-
-    // 2. Enhanced dialogue attribution analysis
-    const allCharacterNames = Object.keys(characterMap).concat([name]);
-    const dialogueResult =
-      this.multiCharacterAnalyzer.analyzeDialogueAttribution(
-        name,
-        text,
-        allCharacterNames
-      );
-    totalMaleScore += dialogueResult.maleScore * 1.3; // Dialogue is reliable
-    totalFemaleScore += dialogueResult.femaleScore * 1.3;
-    if (dialogueResult.evidence) {
-      evidenceList.push(`dialogue: ${dialogueResult.evidence}`);
-    }
-
-    // 3. Character interaction pattern analysis
-    const interactionResult = this.#analyzeCharacterInteractionPatterns(
-      name,
-      text,
-      characterMap
-    );
-    totalMaleScore += interactionResult.maleScore * 1.2;
-    totalFemaleScore += interactionResult.femaleScore * 1.2;
-    if (interactionResult.evidence) {
-      evidenceList.push(`interaction: ${interactionResult.evidence}`);
-    }
-
-    // 4. Relationship-based gender inference
-    const relationshipInference =
-      this.relationshipAnalyzer.inferGenderFromRelated(
-        name,
-        text,
-        characterMap
-      );
-    totalMaleScore += relationshipInference.maleScore * 1.4; // Relationships are strong indicators
-    totalFemaleScore += relationshipInference.femaleScore * 1.4;
-    if (relationshipInference.evidence) {
-      evidenceList.push(`relationship: ${relationshipInference.evidence}`);
-    }
-
-    // 5. Pronoun disambiguation in multi-character context
-    const pronounDisambiguation = this.#performPronounDisambiguation(
-      name,
-      text,
-      allCharacterNames
-    );
-    totalMaleScore += pronounDisambiguation.maleScore;
-    totalFemaleScore += pronounDisambiguation.femaleScore;
-    if (pronounDisambiguation.evidence) {
-      evidenceList.push(`pronoun: ${pronounDisambiguation.evidence}`);
-    }
-
-    return {
-      maleScore: totalMaleScore,
-      femaleScore: totalFemaleScore,
-      evidence: evidenceList.join("; ")
-    };
-  }
-
-  /**
    * Perform traditional analysis methods
    * @param {string} name - Character name
    * @param {string} text - Text context
@@ -383,100 +488,6 @@ class GenderUtils {
     }
 
     return { maleScore, femaleScore, evidence };
-  }
-
-  /**
-   * Perform cross-validation using multi-character analyzer insights
-   * @param {string} name - Character name
-   * @param {string} text - Text context
-   * @param {object} characterMap - Character map
-   * @param {object} preliminaryScores - Initial scores from other analyzers
-   * @param {object} multiCharResult - Multi-character analysis result
-   * @return {object} - Cross-validated scores
-   * @private
-   */
-  #performCrossValidation(
-    name,
-    text,
-    characterMap,
-    preliminaryScores,
-    multiCharResult
-  ) {
-    let { maleScore, femaleScore } = preliminaryScores;
-    let evidenceAdjustment = null;
-    let adjustmentMade = false;
-
-    // Check for inconsistencies between traditional and multi-character analysis
-    const traditionalLeaning =
-      maleScore > femaleScore
-        ? "male"
-        : femaleScore > maleScore
-        ? "female"
-        : "neutral";
-    const multiCharLeaning =
-      multiCharResult.maleScore > multiCharResult.femaleScore
-        ? "male"
-        : multiCharResult.femaleScore > multiCharResult.maleScore
-        ? "female"
-        : "neutral";
-
-    // If there's a strong disagreement, use multi-character analysis to resolve
-    if (
-      traditionalLeaning !== multiCharLeaning &&
-      traditionalLeaning !== "neutral" &&
-      multiCharLeaning !== "neutral"
-    ) {
-      const multiCharConfidence = Math.abs(
-        multiCharResult.maleScore - multiCharResult.femaleScore
-      );
-      const traditionalConfidence = Math.abs(maleScore - femaleScore);
-
-      // If multi-character analysis is more confident, adjust scores
-      if (multiCharConfidence > traditionalConfidence * 1.2) {
-        const adjustmentFactor = 0.3;
-        const adjustment = multiCharConfidence * adjustmentFactor;
-
-        if (multiCharLeaning === "male") {
-          maleScore += adjustment;
-          femaleScore = Math.max(0, femaleScore - adjustment * 0.5);
-        } else {
-          femaleScore += adjustment;
-          maleScore = Math.max(0, maleScore - adjustment * 0.5);
-        }
-
-        evidenceAdjustment = `cross-validated with multi-char analysis (${multiCharLeaning})`;
-        adjustmentMade = true;
-      }
-    }
-
-    // Check for pronoun inconsistencies and correct them
-    const inconsistencyResult =
-      this.pronounAnalyzer.detectPronounInconsistencies(name, text);
-    if (inconsistencyResult.correction && inconsistencyResult.correctedGender) {
-      const correctionWeight = 2;
-
-      if (inconsistencyResult.correctedGender === "male") {
-        maleScore += correctionWeight;
-        femaleScore = Math.max(0, femaleScore - correctionWeight * 0.5);
-      } else if (inconsistencyResult.correctedGender === "female") {
-        femaleScore += correctionWeight;
-        maleScore = Math.max(0, maleScore - correctionWeight * 0.5);
-      }
-
-      if (evidenceAdjustment) {
-        evidenceAdjustment += `; ${inconsistencyResult.correction}`;
-      } else {
-        evidenceAdjustment = inconsistencyResult.correction;
-      }
-      adjustmentMade = true;
-    }
-
-    return {
-      maleScore,
-      femaleScore,
-      evidenceAdjustment,
-      adjustmentMade
-    };
   }
 
   /**
@@ -670,17 +681,6 @@ class GenderUtils {
   #createCharacterMapHash(characterMap) {
     const names = Object.keys(characterMap).sort();
     return SharedUtils.createHash(names.join("|"));
-  }
-
-  /**
-   * Clear caches when character map changes significantly
-   */
-  clearAnalysisCaches() {
-    this.multiCharacterAnalyzer.clearCaches();
-    this.characterInteractionCache.clear();
-    this.lastCharacterMapHash = null;
-
-    console.debug("Analysis caches cleared due to character map changes");
   }
 
   /**

@@ -2,9 +2,18 @@
  * Simple novel ID generator utility
  */
 class NovelIdGenerator {
+  /**
+   * Creates a new NovelIdGenerator instance
+   */
   constructor() {
     this.novelId = "";
+    this.logger = window.logger;
+
+    this.logger.debug(
+      "Novel Dialogue Enhancer: Novel ID Generator initialized"
+    );
   }
+
   /**
    * Generate a unique novel ID from URL and title
    * @param {string} url - Current page URL
@@ -13,7 +22,7 @@ class NovelIdGenerator {
    */
   generateNovelId(url, title) {
     if (!url || typeof url !== "string") {
-      console.warn("Invalid URL provided for novel ID generation");
+      this.logger.warn("Invalid URL provided for novel ID generation");
       return null;
     }
 
@@ -24,13 +33,13 @@ class NovelIdGenerator {
       const novelName = this.#extractNovelName(title, urlObj);
 
       if (!novelName) {
-        console.warn("Could not extract novel name from title or URL");
+        this.logger.warn("Could not extract novel name from title or URL");
         const pathSegment =
           urlObj.pathname.split("/").filter((s) => s.length > 0)[0] ||
           "unknown";
         const fallbackNovelId = this.#createCleanId(domain, pathSegment);
 
-        console.warn(`Using fallback novel ID: ${fallbackNovelId}`);
+        this.logger.warn(`Using fallback novel ID: ${fallbackNovelId}`);
         this.novelId = fallbackNovelId;
         return fallbackNovelId;
       }
@@ -39,7 +48,7 @@ class NovelIdGenerator {
 
       return this.novelId;
     } catch (error) {
-      console.error("Error generating novel ID:", error);
+      this.logger.error("Error generating novel ID:", error);
       return null;
     }
   }

@@ -7,7 +7,8 @@ class PromptGenerator {
    * Creates a new PromptGenerator instance
    */
   constructor() {
-    console.debug("Novel Dialogue Enhancer: Prompt Generator initialized");
+    this.logger = window.logger;
+    this.logger.debug("Novel Dialogue Enhancer: Prompt Generator initialized");
   }
 
   /**
@@ -24,7 +25,7 @@ class PromptGenerator {
     // Default values for novelInfo
     const style = novelInfo?.style || "standard narrative";
     const tone = novelInfo?.tone || "neutral";
-    
+
     return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following web novel text to improve dialogue attribution and clarity.
 The novel's style is ${style} with a ${tone} tone.
 
@@ -59,7 +60,7 @@ ${chunk}`;
    */
   createStyleAnalysisPrompt(sample) {
     if (!sample) return "";
-    
+
     // Get a reasonable size sample for analysis
     const textSample = sample.substring(0, 2500);
 
@@ -91,7 +92,7 @@ ${textSample}
    */
   createGenderAnalysisPrompt(characterName, contextText) {
     if (!characterName) return "";
-    
+
     // Limit context text to a reasonable size
     const limitedContext = contextText.substring(0, 2000);
 

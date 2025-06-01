@@ -11,11 +11,7 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
-  "permissions": [
-    "storage",
-    "activeTab",
-    "scripting"
-  ],
+  "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "*://*.fanmtl.com/*",
     "*://*.novelupdates.com/*",
@@ -23,9 +19,7 @@
     "*://*.webnovel.com/*",
     "http://localhost:11434/*"
   ],
-  "optional_host_permissions": [
-    "*://*/*"
-  ],
+  "optional_host_permissions": ["*://*/*"],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
@@ -44,30 +38,30 @@
       ],
       "js": [
         "assets/js/lib/purify.min.js",
-        "assets/js/utils/gender-utils.js",
-        "assets/js/utils/novel-utils.js",
-        "assets/js/utils/stats-utils.js",
-        "assets/js/utils/shared-utils.js",
         "assets/js/utils/constants.js",
-        "assets/js/utils/error-handler.js",
+        "assets/js/utils/shared-utils.js",
         "assets/js/utils/logger.js",
-        "assets/js/utils/toaster.js",
-        "assets/js/novel/novel-id-generator.js",
-        "assets/js/novel/novel-style-analyzer.js",
-        "assets/js/novel/novel-character-extractor.js",
-        "assets/js/novel/novel-chapter-detector.js",
+        "assets/js/utils/error-handler.js",
+        "assets/js/utils/stats-utils.js",
         "assets/js/gender/base-gender-analyzer.js",
-        "assets/js/gender/pronoun-analyzer.js",
         "assets/js/gender/cultural-analyzer.js",
-        "assets/js/gender/relationship-analyzer.js",
         "assets/js/gender/name-analyzer.js",
+        "assets/js/gender/pronoun-analyzer.js",
+        "assets/js/gender/relationship-analyzer.js",
         "assets/js/gender/appearance-analyzer.js",
         "assets/js/gender/multi-character-context-analyzer.js",
+        "assets/js/utils/gender-utils.js",
+        "assets/js/novel/novel-id-generator.js",
+        "assets/js/novel/novel-character-extractor.js",
+        "assets/js/novel/novel-chapter-detector.js",
+        "assets/js/novel/novel-style-analyzer.js",
+        "assets/js/utils/novel-utils.js",
         "assets/js/llm/text-processor.js",
         "assets/js/llm/prompt-generator.js",
         "assets/js/llm/ollama-client.js",
-        "assets/js/content/content-enhancer-integration.js",
         "assets/js/content/content-element-cache.js",
+        "assets/js/content/content-enhancer-integration.js",
+        "assets/js/toaster.js",
         "content/content.js"
       ],
       "run_at": "document_idle"
