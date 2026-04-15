@@ -54,10 +54,23 @@ const Constants = {
   },
 
   // CSS selectors for content detection
+  // Listed in priority order — first match wins
   SELECTORS: {
     CONTENT: [
+      // Generic (covers royalroad, lightnovelworld, wuxiaworld, novelbuddy, novelpub, wtr-lab…)
       ".chapter-content",
       "#chapter-content",
+      // ScribbleHub
+      ".chp_raw",
+      // NovelBin
+      "#chr-content",
+      // NovelFire / NovelBuddy variants
+      ".chapter-body",
+      // WebNovel (fallback container)
+      ".cha-paragraph",
+      // WTR-LAB / misc reading sites
+      ".reading-content",
+      // Generic fallbacks
       ".novel_content",
       ".chapter-text",
       ".entry-content",

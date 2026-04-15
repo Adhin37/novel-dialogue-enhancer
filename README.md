@@ -56,11 +56,24 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 
 ### Supported Websites
 
-- fanmtl.com
-- novelupdates.com  
-- wuxiaworld.com
-- webnovel.com
-- Any other novel sites you add to the whitelist
+Pre-configured sites (active by default in the extension manifest):
+
+| Site | Description |
+|---|---|
+| **[webnovel.com](https://www.webnovel.com)** | QiDian's official English platform — CN/KR fantasy, romance, martial arts |
+| [fanmtl.com](https://www.fanmtl.com) | Fan MTL novels (Douluo, Villain, Naruto fan-fiction) |
+| [novelupdates.com](https://www.novelupdates.com) | Directory and tracker for Asian translated novels |
+| [wuxiaworld.com](https://www.wuxiaworld.com) | Licensed wuxia / xianxia translations |
+| [royalroad.com](https://www.royalroad.com) | Original English web novels and translations |
+| [scribblehub.com](https://www.scribblehub.com) | Fiction community with original and translated works |
+| [lightnovelworld.org](https://www.lightnovelworld.org) | JP/CN light novel translations |
+| [novelbin.me](https://novelbin.me) | Free novel aggregator with daily updates |
+| [novelfire.net](https://novelfire.net) | Free web novels (CN/JP/KR) |
+| [wtr-lab.com](https://wtr-lab.com) | AI-translated CN novels |
+| [novelbuddy.com](https://www.novelbuddy.com) | Free web novel reader |
+| [novelpub.com](https://www.novelpub.com) | Web novel platform |
+
+Any other site can be added manually via the popup or the Whitelisted Sites tab in Options.
 
 ## How It Works
 
@@ -151,17 +164,21 @@ Character data uses an optimized compressed format (30-40% size reduction):
 The extension works with any Ollama-compatible model. All recommended models use Q4_K_M quantization automatically when pulled via `ollama pull`.
 
 ### Ultra-fast (4–6 GB RAM)
+
 - **`qwen3:4b`** — ~2.5 GB. Speed-focused; good for low-RAM systems.
 
 ### Balanced — Sweet Spot (8 GB RAM)
+
 - **`qwen3:8b`** (default) — ~5 GB. Best all-around for dialogue enhancement.
 - **`gemma3:9b`** — ~6 GB. Google Gemma 3; excellent dialogue quality.
 
 ### High Quality (12–16 GB RAM)
+
 - **`phi4:14b`** — ~9 GB. Microsoft Phi-4; outstanding instruction following.
 - **`qwen3:14b`** — ~9 GB. Larger Qwen3 for better output quality.
 
 ### High-End (24 GB+ VRAM/RAM)
+
 - **`qwen3:30b-a3b`** — MoE architecture; efficient for its quality level.
 - **`mistral-small3.1:24b`** — ~15 GB. Mistral's latest compact model.
 

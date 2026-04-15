@@ -13,10 +13,18 @@
   },
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
+    "*://*.webnovel.com/*",
     "*://*.fanmtl.com/*",
     "*://*.novelupdates.com/*",
     "*://*.wuxiaworld.com/*",
-    "*://*.webnovel.com/*",
+    "*://*.royalroad.com/*",
+    "*://*.scribblehub.com/*",
+    "*://*.lightnovelworld.org/*",
+    "*://*.novelbin.me/*",
+    "*://*.novelfire.net/*",
+    "*://*.wtr-lab.com/*",
+    "*://*.novelbuddy.com/*",
+    "*://*.novelpub.com/*",
     "http://localhost:11434/*"
   ],
   "optional_host_permissions": ["*://*/*"],
@@ -31,10 +39,18 @@
   "content_scripts": [
     {
       "matches": [
+        "*://*.webnovel.com/*",
         "*://*.fanmtl.com/*",
         "*://*.novelupdates.com/*",
         "*://*.wuxiaworld.com/*",
-        "*://*.webnovel.com/*"
+        "*://*.royalroad.com/*",
+        "*://*.scribblehub.com/*",
+        "*://*.lightnovelworld.org/*",
+        "*://*.novelbin.me/*",
+        "*://*.novelfire.net/*",
+        "*://*.wtr-lab.com/*",
+        "*://*.novelbuddy.com/*",
+        "*://*.novelpub.com/*"
       ],
       "js": [
         "assets/js/lib/purify.min.js",
