@@ -30,7 +30,7 @@ const Constants = {
   STORAGE: {
     MAX_EVIDENCE_ENTRIES: 5,
     MAX_DATA_SIZE_BYTES: 100000,
-    DATA_PURGE_AGE_DAYS: 30,
+    DATA_PURGE_AGE_DAYS: 90,
     CACHE_TTL_MS: 5 * 60 * 1000
   },
 

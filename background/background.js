@@ -18,6 +18,12 @@ let globalStats = {
 const whitelistCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
+// Periodic cleanup constants
+const CLEANUP_ALARM_NAME = "periodicStorageCleanup";
+const NOVEL_PURGE_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (3 months)
+const CLEANUP_ALARM_PERIOD_MINUTES = 24 * 60;          // run once per day
+const MAX_NOVEL_DATA_BYTES = 100000;
+
 /**
  * Initializes the background script
  */
@@ -143,7 +149,7 @@ function getNextCharacterId(charMap) {
  * @param {number} maxAge - Maximum age of novels to keep (in milliseconds)
  * @return {object} - Purged character maps
  */
-function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
+function purgeOldNovels(maps, maxAge = NOVEL_PURGE_AGE_MS) {
   if (!maps || typeof maps !== "object") return {};
 
   const now = Date.now();
@@ -169,6 +175,44 @@ function purgeOldNovels(maps, maxAge = 30 * 24 * 60 * 60 * 1000) {
 }
 
 /**
+ * Creates (or confirms) the daily periodic cleanup alarm
+ */
+function scheduleCleanupAlarm() {
+  chrome.alarms.get(CLEANUP_ALARM_NAME, (existing) => {
+    if (!existing) {
+      chrome.alarms.create(CLEANUP_ALARM_NAME, {
+        delayInMinutes: CLEANUP_ALARM_PERIOD_MINUTES,
+        periodInMinutes: CLEANUP_ALARM_PERIOD_MINUTES
+      });
+      console.log("Scheduled periodic storage cleanup alarm (every 24 hours)");
+    }
+  });
+}
+
+/**
+ * Proactive cleanup: purges stale novel data and syncs stats.
+ * Called by the daily chrome.alarms alarm.
+ */
+async function runPeriodicCleanup() {
+  await initializeBackground();
+
+  const beforeCount = Object.keys(novelCharacterMaps).length;
+  novelCharacterMaps = purgeOldNovels(novelCharacterMaps);
+  const afterCount = Object.keys(novelCharacterMaps).length;
+  const removed = beforeCount - afterCount;
+
+  if (removed > 0) {
+    storeNovelCharacterMaps(novelCharacterMaps);
+    globalStats.uniqueNovelsProcessed = Object.keys(novelCharacterMaps)
+      .filter(id => novelCharacterMaps[id].chaps?.length > 0).length;
+    chrome.storage.local.set({ globalStats });
+    console.log(`Periodic cleanup: purged ${removed} novel(s) not read in 90+ days`);
+  } else {
+    console.log("Periodic cleanup: no stale novel entries found");
+  }
+}
+
+/**
  * Stores novel character maps with purging old entries
  * @param {object} novelCharacterMaps - Character maps to store
  */
@@ -179,7 +223,7 @@ function storeNovelCharacterMaps(novelCharacterMaps) {
     const serialized = JSON.stringify(purgedMaps);
     const sizeInBytes = new Blob([serialized]).size;
 
-    if (sizeInBytes > 100000) {
+    if (sizeInBytes > MAX_NOVEL_DATA_BYTES) {
       console.warn(
         "Character maps getting too large, pruning older/smaller entries"
       );
@@ -1353,10 +1397,18 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 
   initializeBackground();
+  scheduleCleanupAlarm();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   initializeBackground();
+  scheduleCleanupAlarm();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === CLEANUP_ALARM_NAME) {
+    runPeriodicCleanup();
+  }
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
