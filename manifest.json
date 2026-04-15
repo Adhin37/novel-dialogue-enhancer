@@ -1,6 +1,6 @@
 {
   "name": "Novel Dialogue Enhancer",
-  "version": "1.0",
+  "version": "1.1.3",
   "description": "Enhances translated novel dialogues to sound more natural",
   "icons": {
     "16": "assets/icons/icon16.png",
@@ -11,7 +11,11 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
-  "permissions": ["storage", "activeTab", "scripting"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
   "host_permissions": [
     "*://*.webnovel.com/*",
     "*://*.fanmtl.com/*",
@@ -27,7 +31,9 @@
     "*://*.novelpub.com/*",
     "http://localhost:11434/*"
   ],
-  "optional_host_permissions": ["*://*/*"],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
   "action": {
     "default_popup": "popup/popup.html",
     "default_icon": {
