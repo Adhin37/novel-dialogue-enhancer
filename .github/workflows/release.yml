@@ -19,12 +19,15 @@ jobs:
     steps:
       - name: Install dependencies (Alpine)
         run: |
-          apk add --no-cache git zip jq bash sed nodejs npm
+          apk add --no-cache git zip jq bash sed nodejs npm curl
 
       - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git clone "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
+          git fetch --tags
+          git checkout "${GITHUB_REF_NAME}"
 
       - name: Validate tag
         shell: bash
@@ -37,12 +40,12 @@ jobs:
 
       - name: Update Manifest Version
         run: |
-          NEW_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           jq ".version = \"$NEW_VERSION\"" manifest.json > manifest.tmp && mv manifest.tmp manifest.json
 
       - name: Update README.md Version Badge
         run: |
-          NEW_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$NEW_VERSION-blue/g" README.md
 
       - name: Commit and Push Version Bump
@@ -70,12 +73,40 @@ jobs:
           test -s CHANGELOG.md
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: Release ${{ github.ref_name }}
-          body_path: CHANGELOG.md
-          prerelease: ${{ contains(github.ref_name, '-') }}
-          files: |
-            dist/novel-dialogue-enhancer.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+
+          IS_PRERELEASE="false"
+          if echo "$TAG" | grep -q '-'; then
+            IS_PRERELEASE="true"
+          fi
+
+          # Create the release and capture the upload URL
+          RELEASE_RESPONSE=$(curl -sf -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases" \
+            -d "{
+              \"tag_name\": \"${TAG}\",
+              \"name\": \"Release ${TAG}\",
+              \"body\": $(jq -Rs . < CHANGELOG.md),
+              \"prerelease\": ${IS_PRERELEASE}
+            }")
+
+          UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | jq -r '.upload_url' | sed 's/{?name,label}//')
+
+          if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
+            echo "Failed to create release. Response:"
+            echo "$RELEASE_RESPONSE"
+            exit 1
+          fi
+
+          # Upload the packaged extension
+          curl -sf -X POST \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Content-Type: application/zip" \
+            "${UPLOAD_URL}?name=novel-dialogue-enhancer.zip" \
+            --data-binary @dist/novel-dialogue-enhancer.zip
