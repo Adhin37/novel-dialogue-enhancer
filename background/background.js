@@ -254,9 +254,10 @@ function handleOllamaRequest(request, sendResponse) {
 
   chrome.storage.sync.get(
     {
-      timeout: 200,
+      timeout: 300,
       temperature: 0.4,
-      topP: 0.9
+      topP: 0.9,
+      contextSize: 32768
     },
     (data) => {
       if (chrome.runtime.lastError) {
@@ -285,19 +286,19 @@ function handleOllamaRequest(request, sendResponse) {
           throw new Error("Invalid prompt");
         }
 
-        if (requestData.prompt.length > 32000) {
-          requestData.prompt = requestData.prompt.substring(0, 32000);
+        if (requestData.prompt.length > 256000) {
+          requestData.prompt = requestData.prompt.substring(0, 256000);
         }
 
         console.log("Sending Ollama request:", {
           model: requestData.model,
           promptLength: requestData.prompt.length,
-          max_tokens: requestData.max_tokens,
+          num_predict: requestData.num_predict,
+          num_ctx: requestData.num_ctx,
           temperature: requestData.temperature,
           top_p: requestData.top_p,
-          stream: requestData.stream || false,
-          timeout: data.timeout + " seconds",
-          options: requestData.options || {}
+          stream: false,
+          timeout: data.timeout + " seconds"
         });
 
         if (requestData.stream === false) {
@@ -323,7 +324,8 @@ function prepareRequestData(requestData, settings) {
   return {
     ...requestData,
     temperature: requestData.temperature || settings.temperature,
-    top_p: requestData.top_p || settings.topP
+    top_p: requestData.top_p || settings.topP,
+    num_ctx: requestData.num_ctx || settings.contextSize || 32768
   };
 }
 
@@ -331,7 +333,7 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
   const ollamaUrl = DEFAULT_OLLAMA_URL + "/api/generate";
 
   const validatedTimeout =
-    typeof timeout === "number" && timeout > 0 && timeout < 300 ? timeout : 60;
+    typeof timeout === "number" && timeout > 0 && timeout < 600 ? timeout : 120;
 
   const controller = new AbortController();
   const requestId = Date.now().toString();
@@ -345,10 +347,13 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
   const safeRequestData = {
     model: String(requestData.model || ""),
     prompt: String(requestData.prompt || ""),
-    max_tokens: parseInt(requestData.max_tokens) || 1024,
-    temperature: parseFloat(requestData.temperature) || 0.4,
-    top_p: parseFloat(requestData.top_p) || 0.9,
-    stream: false
+    stream: false,
+    options: {
+      temperature: parseFloat(requestData.temperature) || 0.4,
+      top_p: parseFloat(requestData.top_p) || 0.9,
+      num_predict: parseInt(requestData.num_predict || requestData.max_tokens) || 8192,
+      num_ctx: parseInt(requestData.num_ctx) || 32768
+    }
   };
 
   fetch(ollamaUrl, {
@@ -1323,8 +1328,8 @@ chrome.runtime.onInstalled.addListener(() => {
       preserveNames: true,
       fixPronouns: true,
       modelName: "qwen3:8b",
-      maxChunkSize: 4000,
-      timeout: 180,
+      contextSize: 32768,
+      timeout: 300,
       disabledPages: [],
       temperature: 0.4,
       topP: 0.9,

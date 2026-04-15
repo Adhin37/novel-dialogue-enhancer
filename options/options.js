@@ -2,8 +2,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const modelNameInput = document.getElementById("model-name");
   const saveButton = document.getElementById("save");
   const resetButton = document.getElementById("reset");
-  const maxChunkSizeSlider = document.getElementById("max-chunk-size");
-  const maxChunkSizeValue = document.getElementById("max-chunk-size-value");
+  const contextSizeSlider = document.getElementById("context-size");
+  const contextSizeValue = document.getElementById("context-size-value");
   const timeoutSlider = document.getElementById("timeout");
   const timeoutValue = document.getElementById("timeout-value");
   const temperatureSlider = document.getElementById("temperature");
@@ -245,7 +245,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateAllSliderBackgrounds() {
     updateSliderBackground(temperatureSlider);
     updateSliderBackground(topPSlider);
-    updateSliderBackground(maxChunkSizeSlider);
+    updateSliderBackground(contextSizeSlider);
     updateSliderBackground(timeoutSlider);
   }
 
@@ -376,7 +376,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ) {
       const defaultSettings = {
         modelName: Constants.DEFAULTS.MODEL_NAME,
-        maxChunkSize: Constants.DEFAULTS.MAX_CHUNK_SIZE,
+        contextSize: Constants.DEFAULTS.CONTEXT_SIZE,
         timeout: Constants.DEFAULTS.TIMEOUT,
         temperature: Constants.DEFAULTS.TEMPERATURE,
         topP: Constants.DEFAULTS.TOP_P
@@ -388,8 +388,8 @@ document.addEventListener("DOMContentLoaded", () => {
           logger.userError("Error resetting settings");
         } else {
           modelNameInput.value = defaultSettings.modelName;
-          maxChunkSizeSlider.value = defaultSettings.maxChunkSize;
-          maxChunkSizeValue.textContent = defaultSettings.maxChunkSize;
+          contextSizeSlider.value = defaultSettings.contextSize;
+          contextSizeValue.textContent = defaultSettings.contextSize;
           timeoutSlider.value = defaultSettings.timeout;
           timeoutValue.textContent = defaultSettings.timeout;
           temperatureSlider.value = defaultSettings.temperature;
@@ -960,7 +960,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     setupSlider(temperatureSlider, temperatureValue);
     setupSlider(topPSlider, topPValue);
-    setupSlider(maxChunkSizeSlider, maxChunkSizeValue);
+    setupSlider(contextSizeSlider, contextSizeValue);
     setupSlider(timeoutSlider, timeoutValue);
 
     clearAllBtn.addEventListener("click", () => {
@@ -991,14 +991,14 @@ document.addEventListener("DOMContentLoaded", () => {
     try {
       // Load initial settings directly
       chrome.storage.sync.get(
-        ["modelName", "maxChunkSize", "timeout", "temperature", "topP"],
+        ["modelName", "contextSize", "timeout", "temperature", "topP"],
         (data) => {
           if (chrome.runtime.lastError) {
             logger.error("Error loading settings:", chrome.runtime.lastError);
             // Use fallback values
             modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
-            maxChunkSizeSlider.value = Constants.DEFAULTS.MAX_CHUNK_SIZE;
-            maxChunkSizeValue.textContent = Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            contextSizeSlider.value = Constants.DEFAULTS.CONTEXT_SIZE;
+            contextSizeValue.textContent = Constants.DEFAULTS.CONTEXT_SIZE;
             timeoutSlider.value = Constants.DEFAULTS.TIMEOUT;
             timeoutValue.textContent = Constants.DEFAULTS.TIMEOUT;
             temperatureSlider.value = Constants.DEFAULTS.TEMPERATURE;
@@ -1008,10 +1008,10 @@ document.addEventListener("DOMContentLoaded", () => {
           } else {
             modelNameInput.value =
               data.modelName || Constants.DEFAULTS.MODEL_NAME;
-            maxChunkSizeSlider.value =
-              data.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
-            maxChunkSizeValue.textContent =
-              data.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
+            contextSizeSlider.value =
+              data.contextSize || Constants.DEFAULTS.CONTEXT_SIZE;
+            contextSizeValue.textContent =
+              data.contextSize || Constants.DEFAULTS.CONTEXT_SIZE;
             timeoutSlider.value = data.timeout || Constants.DEFAULTS.TIMEOUT;
             timeoutValue.textContent =
               data.timeout || Constants.DEFAULTS.TIMEOUT;
@@ -1033,14 +1033,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     saveButton.addEventListener("click", () => {
-      const maxChunkSize = parseInt(maxChunkSizeSlider.value);
+      const contextSize = parseInt(contextSizeSlider.value);
       const timeout = parseInt(timeoutSlider.value);
       const temperature = parseFloat(temperatureSlider.value);
       const topP = parseFloat(topPSlider.value);
 
       const settingsToSave = {
         modelName: modelNameInput.value.trim() || Constants.DEFAULTS.MODEL_NAME,
-        maxChunkSize: maxChunkSize,
+        contextSize: contextSize,
         timeout: timeout,
         temperature: temperature,
         topP: topP

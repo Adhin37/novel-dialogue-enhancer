@@ -1,0 +1,81 @@
+name: Build and Release Extension
+
+on:
+  push:
+    tags:
+      - 'v[0-9].[0-9]*.[0-9]*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: alpine:latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Install dependencies (Alpine)
+        run: |
+          apk add --no-cache git zip jq bash sed nodejs npm
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format: $TAG"
+            exit 1
+          fi
+
+      - name: Update Manifest Version
+        run: |
+          NEW_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          jq ".version = \"$NEW_VERSION\"" manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+
+      - name: Update README.md Version Badge
+        run: |
+          NEW_VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$NEW_VERSION-blue/g" README.md
+
+      - name: Commit and Push Version Bump
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json README.md
+          git commit -m "chore: bump version to ${{ github.ref_name }} [skip ci]"
+          git push origin HEAD:main
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Package extension
+        run: |
+          chmod +x package.sh
+          ./package.sh
+          test -s dist/novel-dialogue-enhancer.zip
+
+      - name: Generate Changelog
+        run: |
+          chmod +x generate-changelog.sh
+          ./generate-changelog.sh
+          test -s CHANGELOG.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          body_path: CHANGELOG.md
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            dist/novel-dialogue-enhancer.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

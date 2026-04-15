@@ -16,11 +16,11 @@ const Constants = {
   // Default settings
   DEFAULTS: {
     MODEL_NAME: "qwen3:8b",
-    MAX_CHUNK_SIZE: 4000,
-    TIMEOUT: 180,
+    MAX_CHUNK_SIZE: 80000,
+    TIMEOUT: 300,
     TEMPERATURE: 0.4,
     TOP_P: 0.9,
-    CONTEXT_SIZE: 8192,
+    CONTEXT_SIZE: 32768,
     EXTENSION_PAUSED: false,
     PRESERVE_NAMES: true,
     FIX_PRONOUNS: true
@@ -50,7 +50,7 @@ const Constants = {
     OLLAMA_GENERATE: "/api/generate",
     OLLAMA_VERSION: "/api/version",
     OLLAMA_TAGS: "/api/tags",
-    TIMEOUT: 200000
+    TIMEOUT: 600000
   },
 
   // CSS selectors for content detection

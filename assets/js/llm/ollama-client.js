@@ -153,7 +153,8 @@ class OllamaClient {
       const requestData = {
         model: model,
         prompt: prompt,
-        max_tokens: options.max_tokens || 4096,
+        num_predict: options.num_predict || options.max_tokens || 8192,
+        num_ctx: options.num_ctx || Constants.DEFAULTS.CONTEXT_SIZE,
         temperature: options.temperature || 0.4,
         top_p: options.top_p || 0.9,
         stream: false
@@ -225,10 +226,10 @@ class OllamaClient {
       chrome.storage.sync.get(
         {
           modelName: "qwen3:8b",
-          timeout: 200,
+          timeout: 300,
           temperature: 0.4,
           topP: 0.9,
-          contextSize: 8192
+          contextSize: 32768
         },
         (data) => {
           if (chrome.runtime.lastError) {

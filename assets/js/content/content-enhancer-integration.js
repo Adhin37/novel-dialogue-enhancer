@@ -251,10 +251,8 @@ class ContentEnhancerIntegration {
    */
   async enhanceTextWithLLM(text, characterSummary) {
     try {
-      // Analyze novel style using novelUtils
       const novelStyle = await this.novelUtils.analyzeNovelStyle(text);
 
-      // Get chapter info if not already detected
       if (!this.novelUtils.chapterInfo) {
         this.novelUtils.chapterInfo = this.novelUtils.detectChapterInfo(
           document.title,
@@ -262,7 +260,6 @@ class ContentEnhancerIntegration {
         );
       }
 
-      // Format novel style information
       const novelInfo = {
         style: novelStyle.style,
         tone: novelStyle.tone,
@@ -271,103 +268,39 @@ class ContentEnhancerIntegration {
         chapterInfo: this.novelUtils.chapterInfo
       };
 
-      // Split text into manageable chunks
       const settings = await this.ollamaClient.getLLMSettings();
-      const textChunks = this.textProcessor.splitIntoChunks(
+
+      // Send the full chapter as a single LLM call — no chunking needed with /no_think mode
+      const prompt = this.promptGenerator.createEnhancementPrompt(
         text,
-        settings.maxChunkSize
-      );
-
-      // Process each chunk
-      const enhancedChunks = await this.#processChunks(
-        textChunks,
         characterSummary,
-        novelInfo,
-        settings
+        "",
+        novelInfo
       );
 
-      const enhancedText = enhancedChunks.join("\n\n");
-      console.log("Text enhancement complete!");
+      const cacheKey = SharedUtils.createHash(text);
 
+      this.logger.info(`Enhancing chapter in one pass (${text.length} chars)`);
+
+      const enhancedText = await this.ollamaClient.processWithLLM(
+        settings.modelName,
+        prompt,
+        {
+          num_predict: settings.contextSize,
+          num_ctx: settings.contextSize,
+          temperature: settings.temperature,
+          top_p: settings.topP,
+          timeout: settings.timeout,
+          cacheKey
+        }
+      );
+
+      this.logger.success("Chapter enhancement complete");
       return this.textProcessor.cleanLLMResponse(enhancedText);
     } catch (error) {
       this.logger.error("LLM enhancement error:", error);
       throw error;
     }
-  }
-
-  /**
-   * Process all text chunks sequentially with enhanced context
-   * @param {Array<string>} chunks - Text chunks to process
-   * @param {string} characterContext - Character information
-   * @param {object} novelInfo - Novel style information
-   * @param {object} settings - LLM settings
-   * @return {Promise<Array<string>>} - Array of enhanced text chunks
-   * @private
-   */
-  async #processChunks(chunks, characterContext, novelInfo, settings) {
-    const enhancedChunks = [];
-    const BATCH_DELAY = Constants.PROCESSING.BATCH_DELAY_MS;
-    let errorCount = 0;
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      console.log(
-        `Processing chunk ${i + 1}/${chunks.length} (size: ${chunk.length})`
-      );
-
-      // Build context using enhanced chunks when available
-      const contextInfo = this.textProcessor.buildChunkContext(
-        enhancedChunks.length > 0
-          ? [...enhancedChunks, ...chunks.slice(enhancedChunks.length)]
-          : chunks,
-        i
-      );
-
-      // Create the prompt using our prompt generator
-      const prompt = this.promptGenerator.createEnhancementPrompt(
-        chunk,
-        characterContext,
-        contextInfo,
-        novelInfo
-      );
-
-      // Create a cache key for the background service
-      const cacheKey = SharedUtils.createHash(chunk + contextInfo);
-
-      try {
-        // Process with LLM via the Ollama client
-        const enhancedChunk = await this.ollamaClient.processWithLLM(
-          settings.modelName,
-          prompt,
-          {
-            max_tokens: settings.contextSize,
-            temperature: settings.temperature,
-            top_p: settings.topP,
-            timeout: settings.timeout,
-            cacheKey: cacheKey
-          }
-        );
-
-        enhancedChunks.push(enhancedChunk);
-      } catch (chunkError) {
-        this.logger.warn("Failed to enhance chunk, using original:", chunkError);
-        enhancedChunks.push(chunk);
-        errorCount++;
-        this.statsUtils.incrementErrorCount();
-      }
-
-      // Add delay between chunks to avoid overwhelming the LLM
-      if (i < chunks.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY));
-      }
-    }
-
-    if (errorCount > 0) {
-      this.logger.warn(`Processing completed with ${errorCount} chunk errors`);
-    }
-
-    return enhancedChunks;
   }
 
   // Enhanced methods for ContentEnhancerIntegration to better utilize MultiCharacterContextAnalyzer

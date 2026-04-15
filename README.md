@@ -1,5 +1,9 @@
 # Novel Dialogue Enhancer
 
+![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![License](https://img.shields.io/badge/license-Apache%202.0-green)
+![Manifest](https://img.shields.io/badge/manifest-v3-orange)
+
 A Chrome extension that improves the quality of translated web novels by enhancing dialogues to sound more natural in English using local AI models.
 
 ## Features
@@ -144,12 +148,24 @@ Character data uses an optimized compressed format (30-40% size reduction):
 
 ## Supported AI Models
 
-The extension works with any Ollama-compatible model. Recommended models:
+The extension works with any Ollama-compatible model. All recommended models use Q4_K_M quantization automatically when pulled via `ollama pull`.
 
-- **qwen3:8b** (default) - Balanced performance and quality
-- **llama3:8b** - Alternative high-quality option
-- **phi3:medium** - Faster processing, good quality
-- **mistral** - Lightweight option for older hardware
+### Ultra-fast (4–6 GB RAM)
+- **`qwen3:4b`** — ~2.5 GB. Speed-focused; good for low-RAM systems.
+
+### Balanced — Sweet Spot (8 GB RAM)
+- **`qwen3:8b`** (default) — ~5 GB. Best all-around for dialogue enhancement.
+- **`gemma3:9b`** — ~6 GB. Google Gemma 3; excellent dialogue quality.
+
+### High Quality (12–16 GB RAM)
+- **`phi4:14b`** — ~9 GB. Microsoft Phi-4; outstanding instruction following.
+- **`qwen3:14b`** — ~9 GB. Larger Qwen3 for better output quality.
+
+### High-End (24 GB+ VRAM/RAM)
+- **`qwen3:30b-a3b`** — MoE architecture; efficient for its quality level.
+- **`mistral-small3.1:24b`** — ~15 GB. Mistral's latest compact model.
+
+To install: `ollama pull <model-name>` (e.g., `ollama pull gemma3:9b`)
 
 ## Development
 

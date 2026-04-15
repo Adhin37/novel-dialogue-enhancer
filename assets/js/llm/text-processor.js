@@ -148,16 +148,19 @@ class TextProcessor {
   cleanLLMResponse(llmResponse) {
     if (!llmResponse) return "";
 
-    // If the response contains markdown code blocks, remove them
-    let cleanedText = llmResponse.replace(/```[\s\S]*?```/g, "");
+    // Strip Qwen3 thinking blocks in case /no_think was not honoured
+    let cleanedText = llmResponse.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
 
-    // Remove potential explanations or notes at the beginning/end
+    // Remove markdown code blocks
+    cleanedText = cleanedText.replace(/```[\s\S]*?```/g, "");
+
+    // Remove standard preamble headers
     cleanedText = cleanedText.replace(
       /^(Here is the enhanced text:|The enhanced text:|Enhanced text:|Enhanced version:)/i,
       ""
     );
 
-    // Remove any final notes
+    // Remove trailing notes
     cleanedText = cleanedText.replace(
       /(Note:.*$)|(I hope this helps.*$)/im,
       ""

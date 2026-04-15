@@ -7,7 +7,7 @@
     "test": "node tests/characterMap.test.js",
     "build:zip": "run-script-os",
     "build:zip:windows": "powershell -Command \"if (Test-Path 'dist/novel-dialogue-enhancer.zip') { Remove-Item 'dist/novel-dialogue-enhancer.zip' -Force }; Compress-Archive -Path assets/*,background/*,content/*,popup/*,options/*,manifest.json,README.md -DestinationPath dist/novel-dialogue-enhancer.zip\"",
-    "build:zip:linux": "rm -f dist/novel-dialogue-enhancer.zip && zip -r dist/novel-dialogue-enhancer.zip assets/* background/* content/* popup/* options/* manifest.json README.md",
+    "build:zip:linux": "bash package.sh",
     "build:zip:default": "echo 'Unsupported OS for build:zip'"
   },
   "repository": {

@@ -1032,90 +1032,30 @@ async function processSingleContentBlock() {
 }
 
 /**
- * Processes multiple paragraphs for enhancement by breaking them into batches
+ * Processes all paragraphs in a single LLM call
  * @param {NodeList} paragraphs - The paragraphs to process
+ * @return {boolean} - Whether enhancement was successful
  */
 async function processMultipleParagraphs(paragraphs) {
   const totalParagraphs = paragraphs.length;
-  const idealChunkSize = Math.max(5, Math.ceil(totalParagraphs / 3));
-  const chunkSize = Math.min(idealChunkSize, 15);
 
-  console.log(
-    `Processing ${totalParagraphs} paragraphs in chunks of ${chunkSize}`
-  );
-
-  // Show a persistent message at the start that won't auto-disappear
-  toaster.showLoading(`Preparing to process ${totalParagraphs} paragraphs...`);
-
-  for (let i = 0; i < paragraphs.length; i += chunkSize) {
-    if (terminateRequested) {
-      console.log(
-        `Enhancement terminated by user at batch ${i}/${paragraphs.length}`
-      );
-      toaster.showWarning("Enhancement terminated by user");
-      break;
-    }
-
-    await processParagraphBatch(paragraphs, i, chunkSize, totalParagraphs);
-
-    if (i + chunkSize < paragraphs.length && !terminateRequested) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-    }
+  if (terminateRequested) {
+    toaster.showWarning("Enhancement terminated by user");
+    return false;
   }
-}
 
-/**
- * Processes a batch of paragraphs for enhancement
- * @param {NodeList} paragraphs - The paragraphs to process
- * @param {number} startIndex - The starting index of the batch
- * @param {number} chunkSize - The size of the batch
- * @param {number} totalParagraphs - The total number of paragraphs
- */
-async function processParagraphBatch(
-  paragraphs,
-  startIndex,
-  chunkSize,
-  totalParagraphs
-) {
-  console.log(
-    `Enhancement progress: ${startIndex}/${paragraphs.length} paragraphs`
-  );
+  console.log(`Processing ${totalParagraphs} paragraphs in a single pass`);
+  toaster.updateProgress(0, 1);
+  toaster.showLoading(`Enhancing ${totalParagraphs} paragraphs...`);
 
-  toaster.updateProgress(startIndex, totalParagraphs);
-  toaster.showLoading(
-    `Processing paragraphs ${startIndex + 1}-${Math.min(
-      startIndex + chunkSize,
-      paragraphs.length
-    )}...`
-  );
-
-  const batch = Array.from(paragraphs).slice(
-    startIndex,
-    startIndex + chunkSize
-  );
-  const batchText = batch.map((p) => p.textContent).join("\n\n");
-  const originalTexts = batch.map((p) => p.textContent); // Store original texts
+  const batchStartTime = performance.now();
+  const originalTexts = Array.from(paragraphs).map((p) => p.textContent);
+  const fullText = originalTexts.join("\n\n");
 
   try {
-    console.log(
-      `Processing batch ${startIndex}-${startIndex + batch.length - 1} (${
-        batchText.length
-      } chars)`
-    );
-
-    const batchStartTime = performance.now();
-    const enhancedText = await contentEnhancerIntegration.enhanceText(
-      batchText
-    );
-    const batchEndTime = performance.now();
-    const batchProcessingTime = batchEndTime - batchStartTime;
+    const enhancedText = await contentEnhancerIntegration.enhanceText(fullText);
 
     if (terminateRequested) {
-      console.log(
-        `Enhancement terminated by user during batch ${startIndex}-${
-          startIndex + batch.length - 1
-        }`
-      );
       toaster.showWarning("Enhancement terminated by user");
       return false;
     }
@@ -1123,77 +1063,45 @@ async function processParagraphBatch(
     const enhancedParagraphs = enhancedText.split("\n\n");
     let successfulUpdates = 0;
 
-    // Apply enhancements with verification
-    for (let j = 0; j < batch.length && j < enhancedParagraphs.length; j++) {
+    for (let j = 0; j < paragraphs.length; j++) {
+      const enhanced = enhancedParagraphs[j] ?? originalTexts[j];
       try {
-        batch[j].innerHTML = window.DOMPurify.sanitize(enhancedParagraphs[j]);
+        paragraphs[j].innerHTML = window.DOMPurify.sanitize(enhanced);
 
-        // Verify each paragraph update
         const updateVerified = verifyAndHandleDOMUpdate(
-          batch[j],
+          paragraphs[j],
           originalTexts[j],
-          enhancedParagraphs[j]
+          enhanced
         );
-
-        if (updateVerified) {
-          successfulUpdates++;
-        } else {
-          console.warn(
-            `Failed to verify update for paragraph ${startIndex + j}`
-          );
-        }
+        if (updateVerified) successfulUpdates++;
       } catch (updateError) {
-        console.error(
-          `Failed to update paragraph ${startIndex + j}:`,
-          updateError
-        );
-        // Try to restore original text
+        console.error(`Failed to update paragraph ${j}:`, updateError);
         try {
-          batch[j].innerHTML = window.DOMPurify.sanitize(originalTexts[j]);
-        } catch (restoreError) {
-          console.error(
-            `Failed to restore paragraph ${startIndex + j}:`,
-            restoreError
-          );
-        }
+          paragraphs[j].innerHTML = window.DOMPurify.sanitize(originalTexts[j]);
+        } catch (_) {}
       }
     }
 
-    console.log(
-      `Batch ${startIndex}-${
-        startIndex + batch.length - 1
-      }: ${successfulUpdates}/${batch.length} paragraphs updated successfully`
-    );
+    toaster.updateProgress(1, 1);
 
-    toaster.updateProgress(
-      Math.min(startIndex + batch.length, totalParagraphs),
-      totalParagraphs
-    );
-
-    // Report paragraph statistics for this batch with actual processing time
+    const processingTime = performance.now() - batchStartTime;
     chrome.runtime.sendMessage({
       action: "updateParagraphStats",
-      paragraphCount: successfulUpdates, // Report actual successful updates
-      processingTime: batchProcessingTime
+      paragraphCount: successfulUpdates,
+      processingTime
     });
 
-    // Return true if at least some paragraphs were updated successfully
+    console.log(
+      `Enhancement complete: ${successfulUpdates}/${totalParagraphs} paragraphs updated`
+    );
     return successfulUpdates > 0;
   } catch (error) {
-    console.error(
-      `Enhancement failed for batch ${startIndex}-${startIndex + chunkSize}:`,
-      error
-    );
-    toaster.showMessage(
-      `Batch ${startIndex}-${
-        startIndex + batch.length
-      } failed. Skipping this batch and continuing...`,
-      "warn",
-      4000
-    );
+    console.error("Enhancement failed:", error);
+    toaster.showWarning("Enhancement failed. Check that Ollama is running.");
     return false;
   }
 }
+
 
 /**
  * Handles termination requests from the background script

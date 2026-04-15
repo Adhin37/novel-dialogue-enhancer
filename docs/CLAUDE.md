@@ -78,6 +78,25 @@ Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online n
 - `StatsUtils` - Statistics tracking across sessions
 - `DarkModeManager` - Theme management with system preference detection
 
+#### 9. Logging System (`assets/js/utils/logger.js`)
+
+- `window.logger` — singleton `Logger` instance available globally in all browser contexts
+- Separates user-facing toast messages from technical console output
+- **User-facing methods**: `userSuccess()`, `userError()`, `userWarning()`, `userInfo()`, `userLoading()`, `userProgress()`
+- **Console methods**: `info()`, `warn()`, `error()`, `success()`
+- **Debug-only methods**: `debug()`, `timing()`, `performance()` — only emit when `debugMode` is `true`
+- Debug mode toggled via options page "Enable Debug Logging", stored in `chrome.storage.sync`
+- Maintains ring-buffer log history of last 100 entries (`window.logger.getRecentLogs()`)
+- Toaster injected at runtime via `window.logger.setToaster(toaster)`
+- `FeedbackManager` has been removed; all user feedback now routes through `window.logger`
+
+Common pattern:
+```javascript
+window.logger.info('Processing chunk', { chunkIndex, total });
+window.logger.userError('Ollama not available. Please start Ollama.');
+window.logger.debug('Gender scores', scores); // only visible in debug mode
+```
+
 ### Data Flow & Architecture
 
 1. **Whitelist Check**: Content script verifies site approval before any activation
@@ -194,8 +213,7 @@ Multi-analyzer approach with cultural awareness and translation error correction
 
 ### Critical Implementation Details
 
-1. **No localStorage/sessionStorage**: Not supported in Claude.ai artifacts environment
-2. **Whitelist Gating**: All functionality conditional on explicit site approval
+1. **Whitelist Gating**: All functionality conditional on explicit site approval
 3. **Compressed Storage**: Gender codes ("m"/"f"/"u") and numeric IDs for efficiency
 4. **Cultural Awareness**: Analysis adapts to detected cultural origin automatically
 5. **Translation Error Correction**: Detects and corrects common machine translation mistakes
@@ -225,3 +243,19 @@ Multi-analyzer approach with cultural awareness and translation error correction
 - **Permissions**: Granular permissions with optional host permissions for security
 
 This architecture provides a robust, scalable foundation for novel dialogue enhancement with strong performance characteristics, comprehensive user control through whitelisting, privacy protection through local processing, and maintainable code structure.
+
+### Recommended Ollama Models (April 2026)
+
+All models below use Q4_K_M quantization automatically when pulled via `ollama pull`.
+
+| Tier | Model | Pull Command | RAM | Notes |
+|---|---|---|---|---|
+| Ultra-fast | `qwen3:4b` | `ollama pull qwen3:4b` | ~2.5 GB | Speed-focused; good for low-RAM systems |
+| **Balanced** | **`qwen3:8b`** | `ollama pull qwen3:8b` | ~5 GB | **Default.** Best all-around for dialogue |
+| Balanced | `gemma3:9b` | `ollama pull gemma3:9b` | ~6 GB | Google Gemma 3; excellent dialogue quality |
+| High Quality | `phi4:14b` | `ollama pull phi4:14b` | ~9 GB | Microsoft Phi-4; outstanding instruction following |
+| High Quality | `qwen3:14b` | `ollama pull qwen3:14b` | ~9 GB | Larger Qwen3 for better quality |
+| High-End | `qwen3:30b-a3b` | `ollama pull qwen3:30b-a3b` | ~20 GB | MoE architecture; efficient for its quality level |
+| High-End | `mistral-small3.1:24b` | `ollama pull mistral-small3.1:24b` | ~15 GB | Mistral's latest compact model |
+
+Default model remains `qwen3:8b` (set in `Constants.DEFAULTS.MODEL_NAME`). Users configure the active model in Options → General → Model Settings.

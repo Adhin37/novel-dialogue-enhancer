@@ -26,30 +26,31 @@ class PromptGenerator {
     const style = novelInfo?.style || "standard narrative";
     const tone = novelInfo?.tone || "neutral";
 
-    return `You are a dialogue enhancer for translated web novels. Your task is to enhance the following web novel text to improve dialogue attribution and clarity.
+    return `You are an expert at enhancing translated web novels. Your task is to improve the following ${contextInfo ? "text section" : "chapter"} to make dialogue and narration sound more natural in English.
 The novel's style is ${style} with a ${tone} tone.
 
-Characters information (name, gender, appearances):
+Characters (name, gender):
 ${characterContext || "No character information available"}
 
-${contextInfo || ""}
+${contextInfo ? contextInfo + "\n" : ""}CRITICAL RULES:
+- Keep ALL character names exactly as written — never translate or change them
+- Preserve EVERY story event, plot detail, and sentence meaning
+- Maintain the exact number of paragraphs — do not merge or split paragraphs
+- Maintain the same emotional tone and mood throughout
+- If a sentence is already natural, leave it unchanged
+- Return ONLY the enhanced text, no explanations, headers, or commentary
 
 INSTRUCTIONS:
-1. Improve dialogue naturalness while preserving the original meaning
-2. Make dialogue flow better in English
-3. Keep all character names in the same language and exactly as provided
-4. Fix pronoun inconsistencies based on the character information above
-5. Briefly translate any foreign titles/cities/terms to English
-6. IMPORTANT: Return ONLY the enhanced text with no explanations, analysis, or commentary
-7. IMPORTANT: Do not use markdown formatting or annotations
-8. Maintain paragraph breaks as in the original text as much as possible
-9. Focus especially on maintaining gender consistency based on the character information provided
-10. Don't change the story or add new plot elements
-11. Maintain the original tone and mood
+1. Make dialogue feel natural in English while preserving the original meaning
+2. Fix pronoun inconsistencies using the character information above
+3. Translate inline foreign titles, honorifics, and place names to English
+4. Preserve paragraph breaks exactly as in the original
+5. Do not use markdown formatting, annotations, or code blocks
+6. Maintain gender consistency throughout based on the character list above
 /no_think
 
 TEXT TO ENHANCE:
-  
+
 ${chunk}`;
   }
 
