@@ -33,7 +33,8 @@ class NovelCharacterExtractor {
         if (!name || name.length > 30) continue;
 
         const sanitizedName = SharedUtils.sanitizeText(name);
-        const extractedName = this.extractCharacterName(sanitizedName);
+        const rawName = this.extractCharacterName(sanitizedName);
+        const extractedName = rawName ? SharedUtils.normalizeName(rawName) : null;
 
         if (extractedName) {
           if (!characterMap[extractedName]) {
@@ -224,7 +225,7 @@ class NovelCharacterExtractor {
           const potentialName = pattern === patterns[0] ? match[2] : match[1];
           const extractedName = this.extractCharacterName(potentialName);
           if (extractedName) {
-            characters.add(extractedName);
+            characters.add(SharedUtils.normalizeName(extractedName));
           }
           break;
         }
@@ -234,14 +235,14 @@ class NovelCharacterExtractor {
     dialoguePatterns.colonSeparatedDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
-        characters.add(extractedName);
+        characters.add(SharedUtils.normalizeName(extractedName));
       }
     });
 
     dialoguePatterns.actionDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
-        characters.add(extractedName);
+        characters.add(SharedUtils.normalizeName(extractedName));
       }
     });
 
@@ -343,7 +344,17 @@ class NovelCharacterExtractor {
       delete cleanedMap[key];
     });
 
-    return cleanedMap;
+    // Merge any remaining case variants into a single canonical entry
+    const deduped = {};
+    for (const [name, data] of Object.entries(cleanedMap)) {
+      const key = SharedUtils.normalizeName(name);
+      if (deduped[key]) {
+        deduped[key].appearances += data.appearances || 0;
+      } else {
+        deduped[key] = { ...data };
+      }
+    }
+    return deduped;
   }
 
   /**

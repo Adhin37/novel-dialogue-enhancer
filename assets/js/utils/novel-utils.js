@@ -147,10 +147,11 @@ class NovelUtils {
 
     // Merge extracted characters with existing character map
     Object.entries(extractedCharacters).forEach(([name, data]) => {
-      if (!characterMap[name]) {
-        characterMap[name] = data;
+      const key = SharedUtils.normalizeName(name);
+      if (!characterMap[key]) {
+        characterMap[key] = data;
       } else {
-        characterMap[name].appearances += data.appearances;
+        characterMap[key].appearances += data.appearances;
       }
     });
 
@@ -298,10 +299,15 @@ class NovelUtils {
     const novelData = await this.loadExistingNovelData();
     const existingMap = novelData.characterMap || {};
 
+    const normalizedKeys = new Set(
+      Object.keys(characterMap).map(SharedUtils.normalizeName)
+    );
     const mergedMap = {
       ...characterMap,
       ...Object.fromEntries(
-        Object.entries(existingMap).filter(([name]) => !characterMap[name])
+        Object.entries(existingMap)
+          .filter(([name]) => !normalizedKeys.has(SharedUtils.normalizeName(name)))
+          .map(([name, data]) => [SharedUtils.normalizeName(name), data])
       )
     };
 

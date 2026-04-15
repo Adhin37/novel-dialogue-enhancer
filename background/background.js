@@ -781,7 +781,7 @@ function handleMessage(request, sender, sendResponse) {
         for (const [id, character] of Object.entries(
           novelCharacterMaps[novelId].chars
         )) {
-          if (character && character.name === charData.name) {
+          if (character && character.name.toLowerCase() === charData.name.toLowerCase()) {
             existingCharId = id;
             break;
           }

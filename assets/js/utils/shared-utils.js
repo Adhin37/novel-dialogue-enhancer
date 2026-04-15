@@ -140,6 +140,23 @@ class SharedUtils {
   }
 
   /**
+   * Normalize a character name to canonical form:
+   * trim, collapse internal whitespace, capitalize first letter of each word.
+   * Other letters are preserved as-is ("McGregor" stays "McGregor").
+   * @param {string} name - Name to normalize
+   * @return {string} - Normalized name
+   */
+  static normalizeName(name) {
+    if (!name || typeof name !== "string") return name;
+    return name
+      .trim()
+      .replace(/\s+/g, " ")
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  }
+
+  /**
    * Validate confidence score
    * @param {number} confidence - Confidence to validate
    * @return {boolean} - Whether confidence is valid
@@ -188,7 +205,7 @@ class SharedUtils {
     evidence = []
   ) {
     return {
-      name: String(name || ""),
+      name: SharedUtils.normalizeName(String(name || "")) || String(name || ""),
       gender: this.compressGender(gender),
       confidence: this.validateConfidence(confidence) ? confidence : 0,
       appearances: this.validateAppearances(appearances) ? appearances : 1,
