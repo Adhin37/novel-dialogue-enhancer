@@ -19,21 +19,27 @@ REQUIRED=(
   "manifest.json"
   "LICENSE"
   "README.md"
-  "background/background.js"
-  "content/content.js"
-  "popup/popup.html"
-  "popup/popup.js"
-  "popup/popup.css"
-  "options/options.html"
-  "options/options.js"
-  "options/options.css"
-  "assets/js/lib/purify.min.js"
-  "assets/js/utils/constants.js"
-  "assets/js/utils/shared-utils.js"
-  "assets/js/utils/logger.js"
-  "assets/js/llm/ollama-client.js"
-  "assets/js/llm/prompt-generator.js"
-  "assets/js/llm/text-processor.js"
+  "src/background/background.js"
+  "src/background/background.min.js"
+  "src/content/content.js"
+  "src/content/content.min.js"
+  "src/popup/popup.html"
+  "src/popup/popup.js"
+  "src/popup/popup.css"
+  "src/popup/popup.min.js"
+  "src/popup/popup.min.css"
+  "src/options/options.html"
+  "src/options/options.js"
+  "src/options/options.css"
+  "src/options/options.min.js"
+  "src/options/options.min.css"
+  "src/shared/lib/purify.min.js"
+  "src/shared/utils/constants.js"
+  "src/shared/utils/shared-utils.js"
+  "src/shared/utils/logger.js"
+  "src/shared/llm/ollama-client.js"
+  "src/shared/llm/prompt-generator.js"
+  "src/shared/llm/text-processor.js"
 )
 
 for f in "${REQUIRED[@]}"; do
@@ -43,8 +49,8 @@ for f in "${REQUIRED[@]}"; do
   fi
 done
 
-if [ ! -d "assets/icons" ]; then
-  echo "  ERROR: missing assets/icons/"
+if [ ! -d "src/assets/icons" ]; then
+  echo "  ERROR: missing src/assets/icons/"
   MISSING=$((MISSING + 1))
 fi
 
@@ -61,11 +67,7 @@ mkdir -p dist
 rm -f "$RELEASE_ZIP"
 zip -r "$RELEASE_ZIP" \
   manifest.json LICENSE README.md \
-  assets/ \
-  background/ \
-  content/ \
-  popup/ \
-  options/
+  src/
 echo "  $RELEASE_ZIP created ($(du -sh "$RELEASE_ZIP" | cut -f1))"
 
 echo ""

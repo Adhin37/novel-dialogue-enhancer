@@ -2,11 +2,14 @@
   "name": "novel-dialogue-enhancer",
   "version": "1.0.0",
   "description": "Novel dialogue enhancer",
-  "main": "content.js",
+  "type": "module",
   "scripts": {
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev",
     "test": "node tests/characterMap.test.js",
+    "test:e2e": "playwright test",
     "build:zip": "run-script-os",
-    "build:zip:windows": "powershell -Command \"if (Test-Path 'dist/novel-dialogue-enhancer.zip') { Remove-Item 'dist/novel-dialogue-enhancer.zip' -Force }; Compress-Archive -Path assets/*,background/*,content/*,popup/*,options/*,manifest.json,README.md -DestinationPath dist/novel-dialogue-enhancer.zip\"",
+    "build:zip:windows": "powershell -Command \"if (Test-Path 'dist/novel-dialogue-enhancer.zip') { Remove-Item 'dist/novel-dialogue-enhancer.zip' -Force }; Compress-Archive -Path src/*,manifest.json,README.md -DestinationPath dist/novel-dialogue-enhancer.zip\"",
     "build:zip:linux": "bash package.sh",
     "build:zip:default": "echo 'Unsupported OS for build:zip'"
   },
@@ -25,6 +28,8 @@
   "homepage": "https://github.com/Adhin37/novel-dialogue-enhancer#readme",
   "devDependencies": {
     "@eslint/js": "^9.26.0",
+    "@playwright/test": "^1.59.1",
+    "esbuild": "^0.25.0",
     "eslint": "^9.26.0",
     "globals": "^16.1.0",
     "run-script-os": "^1.1.6"

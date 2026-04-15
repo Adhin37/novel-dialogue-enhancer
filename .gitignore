@@ -16,3 +16,6 @@ node_modules/
 .env
 .claude
 dist/
+src/**/*.min.js
+src/**/*.min.css
+test-results/
