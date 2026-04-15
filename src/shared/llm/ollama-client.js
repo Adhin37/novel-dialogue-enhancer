@@ -228,7 +228,7 @@ export class OllamaClient {
     return new Promise((resolve, reject) =>
       chrome.storage.sync.get(
         {
-          modelName: "qwen3:8b",
+          modelName: "qwen3:8b-q4_K_M",
           timeout: 300,
           temperature: 0.4,
           topP: 0.9,

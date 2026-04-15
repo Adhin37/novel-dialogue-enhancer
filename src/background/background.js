@@ -1371,7 +1371,7 @@ chrome.runtime.onInstalled.addListener(() => {
       isExtensionPaused: false,
       preserveNames: true,
       fixPronouns: true,
-      modelName: "qwen3:8b",
+      modelName: "qwen3:8b-q4_K_M",
       contextSize: 32768,
       timeout: 300,
       disabledPages: [],

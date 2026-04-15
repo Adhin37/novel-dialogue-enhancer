@@ -22,7 +22,7 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 ### Prerequisites
 
 1. **Install Ollama**: Download and install [Ollama](https://ollama.com) on your computer
-2. **Pull an AI Model**: Run `ollama pull qwen3:8b` (or another supported model)
+2. **Pull an AI Model**: Run `ollama pull qwen3:8b-q4_K_M` (or another supported model)
 3. **Start Ollama Server**: Run `ollama serve` to make the AI model available
 
 ### Extension Installation
@@ -143,7 +143,7 @@ Character data uses an optimized compressed format (30-40% size reduction):
 
 ### Model Settings
 
-- **Model Name**: Specify which Ollama model to use (default: qwen3:8b)
+- **Model Name**: Specify which Ollama model to use (default: qwen3:8b-q4_K_M)
 - **Temperature**: Control creativity vs consistency (0.1-1.0)
 - **Top P**: Control language diversity (0.1-1.0)
 
@@ -169,7 +169,7 @@ The extension works with any Ollama-compatible model. All recommended models use
 
 ### Balanced — Sweet Spot (8 GB RAM)
 
-- **`qwen3:8b`** (default) — ~5 GB. Best all-around for dialogue enhancement.
+- **`qwen3:8b-q4_K_M`** (default) — ~5 GB. Best all-around for dialogue enhancement.
 - **`gemma3:9b`** — ~6 GB. Google Gemma 3; excellent dialogue quality.
 
 ### High Quality (12–16 GB RAM)

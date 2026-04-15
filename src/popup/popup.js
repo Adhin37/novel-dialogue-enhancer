@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
     ["whitelistedSites", "isExtensionPaused", "preserveNames", "fixPronouns"],
     (data) => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "Error loading initial settings:",
           chrome.runtime.lastError
         );
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
         preserveNamesToggle.checked = data.preserveNames !== false;
         fixPronounsToggle.checked = data.fixPronouns !== false;
 
-        console.log("Loaded settings:", {
+        logger.debug("Loaded settings:", {
           whitelistedSites: whitelistedSites.length,
           isExtensionPaused,
           preserveNames: preserveNamesToggle.checked,
@@ -59,12 +59,12 @@ document.addEventListener("DOMContentLoaded", () => {
   preserveNamesToggle.addEventListener("change", function () {
     chrome.storage.sync.set({ preserveNames: this.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "Error saving preserve names setting:",
           chrome.runtime.lastError
         );
       } else {
-        console.log(`Preserve names setting updated: ${this.checked}`);
+        logger.debug(`Preserve names setting updated: ${this.checked}`);
       }
     });
   });
@@ -72,12 +72,12 @@ document.addEventListener("DOMContentLoaded", () => {
   fixPronounsToggle.addEventListener("change", function () {
     chrome.storage.sync.set({ fixPronouns: this.checked }, () => {
       if (chrome.runtime.lastError) {
-        console.error(
+        logger.error(
           "Error saving fix pronouns setting:",
           chrome.runtime.lastError
         );
       } else {
-        console.log(`Fix pronouns setting updated: ${this.checked}`);
+        logger.debug(`Fix pronouns setting updated: ${this.checked}`);
       }
     });
   });
@@ -94,11 +94,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     chrome.storage.sync.set({ isExtensionPaused: isExtensionPaused }, () => {
       if (chrome.runtime.lastError) {
-        console.error("Failed to save pause state:", chrome.runtime.lastError);
+        logger.error("Failed to save pause state:", chrome.runtime.lastError);
         statusMessage.textContent = "Error saving pause state";
         setTimeout(() => updateStatus(), 2000);
       } else {
-        console.log(`Extension paused state set to: ${isExtensionPaused}`);
+        logger.debug(`Extension paused state set to: ${isExtensionPaused}`);
 
         if (isExtensionPaused) {
           terminateActiveOperations();
@@ -118,14 +118,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function terminateActiveOperations() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-        console.error("No active tabs found for termination:", tabs);
+        logger.error("No active tabs found for termination:", tabs);
         statusMessage.textContent = "Extension paused (no active tab)";
         return;
       }
 
       const activeTab = tabs[0];
       if (!activeTab || !activeTab.id) {
-        console.error("Invalid active tab for termination:", activeTab);
+        logger.error("Invalid active tab for termination:", activeTab);
         statusMessage.textContent = "Extension paused (invalid tab)";
         return;
       }
@@ -136,12 +136,12 @@ document.addEventListener("DOMContentLoaded", () => {
           { action: "terminateOperations" },
           (terminateResponse) => {
             if (chrome.runtime.lastError) {
-              console.error(
+              logger.error(
                 "Failed to send termination signal:",
                 chrome.runtime.lastError
               );
             } else if (terminateResponse) {
-              console.log(
+              logger.debug(
                 "Termination signal sent successfully:",
                 terminateResponse
               );
@@ -161,12 +161,12 @@ document.addEventListener("DOMContentLoaded", () => {
       { action: "terminateAllRequests" },
       (terminateResponse) => {
         if (chrome.runtime.lastError) {
-          console.error(
+          logger.error(
             "Failed to terminate background requests:",
             chrome.runtime.lastError
           );
         } else if (terminateResponse) {
-          console.log("Background requests terminated:", terminateResponse);
+          logger.debug("Background requests terminated:", terminateResponse);
         }
       }
     );
@@ -204,21 +204,21 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Runtime error:", chrome.runtime.lastError);
+          logger.error("Runtime error:", chrome.runtime.lastError);
           statusMessage.textContent = "Error communicating with extension";
           setTimeout(() => updateStatus(), 2000);
           return;
         }
 
         if (!response || typeof response !== "object") {
-          console.warn("Invalid add whitelist response:", response);
+          logger.warn("Invalid add whitelist response:", response);
           statusMessage.textContent = "Invalid response format";
           setTimeout(() => updateStatus(), 2000);
           return;
         }
 
         if (response.success) {
-          console.log(`Successfully added ${currentTabHostname} to whitelist`);
+          logger.info(`Successfully added ${currentTabHostname} to whitelist`);
 
           // Update local whitelist array and storage
           if (!whitelistedSites.includes(currentTabHostname)) {
@@ -228,12 +228,12 @@ document.addEventListener("DOMContentLoaded", () => {
               { whitelistedSites: whitelistedSites },
               () => {
                 if (chrome.runtime.lastError) {
-                  console.error(
+                  logger.error(
                     "Error updating local whitelist storage:",
                     chrome.runtime.lastError
                   );
                 } else {
-                  console.log(`Whitelist updated: added ${currentTabHostname}`);
+                  logger.debug(`Whitelist updated: added ${currentTabHostname}`);
                 }
               }
             );
@@ -246,7 +246,7 @@ document.addEventListener("DOMContentLoaded", () => {
           setTimeout(() => updateStatus(), 2000);
           sendPageStatusUpdate(true);
         } else {
-          console.warn("Failed to add to whitelist:", response.message);
+          logger.warn("Failed to add to whitelist:", response.message);
           statusMessage.textContent =
             response.message || "Failed to add site to whitelist";
           setTimeout(() => updateStatus(), 2000);
@@ -266,21 +266,21 @@ document.addEventListener("DOMContentLoaded", () => {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Runtime error:", chrome.runtime.lastError);
+          logger.error("Runtime error:", chrome.runtime.lastError);
           statusMessage.textContent = "Error communicating with extension";
           setTimeout(() => updateStatus(), 2000);
           return;
         }
 
         if (!response || typeof response !== "object") {
-          console.warn("Invalid remove whitelist response:", response);
+          logger.warn("Invalid remove whitelist response:", response);
           statusMessage.textContent = "Invalid response format";
           setTimeout(() => updateStatus(), 2000);
           return;
         }
 
         if (response.success) {
-          console.log(
+          logger.info(
             `Successfully removed ${currentTabHostname} from whitelist`
           );
 
@@ -295,12 +295,12 @@ document.addEventListener("DOMContentLoaded", () => {
               { whitelistedSites: whitelistedSites },
               () => {
                 if (chrome.runtime.lastError) {
-                  console.error(
+                  logger.error(
                     "Error updating local whitelist storage:",
                     chrome.runtime.lastError
                   );
                 } else {
-                  console.log(
+                  logger.debug(
                     `Whitelist updated: removed ${currentTabHostname}`
                   );
                 }
@@ -314,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
           setTimeout(() => updateStatus(), 2000);
           sendPageStatusUpdate(false);
         } else {
-          console.warn("Failed to remove from whitelist:", response.message);
+          logger.warn("Failed to remove from whitelist:", response.message);
           statusMessage.textContent =
             response.message || "Failed to remove site";
           setTimeout(() => updateStatus(), 2000);
@@ -329,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function handleEnhanceNowClick() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-        console.error("No active tabs found for enhancement:", tabs);
+        logger.error("No active tabs found for enhancement:", tabs);
         statusMessage.textContent = "Error: No active tab found";
         setTimeout(() => updateStatus(), 2000);
         return;
@@ -337,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const activeTab = tabs[0];
       if (!activeTab || !activeTab.id) {
-        console.error("Invalid active tab for enhancement:", activeTab);
+        logger.error("Invalid active tab for enhancement:", activeTab);
         statusMessage.textContent = "Error: Invalid active tab";
         setTimeout(() => updateStatus(), 2000);
         return;
@@ -349,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
           { action: "ping" },
           (response) => {
             if (chrome.runtime.lastError) {
-              console.error(
+              logger.error(
                 "Content script ping failed:",
                 chrome.runtime.lastError
               );
@@ -359,20 +359,20 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (!response || typeof response !== "object") {
-              console.warn("Invalid ping response:", response);
+              logger.warn("Invalid ping response:", response);
               statusMessage.textContent = "Invalid extension response";
               setTimeout(() => updateStatus(), 2000);
               return;
             }
 
             if (!response.whitelisted) {
-              console.log("Site not whitelisted for enhancement");
+              logger.debug("Site not whitelisted for enhancement");
               statusMessage.textContent = "Site must be whitelisted first";
               setTimeout(() => updateStatus(), 2000);
               return;
             }
 
-            console.log("Sending enhancement request...");
+            logger.debug("Sending enhancement request...");
             chrome.tabs.sendMessage(
               activeTab.id,
               {
@@ -385,7 +385,7 @@ document.addEventListener("DOMContentLoaded", () => {
               },
               (enhanceResponse) => {
                 if (chrome.runtime.lastError) {
-                  console.error(
+                  logger.error(
                     "Enhancement request failed:",
                     chrome.runtime.lastError
                   );
@@ -395,7 +395,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 if (!enhanceResponse || typeof enhanceResponse !== "object") {
-                  console.warn(
+                  logger.warn(
                     "Invalid enhancement response:",
                     enhanceResponse
                   );
@@ -405,18 +405,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 if (enhanceResponse.status === "enhanced") {
-                  console.log(
+                  logger.info(
                     "Enhancement completed successfully:",
                     enhanceResponse.stats
                   );
                   statusMessage.textContent = "Enhancement applied!";
                 } else if (enhanceResponse.status === "failed") {
-                  console.error("Enhancement failed:", enhanceResponse.error);
+                  logger.error("Enhancement failed:", enhanceResponse.error);
                   statusMessage.textContent = `Enhancement failed: ${
                     enhanceResponse.error || "Unknown error"
                   }`;
                 } else {
-                  console.log("Enhancement status:", enhanceResponse.status);
+                  logger.debug("Enhancement status:", enhanceResponse.status);
                   statusMessage.textContent = "Enhancement started...";
                 }
 
@@ -426,7 +426,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         );
       } catch (error) {
-        console.error("Exception in handleEnhanceNowClick:", error);
+        logger.error("Exception in handleEnhanceNowClick:", error);
         statusMessage.textContent = "Error: " + error.message;
         setTimeout(() => updateStatus(), 2000);
       }
@@ -448,19 +448,19 @@ document.addEventListener("DOMContentLoaded", () => {
       { action: "checkSitePermission", url: currentTabUrl },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Permission check failed:", chrome.runtime.lastError);
+          logger.error("Permission check failed:", chrome.runtime.lastError);
           updateStatus();
           return;
         }
 
         if (!response || typeof response !== "object") {
-          console.warn("Invalid permission check response:", response);
+          logger.warn("Invalid permission check response:", response);
           updateStatus();
           return;
         }
 
         const hasPermission = Boolean(response.hasPermission);
-        console.log(
+        logger.debug(
           `Permission check result for ${currentTabHostname}: ${hasPermission}`
         );
 
@@ -482,14 +482,14 @@ document.addEventListener("DOMContentLoaded", () => {
   function processCurrentTab() {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-        console.error("No active tabs found:", tabs);
+        logger.error("No active tabs found:", tabs);
         statusMessage.textContent = "No active tab found";
         return;
       }
 
       const activeTab = tabs[0];
       if (!activeTab || !activeTab.url) {
-        console.error("Invalid active tab:", activeTab);
+        logger.error("Invalid active tab:", activeTab);
         statusMessage.textContent = "Invalid tab URL";
         return;
       }
@@ -500,11 +500,11 @@ document.addEventListener("DOMContentLoaded", () => {
         currentTabHostname = url.hostname;
         currentSite.textContent = currentTabHostname;
 
-        console.log(`Processing tab: ${currentTabHostname}`);
+        logger.debug(`Processing tab: ${currentTabHostname}`);
 
         const isChromePage = currentTabUrl.startsWith("chrome");
         if (isChromePage) {
-          console.log("Chrome page detected, disabling features");
+          logger.debug("Chrome page detected, disabling features");
           whitelistButton.disabled = true;
           whitelistButton.classList.add("disabled");
           whitelistText.textContent = "Not Available";
@@ -519,7 +519,7 @@ document.addEventListener("DOMContentLoaded", () => {
           { action: "ping" },
           (response) => {
             if (chrome.runtime.lastError) {
-              console.log(
+              logger.debug(
                 "Content script not available, using background check"
               );
               checkWhitelistWithBackground();
@@ -527,13 +527,13 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             if (!response || typeof response !== "object") {
-              console.warn("Invalid content script response:", response);
+              logger.warn("Invalid content script response:", response);
               checkWhitelistWithBackground();
               return;
             }
 
             const isWhitelisted = Boolean(response.whitelisted);
-            console.log(`Content script whitelist status: ${isWhitelisted}`);
+            logger.debug(`Content script whitelist status: ${isWhitelisted}`);
 
             updateWhitelistButton(isWhitelisted);
             updateEnhanceButton(isWhitelisted);
@@ -541,7 +541,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         );
       } catch (error) {
-        console.error("Error processing current tab:", error);
+        logger.error("Error processing current tab:", error);
         statusMessage.textContent = "Error processing current page";
       }
     });
@@ -650,13 +650,13 @@ document.addEventListener("DOMContentLoaded", () => {
   function sendPageStatusUpdate(isWhitelisted) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !Array.isArray(tabs) || tabs.length === 0) {
-        console.error("No active tabs found for status update:", tabs);
+        logger.error("No active tabs found for status update:", tabs);
         return;
       }
 
       const activeTab = tabs[0];
       if (!activeTab || !activeTab.id) {
-        console.error("Invalid active tab for status update:", activeTab);
+        logger.error("Invalid active tab for status update:", activeTab);
         return;
       }
 
@@ -669,19 +669,19 @@ document.addEventListener("DOMContentLoaded", () => {
           },
           (updateResponse) => {
             if (chrome.runtime.lastError) {
-              console.error(
+              logger.error(
                 "Failed to send page status update:",
                 chrome.runtime.lastError
               );
             } else if (updateResponse) {
-              console.log(
+              logger.debug(
                 `Page status update sent successfully: ${updateResponse.status}`
               );
             }
           }
         );
       } catch (error) {
-        console.error("Failed to send page status update:", error);
+        logger.error("Failed to send page status update:", error);
       }
     });
   }

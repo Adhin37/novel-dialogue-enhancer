@@ -4,6 +4,7 @@
  */
 const { test, expect, chromium } = require('@playwright/test');
 const path = require('path');
+const http = require('http');
 
 const extensionPath = path.resolve(__dirname, '../..');
 
@@ -104,7 +105,7 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
         )
       )
     );
-    expect(settings.modelName).toBe('qwen3:8b');
+    expect(settings.modelName).toBe('qwen3:8b-q4_K_M');
     expect(settings.temperature).toBe(0.4);
     expect(settings.topP).toBe(0.9);
     expect(settings.contextSize).toBe(32768);
@@ -311,9 +312,228 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
     await page.goto(`chrome-extension://${extensionId}/src/options/options.html`);
     await page.waitForLoadState('domcontentloaded');
     // toHaveValue auto-retries until the storage callback populates the input
-    await expect(page.locator('#model-name')).toHaveValue('qwen3:8b', { timeout: 8000 });
+    await expect(page.locator('#model-name')).toHaveValue('qwen3:8b-q4_K_M', { timeout: 8000 });
     await expect(page.locator('#temperature-value')).toHaveText('0.4');
 
     await page.close();
+  });
+
+  // -------------------------------------------------------------------------
+  // 12. MTL enhancement — mock WebNovel page with realistic bad translation
+  //
+  // Strategy:
+  //   • A mock HTTP server on port 11434 stands in for Ollama (skipped if the
+  //     port is already occupied by a real Ollama instance).
+  //   • context.route() intercepts the webnovel.com URL and returns a local
+  //     HTML page so the extension's content script is injected automatically
+  //     (it matches *://*.webnovel.com/* in the manifest).
+  //   • www.webnovel.com is added to whitelistedSites so the content script
+  //     proceeds past its site-permission gate.
+  //   • After the 800 ms init delay the content script calls the mock Ollama,
+  //     receives deterministic "enhanced" text, and rewrites the DOM.
+  //   • Assertions verify both that the DOM changed and that specific MTL
+  //     defects present in the original are absent in the enhancement.
+  // -------------------------------------------------------------------------
+  test.describe('MTL enhancement — mock WebNovel chapter', () => {
+    // A real chapter URL pattern so the manifest content_script rule fires.
+    const MOCK_URL = 'https://www.webnovel.com/book/00000000000000000/00000000000000000';
+
+    // ---------- source text: typical MTL from a cultivation novel ----------
+    // Hallmarks of bad machine translation used as ground-truth defects:
+    //   • "He brows knit tightly"  — wrong pronoun + missing article
+    //   • "This lord not need explain"  — literal CN self-referential speech
+    //   • "He breath came out ragged"  — pronoun swap (她→he instead of she)
+    //   • "Silence fall over hall"  — missing article + wrong tense
+    const MTL_TEXT = [
+      'Li Wei pushed open the hall door. He brows knit tightly as he survey the damage before him.',
+      '"You actually dare show your face here!" The cold voice belong to Xu Mengyao, who stand in center of hall, hand clasped behind her back. "After what you do to this lord\'s city?"',
+      'Li Wei let out cold snort. "This lord not need explain himself to you, a mere cultivator of third realm."',
+      'Xu Mengyao feel her heart clench. The rage inside she was almost too much to control. He breath came out ragged.',
+      '"You..." He voice tremble. The eyes of Xu Mengyao become red. "You kill him. You kill my brother!"',
+      'Zhang Hu, who stand silently by doorframe, feel uncomfortable with scene. He watch as tears begin to fall from Xu Mengyao eye. He heart feel heavy.',
+      '"The weak exist to be consumed by strong." Li Wei voice was without mercy. "Your brother was weak. He die as is natural."',
+      'Xu Mengyao clench his fist. The nails dig deep into palm, and pain clear she head. She look straight into eye of Li Wei, and he saw determination there.',
+      '"I will become stronger than you." She say, voice quiet but firm. "And on that day, this lord will make you understand what regret feel like."',
+      'Silence fall over hall. Only wind howl outside could be hear.',
+    ].join('\n\n');
+
+    // ---------- deterministic mock response returned by the fake Ollama ----------
+    // Fixes every defect above so assertions are precise and stable.
+    const ENHANCED_TEXT = [
+      'Li Wei pushed open the hall door. His brows knitted tightly as he surveyed the damage before him.',
+      '"You actually dare show your face here!" The cold voice belonged to Xu Mengyao, who stood in the center of the hall, her hands clasped behind her back. "After what you did to this city?"',
+      'Li Wei let out a cold snort. "I don\'t need to explain myself to you, a mere third-realm cultivator."',
+      'Xu Mengyao felt her heart clench. The rage inside her was almost too much to control. Her breath came out ragged.',
+      '"You..." Her voice trembled. Xu Mengyao\'s eyes turned red. "You killed him. You killed my brother!"',
+      'Zhang Hu, who stood silently by the doorframe, felt uncomfortable with the scene. He watched as tears began to fall from Xu Mengyao\'s eyes. His heart felt heavy.',
+      '"The weak exist to be consumed by the strong." Li Wei\'s voice was without mercy. "Your brother was weak. He died as was natural."',
+      'Xu Mengyao clenched her fist. Her nails dug deep into her palm, and the pain cleared her head. She looked straight into Li Wei\'s eyes, and he saw determination there.',
+      '"I will become stronger than you." She said, her voice quiet but firm. "And on that day, I will make you understand what regret feels like."',
+      'Silence fell over the hall. Only the howl of the wind outside could be heard.',
+    ].join('\n\n');
+
+    const MOCK_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chapter 1: The Hall — MTL E2E Test</title>
+</head>
+<body>
+  <div class="chapter-content">${MTL_TEXT.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')}</div>
+</body>
+</html>`;
+
+    let ollamaMockServer = null;
+    let ollamaMockStarted = false;
+    let chapterPage = null;
+
+    test.beforeAll(async () => {
+      // ── 1. Start mock Ollama server ────────────────────────────────────────
+      ollamaMockServer = http.createServer((req, res) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Content-Type', 'application/json');
+
+        if (req.method === 'OPTIONS') {
+          res.writeHead(204);
+          res.end();
+          return;
+        }
+
+        if (req.url === '/api/version' && req.method === 'GET') {
+          res.writeHead(200);
+          res.end(JSON.stringify({ version: '0.6.0' }));
+          return;
+        }
+
+        if (req.url === '/api/tags' && req.method === 'GET') {
+          res.writeHead(200);
+          res.end(JSON.stringify({
+            models: [{ name: 'qwen3:8b-q4_K_M', modified_at: '2024-01-01T00:00:00Z', size: 1 }],
+          }));
+          return;
+        }
+
+        if (req.url === '/api/generate' && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => { body += chunk; });
+          req.on('end', () => {
+            res.writeHead(200);
+            // Non-streaming response: single JSON object, no literal newlines in
+            // the outer JSON so processOllamaResponse() hits the else branch.
+            res.end(JSON.stringify({ model: 'qwen3:8b-q4_K_M', response: ENHANCED_TEXT, done: true }));
+          });
+          return;
+        }
+
+        res.writeHead(404);
+        res.end(JSON.stringify({ error: 'not found' }));
+      });
+
+      await new Promise((resolve, reject) => {
+        ollamaMockServer.listen(11434, '127.0.0.1', () => {
+          ollamaMockStarted = true;
+          resolve();
+        });
+        ollamaMockServer.once('error', reject);
+      }).catch(() => {
+        // Port 11434 already occupied (real Ollama running).
+        // The test will be skipped via the guard inside the test body.
+        ollamaMockStarted = false;
+      });
+
+      // ── 2. Route the target webnovel URL to local mock HTML ───────────────
+      await context.route(MOCK_URL, async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html; charset=utf-8',
+          body: MOCK_HTML,
+        });
+      });
+
+      // ── 3. Whitelist www.webnovel.com ─────────────────────────────────────
+      await background.evaluate(() =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('whitelistedSites', (data) => {
+            const sites = data.whitelistedSites || [];
+            if (!sites.includes('www.webnovel.com')) sites.push('www.webnovel.com');
+            chrome.storage.sync.set({ whitelistedSites: sites }, resolve);
+          })
+        )
+      );
+
+      // Clear the background's whitelist cache so the fresh storage value is used
+      // when the content script calls checkSitePermission() on navigation.
+      await background.evaluate(() => { whitelistCache.clear(); });
+    });
+
+    test.afterAll(async () => {
+      if (chapterPage) await chapterPage.close().catch(() => {});
+
+      // Remove the webnovel route so it doesn't bleed into other tests.
+      await context.unroute(MOCK_URL).catch(() => {});
+
+      // Restore whitelist to its pre-test state.
+      await background.evaluate(() =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('whitelistedSites', (data) => {
+            const sites = (data.whitelistedSites || []).filter(
+              (s) => s !== 'www.webnovel.com'
+            );
+            chrome.storage.sync.set({ whitelistedSites: sites }, resolve);
+          })
+        )
+      );
+      await background.evaluate(() => { whitelistCache.clear(); });
+
+      if (ollamaMockServer) {
+        await new Promise((resolve) => ollamaMockServer.close(resolve));
+      }
+    });
+
+    test('extension rewrites MTL chapter DOM and fixes known translation defects', async () => {
+      if (!ollamaMockStarted) {
+        test.skip(true, 'Port 11434 is occupied — cannot start mock Ollama server. Run with Ollama stopped.');
+      }
+
+      chapterPage = await context.newPage();
+      await chapterPage.goto(MOCK_URL, { waitUntil: 'domcontentloaded' });
+
+      // Confirm the mock HTML loaded and original defects are present.
+      const originalText = await chapterPage.locator('.chapter-content').textContent();
+      expect(originalText).toContain('He brows knit tightly');
+      expect(originalText).toContain('This lord not need explain');
+      expect(originalText).toContain('He breath came out ragged');
+      expect(originalText).toContain('Silence fall over hall');
+
+      // Wait for the content script to finish enhancement (800 ms init delay +
+      // mock Ollama round-trip). The DOM must differ from the original snapshot.
+      await chapterPage.waitForFunction(
+        (orig) => {
+          const el = document.querySelector('.chapter-content');
+          return el !== null && el.textContent.trim() !== orig.trim();
+        },
+        originalText,
+        { timeout: 30_000 }
+      );
+
+      const enhancedText = await chapterPage.locator('.chapter-content').textContent();
+
+      // ── Metric 1: the DOM was actually rewritten ────────────────────────
+      expect(enhancedText).not.toBe(originalText);
+      expect(enhancedText.length).toBeGreaterThan(100);
+
+      // ── Metric 2: pronoun / article defects removed ─────────────────────
+      expect(enhancedText).not.toContain('He brows knit tightly');
+      expect(enhancedText).not.toContain('He breath came out ragged');
+
+      // ── Metric 3: correct English introduced by the mock response ────────
+      expect(enhancedText).toContain('His brows knitted tightly');
+      expect(enhancedText).toContain('Her breath came out ragged');
+
+      // ── Metric 4: tense / article corrections ───────────────────────────
+      expect(enhancedText).not.toContain('Silence fall over hall');
+      expect(enhancedText).toContain('Silence fell over the hall');
+    });
   });
 });

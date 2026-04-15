@@ -251,11 +251,11 @@ All models below use Q4_K_M quantization automatically when pulled via `ollama p
 | Tier | Model | Pull Command | RAM | Notes |
 |---|---|---|---|---|
 | Ultra-fast | `qwen3:4b` | `ollama pull qwen3:4b` | ~2.5 GB | Speed-focused; good for low-RAM systems |
-| **Balanced** | **`qwen3:8b`** | `ollama pull qwen3:8b` | ~5 GB | **Default.** Best all-around for dialogue |
+| **Balanced** | **`qwen3:8b-q4_K_M`** | `ollama pull qwen3:8b-q4_K_M` | ~5 GB | **Default.** Best all-around for dialogue |
 | Balanced | `gemma3:9b` | `ollama pull gemma3:9b` | ~6 GB | Google Gemma 3; excellent dialogue quality |
 | High Quality | `phi4:14b` | `ollama pull phi4:14b` | ~9 GB | Microsoft Phi-4; outstanding instruction following |
 | High Quality | `qwen3:14b` | `ollama pull qwen3:14b` | ~9 GB | Larger Qwen3 for better quality |
 | High-End | `qwen3:30b-a3b` | `ollama pull qwen3:30b-a3b` | ~20 GB | MoE architecture; efficient for its quality level |
 | High-End | `mistral-small3.1:24b` | `ollama pull mistral-small3.1:24b` | ~15 GB | Mistral's latest compact model |
 
-Default model remains `qwen3:8b` (set in `Constants.DEFAULTS.MODEL_NAME`). Users configure the active model in Options → General → Model Settings.
+Default model remains `qwen3:8b-q4_K_M` (set in `Constants.DEFAULTS.MODEL_NAME`). Users configure the active model in Options → General → Model Settings.

@@ -15,7 +15,7 @@ export const Constants = {
 
   // Default settings
   DEFAULTS: {
-    MODEL_NAME: "qwen3:8b",
+    MODEL_NAME: "qwen3:8b-q4_K_M",
     MAX_CHUNK_SIZE: 80000,
     TIMEOUT: 300,
     TEMPERATURE: 0.4,
