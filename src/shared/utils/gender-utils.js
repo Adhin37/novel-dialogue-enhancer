@@ -1,12 +1,12 @@
-import {{ logger }} from "./logger.js";
-import {{ Constants }} from "./constants.js";
-import {{ SharedUtils }} from "./shared-utils.js";
-import {{ CulturalAnalyzer }} from "../gender/cultural-analyzer.js";
-import {{ NameAnalyzer }} from "../gender/name-analyzer.js";
-import {{ PronounAnalyzer }} from "../gender/pronoun-analyzer.js";
-import {{ RelationshipAnalyzer }} from "../gender/relationship-analyzer.js";
-import {{ AppearanceAnalyzer }} from "../gender/appearance-analyzer.js";
-import {{ MultiCharacterContextAnalyzer }} from "../gender/multi-character-context-analyzer.js";
+import { logger } from "./logger.js";
+import { Constants } from "./constants.js";
+import { SharedUtils } from "./shared-utils.js";
+import { CulturalAnalyzer } from "../gender/cultural-analyzer.js";
+import { NameAnalyzer } from "../gender/name-analyzer.js";
+import { PronounAnalyzer } from "../gender/pronoun-analyzer.js";
+import { RelationshipAnalyzer } from "../gender/relationship-analyzer.js";
+import { AppearanceAnalyzer } from "../gender/appearance-analyzer.js";
+import { MultiCharacterContextAnalyzer } from "../gender/multi-character-context-analyzer.js";
 
 /**
  * Core gender utilities module for Novel Dialogue Enhancer

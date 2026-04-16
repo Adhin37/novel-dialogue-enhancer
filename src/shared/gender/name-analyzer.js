@@ -3,7 +3,7 @@
  * Specialized module for character name pattern analysis
  * Identifies titles, honorifics, and name patterns that indicate gender
  */
-import {{ SharedUtils }} from "../utils/shared-utils.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class NameAnalyzer {
   /**

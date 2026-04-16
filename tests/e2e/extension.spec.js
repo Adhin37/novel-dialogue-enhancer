@@ -105,7 +105,7 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
         )
       )
     );
-    expect(settings.modelName).toBe('qwen3:8b-q4_K_M');
+    expect(settings.modelName).toBe('qwen3.5:4b');
     expect(settings.temperature).toBe(0.4);
     expect(settings.topP).toBe(0.9);
     expect(settings.contextSize).toBe(32768);
@@ -312,31 +312,32 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
     await page.goto(`chrome-extension://${extensionId}/src/options/options.html`);
     await page.waitForLoadState('domcontentloaded');
     // toHaveValue auto-retries until the storage callback populates the input
-    await expect(page.locator('#model-name')).toHaveValue('qwen3:8b-q4_K_M', { timeout: 8000 });
+    await expect(page.locator('#model-name')).toHaveValue('qwen3.5:4b', { timeout: 8000 });
     await expect(page.locator('#temperature-value')).toHaveText('0.4');
 
     await page.close();
   });
 
   // -------------------------------------------------------------------------
-  // 12. MTL enhancement — mock WebNovel page with realistic bad translation
+  // 12. MTL enhancement — WebNovel page with realistic bad translation
   //
   // Strategy:
-  //   • A mock HTTP server on port 11434 stands in for Ollama (skipped if the
-  //     port is already occupied by a real Ollama instance).
-  //   • context.route() intercepts the webnovel.com URL and returns a local
-  //     HTML page so the extension's content script is injected automatically
-  //     (it matches *://*.webnovel.com/* in the manifest).
-  //   • www.webnovel.com is added to whitelistedSites so the content script
-  //     proceeds past its site-permission gate.
-  //   • After the 800 ms init delay the content script calls the mock Ollama,
-  //     receives deterministic "enhanced" text, and rewrites the DOM.
-  //   • Assertions verify both that the DOM changed and that specific MTL
-  //     defects present in the original are absent in the enhancement.
+  //   • beforeAll probes real Ollama (127.0.0.1:11434) to confirm it is
+  //     running and the required model is loaded.  Skipped if not available.
+  //   • context.route() intercepts the webnovel.com URL and serves local HTML
+  //     so the manifest content_script rule fires automatically.
+  //   • www.webnovel.com is whitelisted so the content script passes its
+  //     site-permission gate.
+  //   • The browser window stays visible (headless: false) so the DOM
+  //     rewrite can be observed in real time.
+  //   • Assertions are structural: DOM changed + known MTL patterns removed.
   // -------------------------------------------------------------------------
-  test.describe('MTL enhancement — mock WebNovel chapter', () => {
+  test.describe('MTL enhancement — WebNovel chapter', () => {
     // A real chapter URL pattern so the manifest content_script rule fires.
     const MOCK_URL = 'https://www.webnovel.com/book/00000000000000000/00000000000000000';
+    // Resolved in beforeAll from chrome.storage.sync so it matches whatever
+    // the user has configured in the extension options.
+    let REQUIRED_MODEL = 'qwen3.5:4b'; // default fallback
 
     // ---------- source text: typical MTL from a cultivation novel ----------
     // Hallmarks of bad machine translation used as ground-truth defects:
@@ -357,21 +358,6 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       'Silence fall over hall. Only wind howl outside could be hear.',
     ].join('\n\n');
 
-    // ---------- deterministic mock response returned by the fake Ollama ----------
-    // Fixes every defect above so assertions are precise and stable.
-    const ENHANCED_TEXT = [
-      'Li Wei pushed open the hall door. His brows knitted tightly as he surveyed the damage before him.',
-      '"You actually dare show your face here!" The cold voice belonged to Xu Mengyao, who stood in the center of the hall, her hands clasped behind her back. "After what you did to this city?"',
-      'Li Wei let out a cold snort. "I don\'t need to explain myself to you, a mere third-realm cultivator."',
-      'Xu Mengyao felt her heart clench. The rage inside her was almost too much to control. Her breath came out ragged.',
-      '"You..." Her voice trembled. Xu Mengyao\'s eyes turned red. "You killed him. You killed my brother!"',
-      'Zhang Hu, who stood silently by the doorframe, felt uncomfortable with the scene. He watched as tears began to fall from Xu Mengyao\'s eyes. His heart felt heavy.',
-      '"The weak exist to be consumed by the strong." Li Wei\'s voice was without mercy. "Your brother was weak. He died as was natural."',
-      'Xu Mengyao clenched her fist. Her nails dug deep into her palm, and the pain cleared her head. She looked straight into Li Wei\'s eyes, and he saw determination there.',
-      '"I will become stronger than you." She said, her voice quiet but firm. "And on that day, I will make you understand what regret feels like."',
-      'Silence fell over the hall. Only the howl of the wind outside could be heard.',
-    ].join('\n\n');
-
     const MOCK_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -383,66 +369,156 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
 </body>
 </html>`;
 
-    let ollamaMockServer = null;
-    let ollamaMockStarted = false;
+    let ollamaAvailable = false;
     let chapterPage = null;
+    let ollamaCorsRouteAdded = false; // true if we installed an Origin-stripping route
+
+    /** GET /api/tags → array of model name strings, or [] on error. */
+    function fetchOllamaModels() {
+      return new Promise((resolve) => {
+        const req = http.get('http://127.0.0.1:11434/api/tags', (res) => {
+          let data = '';
+          res.on('data', (c) => { data += c; });
+          res.on('end', () => {
+            try { resolve(JSON.parse(data).models?.map((m) => m.name) ?? []); }
+            catch { resolve([]); }
+          });
+        });
+        req.on('error', () => resolve([]));
+        req.setTimeout(3000, () => { req.destroy(); resolve([]); });
+      });
+    }
+
+    /**
+     * POST /api/generate with a chrome-extension Origin header to simulate
+     * exactly what the background service worker sends.
+     * Returns the HTTP status code, or 0 on network error.
+     */
+    function probeGenerate(model) {
+      const body = JSON.stringify({ model, prompt: 'Hi', stream: false, options: { num_predict: 1 } });
+      return new Promise((resolve) => {
+        const req = http.request(
+          {
+            hostname: '127.0.0.1', port: 11434, path: '/api/generate', method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body),
+              'Origin': 'chrome-extension://testprobeorigin',
+            },
+          },
+          (res) => { res.resume(); resolve(res.statusCode); }
+        );
+        req.on('error', () => resolve(0));
+        req.setTimeout(15000, () => { req.destroy(); resolve(0); });
+        req.write(body);
+        req.end();
+      });
+    }
+
+    /**
+     * Resolve which Ollama model to use, and ensure the extension can reach it.
+     *
+     * Ollama 0.6+ blocks requests with Origin: chrome-extension:// (403).
+     * Since Playwright 1.36, context.route() intercepts service worker fetches,
+     * so when 403 is detected we install a route that strips the Origin header
+     * before forwarding — no Ollama restart required.
+     *
+     * Returns the chosen model name, or null if Ollama is unavailable.
+     */
+    async function resolveOllamaModel() {
+      const models = await fetchOllamaModels();
+      if (models.length === 0) return null;
+
+      const chosen = models.includes(REQUIRED_MODEL) ? REQUIRED_MODEL : models[0];
+
+      const status = await probeGenerate(chosen);
+      if (status === 0) return null; // connection error
+
+      if (status === 403) {
+        // Install a context-level route that strips the chrome-extension Origin
+        // header so Ollama accepts the request.  This intercepts both page and
+        // service-worker fetches (Playwright ≥ 1.36).
+        console.log('[MTL] Ollama returned 403 — installing proxy route for localhost:11434');
+        // Full-proxy approach: intercept the service worker's request entirely,
+        // make a fresh Node.js HTTP request to Ollama (no Origin header), and
+        // return the response via route.fulfill().
+        // route.continue() cannot remove Origin because Chrome re-adds it at the
+        // network layer for cross-origin extension requests.
+        await context.route('http://localhost:11434/**', async (route) => {
+          const req = route.request();
+          const url = new URL(req.url());
+          console.log(`[route] ${req.method()} ${url.pathname}`);
+
+          let postBody = req.method() !== 'GET' ? await req.postDataBuffer() : null;
+
+          // For /api/generate, inject think:false so qwen3 skips its reasoning
+          // chain — without this the model can spend minutes thinking before
+          // producing output, which exceeds the test timeout.
+          if (url.pathname === '/api/generate' && postBody) {
+            try {
+              const json = JSON.parse(postBody.toString());
+              json.think = false;
+              postBody = Buffer.from(JSON.stringify(json));
+            } catch { /* leave body unchanged if not valid JSON */ }
+          }
+
+          const responseData = await new Promise((resolve) => {
+            const options = {
+              hostname: '127.0.0.1',
+              port: 11434,
+              path: url.pathname + url.search,
+              method: req.method(),
+              headers: {
+                'content-type': 'application/json',
+                ...(postBody ? { 'content-length': String(postBody.length) } : {}),
+              },
+            };
+            const proxyReq = http.request(options, (res) => {
+              const chunks = [];
+              res.on('data', (c) => chunks.push(c));
+              res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }));
+            });
+            proxyReq.on('error', (e) => resolve({ status: 502, headers: {}, body: Buffer.from(e.message) }));
+            if (postBody) proxyReq.write(postBody);
+            proxyReq.end();
+          });
+
+          await route.fulfill({
+            status: responseData.status,
+            headers: responseData.headers,
+            body: responseData.body,
+          });
+        });
+        ollamaCorsRouteAdded = true;
+      }
+
+      return chosen;
+    }
 
     test.beforeAll(async () => {
-      // ── 1. Start mock Ollama server ────────────────────────────────────────
-      ollamaMockServer = http.createServer((req, res) => {
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-        res.setHeader('Content-Type', 'application/json');
+      // ── 0. Read the model name the user has configured in the extension ───
+      const storedModel = await background.evaluate(() =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('modelName', (d) => resolve(d.modelName || null))
+        )
+      );
+      if (storedModel) REQUIRED_MODEL = storedModel;
 
-        if (req.method === 'OPTIONS') {
-          res.writeHead(204);
-          res.end();
-          return;
-        }
+      // ── 1. Resolve which Ollama model to use (also checks CORS) ──────────
+      const resolvedModel = await resolveOllamaModel();
+      ollamaAvailable = resolvedModel !== null;
 
-        if (req.url === '/api/version' && req.method === 'GET') {
-          res.writeHead(200);
-          res.end(JSON.stringify({ version: '0.6.0' }));
-          return;
-        }
+      // If a different model was chosen (configured one not installed), sync
+      // the extension's modelName setting so the content script uses it too.
+      if (resolvedModel && resolvedModel !== REQUIRED_MODEL) {
+        REQUIRED_MODEL = resolvedModel;
+        await background.evaluate((model) =>
+          new Promise((resolve) => chrome.storage.sync.set({ modelName: model }, resolve)),
+          REQUIRED_MODEL
+        );
+      }
 
-        if (req.url === '/api/tags' && req.method === 'GET') {
-          res.writeHead(200);
-          res.end(JSON.stringify({
-            models: [{ name: 'qwen3:8b-q4_K_M', modified_at: '2024-01-01T00:00:00Z', size: 1 }],
-          }));
-          return;
-        }
-
-        if (req.url === '/api/generate' && req.method === 'POST') {
-          let body = '';
-          req.on('data', (chunk) => { body += chunk; });
-          req.on('end', () => {
-            res.writeHead(200);
-            // Non-streaming response: single JSON object, no literal newlines in
-            // the outer JSON so processOllamaResponse() hits the else branch.
-            res.end(JSON.stringify({ model: 'qwen3:8b-q4_K_M', response: ENHANCED_TEXT, done: true }));
-          });
-          return;
-        }
-
-        res.writeHead(404);
-        res.end(JSON.stringify({ error: 'not found' }));
-      });
-
-      await new Promise((resolve, reject) => {
-        ollamaMockServer.listen(11434, '127.0.0.1', () => {
-          ollamaMockStarted = true;
-          resolve();
-        });
-        ollamaMockServer.once('error', reject);
-      }).catch(() => {
-        // Port 11434 already occupied (real Ollama running).
-        // The test will be skipped via the guard inside the test body.
-        ollamaMockStarted = false;
-      });
-
-      // ── 2. Route the target webnovel URL to local mock HTML ───────────────
+      // ── 2. Route the target webnovel URL to local MTL HTML ────────────────
       await context.route(MOCK_URL, async (route) => {
         await route.fulfill({
           status: 200,
@@ -462,8 +538,8 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
         )
       );
 
-      // Clear the background's whitelist cache so the fresh storage value is used
-      // when the content script calls checkSitePermission() on navigation.
+      // Clear the background's whitelist cache so the fresh storage value is
+      // used when the content script calls checkSitePermission() on navigation.
       await background.evaluate(() => { whitelistCache.clear(); });
     });
 
@@ -486,20 +562,44 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       );
       await background.evaluate(() => { whitelistCache.clear(); });
 
-      if (ollamaMockServer) {
-        await new Promise((resolve) => ollamaMockServer.close(resolve));
+      // Remove the Origin-stripping Ollama route if we installed one.
+      if (ollamaCorsRouteAdded) {
+        await context.unroute('http://localhost:11434/**').catch(() => {});
+        ollamaCorsRouteAdded = false;
       }
     });
 
     test('extension rewrites MTL chapter DOM and fixes known translation defects', async () => {
-      if (!ollamaMockStarted) {
-        test.skip(true, 'Port 11434 is occupied — cannot start mock Ollama server. Run with Ollama stopped.');
+      if (!ollamaAvailable) {
+        test.skip(true, [
+          'Skipped: Ollama not reachable, no models found,',
+          'or POST /api/generate returned 403.',
+          'To enable: restart Ollama with OLLAMA_ORIGINS=chrome-extension://*',
+          '  e.g.  OLLAMA_ORIGINS=chrome-extension://* ollama serve',
+        ].join(' '));
       }
 
+      // Real LLM inference can take several minutes — override the global 60 s limit.
+      test.setTimeout(180_000);
+
+      // Navigate to the page — the browser window stays open (headless: false)
+      // so the enhancement can be observed in real time as the LLM rewrites it.
       chapterPage = await context.newPage();
+
+      // Capture page console so test output shows content-script progress.
+      chapterPage.on('console', (msg) => {
+        const text = msg.text();
+        if (text.includes('Novel Dialogue') || text.includes('Ollama') ||
+            text.includes('whiteList') || text.includes('whitelist') ||
+            text.includes('Site') || text.includes('enhancement') ||
+            text.includes('Enhancement')) {
+          console.log(`[page] ${msg.type()}: ${text}`);
+        }
+      });
+
       await chapterPage.goto(MOCK_URL, { waitUntil: 'domcontentloaded' });
 
-      // Confirm the mock HTML loaded and original defects are present.
+      // Confirm the MTL HTML loaded and original defects are present.
       const originalText = await chapterPage.locator('.chapter-content').textContent();
       expect(originalText).toContain('He brows knit tightly');
       expect(originalText).toContain('This lord not need explain');
@@ -507,14 +607,14 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       expect(originalText).toContain('Silence fall over hall');
 
       // Wait for the content script to finish enhancement (800 ms init delay +
-      // mock Ollama round-trip). The DOM must differ from the original snapshot.
+      // LLM round-trip). Generous timeout for real model inference.
       await chapterPage.waitForFunction(
         (orig) => {
           const el = document.querySelector('.chapter-content');
           return el !== null && el.textContent.trim() !== orig.trim();
         },
         originalText,
-        { timeout: 30_000 }
+        { timeout: 120_000 }
       );
 
       const enhancedText = await chapterPage.locator('.chapter-content').textContent();
@@ -523,17 +623,10 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       expect(enhancedText).not.toBe(originalText);
       expect(enhancedText.length).toBeGreaterThan(100);
 
-      // ── Metric 2: pronoun / article defects removed ─────────────────────
+      // ── Metric 2: known MTL defect patterns removed by the LLM ─────────
       expect(enhancedText).not.toContain('He brows knit tightly');
       expect(enhancedText).not.toContain('He breath came out ragged');
-
-      // ── Metric 3: correct English introduced by the mock response ────────
-      expect(enhancedText).toContain('His brows knitted tightly');
-      expect(enhancedText).toContain('Her breath came out ragged');
-
-      // ── Metric 4: tense / article corrections ───────────────────────────
       expect(enhancedText).not.toContain('Silence fall over hall');
-      expect(enhancedText).toContain('Silence fell over the hall');
     });
   });
 });

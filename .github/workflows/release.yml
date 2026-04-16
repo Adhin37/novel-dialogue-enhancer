@@ -43,7 +43,7 @@ jobs:
         run: |
           NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           jq ".version = \"$NEW_VERSION\"" manifest.json > manifest.tmp && mv manifest.tmp manifest.json
-          
+
       - name: Update Package Version
         run: |
           NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')

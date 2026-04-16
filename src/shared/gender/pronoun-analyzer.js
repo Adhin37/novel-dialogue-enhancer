@@ -3,7 +3,7 @@
  * Specialized module for pronoun analysis in text
  * Identifies and analyzes pronoun usage to determine character gender
  */
-import {{ SharedUtils }} from "../utils/shared-utils.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class PronounAnalyzer {
   /**

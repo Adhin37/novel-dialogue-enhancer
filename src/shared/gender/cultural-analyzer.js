@@ -3,8 +3,8 @@
  * Specialized module for cultural origin detection and analysis
  * Identifies cultural contexts and specific cultural indicators
  */
-import {{ BaseGenderAnalyzer }} from "./base-gender-analyzer.js";
-import {{ SharedUtils }} from "../utils/shared-utils.js";
+import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class CulturalAnalyzer extends BaseGenderAnalyzer {
   /**

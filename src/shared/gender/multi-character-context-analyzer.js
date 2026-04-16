@@ -3,8 +3,8 @@
  * Advanced analyzer for handling multiple characters in same context
  * Enhanced integration with sophisticated analysis methods exposed
  */
-import {{ BaseGenderAnalyzer }} from "./base-gender-analyzer.js";
-import {{ SharedUtils }} from "../utils/shared-utils.js";
+import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
   /**

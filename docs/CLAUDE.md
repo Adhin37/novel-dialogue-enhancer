@@ -258,4 +258,4 @@ All models below use Q4_K_M quantization automatically when pulled via `ollama p
 | High-End | `qwen3:30b-a3b` | `ollama pull qwen3:30b-a3b` | ~20 GB | MoE architecture; efficient for its quality level |
 | High-End | `mistral-small3.1:24b` | `ollama pull mistral-small3.1:24b` | ~15 GB | Mistral's latest compact model |
 
-Default model remains `qwen3:8b-q4_K_M` (set in `Constants.DEFAULTS.MODEL_NAME`). Users configure the active model in Options → General → Model Settings.
+Default model remains `qwen3.5:4b` (set in `Constants.DEFAULTS.MODEL_NAME`). Users configure the active model in Options → General → Model Settings.

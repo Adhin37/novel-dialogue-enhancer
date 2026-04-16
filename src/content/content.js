@@ -1219,7 +1219,8 @@ function verifyTextUpdate(element, expectedText) {
  * @return {boolean} - Whether verification passed
  */
 function verifyAndHandleDOMUpdate(element, originalText, enhancedText) {
-  const updateSuccessful = verifyTextUpdate(element, enhancedText);
+  // Pass originalText so verifyTextUpdate checks the DOM now DIFFERS from it.
+  const updateSuccessful = verifyTextUpdate(element, originalText);
 
   if (!updateSuccessful) {
     console.warn("DOM update verification failed, attempting recovery");

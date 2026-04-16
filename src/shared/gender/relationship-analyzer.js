@@ -3,7 +3,7 @@
  * Specialized module for analyzing character relationships
  * Identifies relationship patterns and character roles that indicate gender
  */
-import {{ SharedUtils }} from "../utils/shared-utils.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class RelationshipAnalyzer {
   /**

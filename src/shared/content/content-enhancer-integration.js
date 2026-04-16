@@ -2,6 +2,11 @@ import { logger } from "../utils/logger.js";
 import { Constants } from "../utils/constants.js";
 import { SharedUtils } from "../utils/shared-utils.js";
 import { NovelUtils } from "../utils/novel-utils.js";
+import { GenderUtils } from "../utils/gender-utils.js";
+import { OllamaClient } from "../llm/ollama-client.js";
+import { StatsUtils } from "../utils/stats-utils.js";
+import { TextProcessor } from "../llm/text-processor.js";
+import { PromptGenerator } from "../llm/prompt-generator.js";
 
 // content-enhancer-integration.js
 /**
