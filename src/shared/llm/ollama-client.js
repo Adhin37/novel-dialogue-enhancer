@@ -232,7 +232,7 @@ export class OllamaClient {
           timeout: 300,
           temperature: 0.4,
           topP: 0.9,
-          contextSize: 32768
+          contextSize: 8192
         },
         (data) => {
           if (chrome.runtime.lastError) {

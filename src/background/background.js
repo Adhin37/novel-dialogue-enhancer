@@ -18,6 +18,10 @@ let globalStats = {
 const whitelistCache = new Map();
 const CACHE_EXPIRY = 5 * 60 * 1000;
 
+const llmResponseCache = new Map();          // in-memory fast path (per service-worker session)
+const LLM_CACHE_TTL    = 12 * 60 * 60 * 1000; // 12 hours
+const LLM_CACHE_PREFIX = "llmCache_";
+
 // Periodic cleanup constants
 const CLEANUP_ALARM_NAME = "periodicStorageCleanup";
 const NOVEL_PURGE_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (3 months)
@@ -210,6 +214,19 @@ async function runPeriodicCleanup() {
   } else {
     console.log("Periodic cleanup: no stale novel entries found");
   }
+
+  // Evict expired in-memory LLM cache entries
+  const now = Date.now();
+  for (const [k, v] of llmResponseCache) {
+    if (now - v.ts > LLM_CACHE_TTL) llmResponseCache.delete(k);
+  }
+  // Evict expired persistent LLM cache entries
+  chrome.storage.local.get(null, (all) => {
+    const expired = Object.keys(all).filter(
+      (k) => k.startsWith(LLM_CACHE_PREFIX) && now - (all[k]?.ts ?? 0) > LLM_CACHE_TTL
+    );
+    if (expired.length) chrome.storage.local.remove(expired);
+  });
 }
 
 /**
@@ -301,7 +318,7 @@ function handleOllamaRequest(request, sendResponse) {
       timeout: 300,
       temperature: 0.4,
       topP: 0.9,
-      contextSize: 32768
+      contextSize: 8192
     },
     (data) => {
       if (chrome.runtime.lastError) {
@@ -345,10 +362,46 @@ function handleOllamaRequest(request, sendResponse) {
           timeout: data.timeout + " seconds"
         });
 
-        if (requestData.stream === false) {
-          processNonStreamingRequest(requestData, data.timeout, sendResponse);
-        } else {
+        if (requestData.stream !== false) {
           sendResponse({ error: "Invalid stream value" });
+          return;
+        }
+
+        const cacheKey = request.cacheKey;
+
+        if (cacheKey) {
+          // 1. Fast in-memory hit
+          const memHit = llmResponseCache.get(cacheKey);
+          if (memHit && Date.now() - memHit.ts < LLM_CACHE_TTL) {
+            console.log(`[LLM Cache] mem-HIT ${cacheKey}`);
+            sendResponse({ enhancedText: memHit.text });
+            return;
+          }
+
+          // 2. Persistent hit (survives service-worker restart)
+          chrome.storage.local.get(LLM_CACHE_PREFIX + cacheKey, (stored) => {
+            const entry = stored[LLM_CACHE_PREFIX + cacheKey];
+            if (!chrome.runtime.lastError && entry && Date.now() - entry.ts < LLM_CACHE_TTL) {
+              console.log(`[LLM Cache] storage-HIT ${cacheKey}`);
+              llmResponseCache.set(cacheKey, entry); // repopulate memory
+              sendResponse({ enhancedText: entry.text });
+              return;
+            }
+            if (entry) chrome.storage.local.remove(LLM_CACHE_PREFIX + cacheKey); // expired
+
+            // 3. Cache miss — call Ollama, store result on success
+            processNonStreamingRequest(requestData, data.timeout, (resp) => {
+              if (resp?.enhancedText) {
+                const e = { text: resp.enhancedText, ts: Date.now() };
+                llmResponseCache.set(cacheKey, e);
+                chrome.storage.local.set({ [LLM_CACHE_PREFIX + cacheKey]: e });
+              }
+              sendResponse(resp);
+            });
+          });
+        } else {
+          // No cache key — call directly
+          processNonStreamingRequest(requestData, data.timeout, sendResponse);
         }
       } catch (error) {
         console.error("Error preparing request:", error);
@@ -369,7 +422,7 @@ function prepareRequestData(requestData, settings) {
     ...requestData,
     temperature: requestData.temperature || settings.temperature,
     top_p: requestData.top_p || settings.topP,
-    num_ctx: requestData.num_ctx || settings.contextSize || 32768
+    num_ctx: requestData.num_ctx || settings.contextSize || 8192
   };
 }
 
@@ -388,17 +441,26 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
     validatedTimeout * 1000
   );
 
+  const num_predict = parseInt(requestData.num_predict || requestData.max_tokens) || 4096;
+  const num_ctx     = parseInt(requestData.num_ctx) || 8192;
+
   const safeRequestData = {
     model: String(requestData.model || ""),
     prompt: String(requestData.prompt || ""),
     stream: false,
+    think: false,   // disable reasoning chain for qwen3/qwen3.5 (ignored by non-thinking models)
     options: {
       temperature: parseFloat(requestData.temperature) || 0.4,
       top_p: parseFloat(requestData.top_p) || 0.9,
-      num_predict: parseInt(requestData.num_predict || requestData.max_tokens) || 8192,
-      num_ctx: parseInt(requestData.num_ctx) || 32768
+      num_predict,
+      num_ctx
     }
   };
+
+  const t0 = Date.now();
+  console.log(
+    `[Ollama] → ${safeRequestData.model} | think:false | num_ctx:${num_ctx} | num_predict:${num_predict} | prompt_len:${safeRequestData.prompt.length}`
+  );
 
   fetch(ollamaUrl, {
     method: "POST",
@@ -412,7 +474,10 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
       }
       return response.text();
     })
-    .then((rawText) => processOllamaResponse(rawText, sendResponse))
+    .then((rawText) => {
+      console.log(`[Ollama] ← ${safeRequestData.model} responded in ${((Date.now() - t0) / 1000).toFixed(1)}s | raw_len:${rawText.length}`);
+      return processOllamaResponse(rawText, sendResponse);
+    })
     .catch((error) =>
       handleOllamaError(error, controller, validatedTimeout, sendResponse)
     )
@@ -1372,7 +1437,7 @@ chrome.runtime.onInstalled.addListener(() => {
       preserveNames: true,
       fixPronouns: true,
       modelName: "qwen3.5:4b",
-      contextSize: 32768,
+      contextSize: 8192,
       timeout: 300,
       disabledPages: [],
       temperature: 0.4,

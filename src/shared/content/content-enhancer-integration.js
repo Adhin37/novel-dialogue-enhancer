@@ -254,6 +254,23 @@ export class ContentEnhancerIntegration {
   }
 
   /**
+   * Round prompt-token estimate up to the nearest power-of-2 KV-cache bucket,
+   * adding 50% headroom for output tokens. Conservative 3.5 chars/token covers
+   * the Chinese/English mix typical in web novel chapters.
+   * @param {string} prompt
+   * @param {number} maxCtx - User-configured ceiling (default 8192)
+   * @return {number}
+   */
+  #computeDynamicCtx(prompt, maxCtx = 8192) {
+    const estimate = Math.ceil(prompt.length / 3.5); // input tokens
+    const needed   = Math.ceil(estimate * 1.5);       // +50% for output
+    for (const b of [512, 1024, 2048, 4096, 8192]) {
+      if (b >= needed) return Math.min(b, maxCtx);
+    }
+    return maxCtx;
+  }
+
+  /**
    * Enhance text using the LLM with character context
    * @param {string} text - Text to enhance
    * @param {string} characterSummary - Character information summary
@@ -280,7 +297,6 @@ export class ContentEnhancerIntegration {
 
       const settings = await this.ollamaClient.getLLMSettings();
 
-      // Send the full chapter as a single LLM call — no chunking needed with /no_think mode
       const prompt = this.promptGenerator.createEnhancementPrompt(
         text,
         characterSummary,
@@ -288,16 +304,17 @@ export class ContentEnhancerIntegration {
         novelInfo
       );
 
-      const cacheKey = SharedUtils.createHash(text);
+      const cacheKey   = SharedUtils.createHash(text);
+      const dynamicCtx = this.#computeDynamicCtx(prompt, settings.contextSize || 8192);
 
-      this.logger.info(`Enhancing chapter in one pass (${text.length} chars)`);
+      this.logger.info(`Enhancing chapter in one pass (${text.length} chars, num_ctx: ${dynamicCtx})`);
 
       const enhancedText = await this.ollamaClient.processWithLLM(
         settings.modelName,
         prompt,
         {
-          num_predict: settings.contextSize,
-          num_ctx: settings.contextSize,
+          num_predict: 4096,
+          num_ctx: dynamicCtx,
           temperature: settings.temperature,
           top_p: settings.topP,
           timeout: settings.timeout,

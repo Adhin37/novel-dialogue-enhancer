@@ -251,7 +251,8 @@ All models below use Q4_K_M quantization automatically when pulled via `ollama p
 | Tier | Model | Pull Command | RAM | Notes |
 |---|---|---|---|---|
 | Ultra-fast | `qwen3:4b` | `ollama pull qwen3:4b` | ~2.5 GB | Speed-focused; good for low-RAM systems |
-| **Balanced** | **`qwen3:8b-q4_K_M`** | `ollama pull qwen3:8b-q4_K_M` | ~5 GB | **Default.** Best all-around for dialogue |
+| Balanced | `qwen3:8b-q4_K_M` | `ollama pull qwen3:8b-q4_K_M` | ~5 GB | Best all-around for dialogue |
+| **Balanced** | **`qwen3.5:4b`** | `ollama pull qwen3.5:4b` | ~5 GB | **Default.** Fast, high quality dialogue |
 | Balanced | `gemma3:9b` | `ollama pull gemma3:9b` | ~6 GB | Google Gemma 3; excellent dialogue quality |
 | High Quality | `phi4:14b` | `ollama pull phi4:14b` | ~9 GB | Microsoft Phi-4; outstanding instruction following |
 | High Quality | `qwen3:14b` | `ollama pull qwen3:14b` | ~9 GB | Larger Qwen3 for better quality |

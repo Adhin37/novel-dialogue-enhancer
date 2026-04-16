@@ -447,21 +447,29 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
         await context.route('http://localhost:11434/**', async (route) => {
           const req = route.request();
           const url = new URL(req.url());
-          console.log(`[route] ${req.method()} ${url.pathname}`);
 
           let postBody = req.method() !== 'GET' ? await req.postDataBuffer() : null;
 
-          // For /api/generate, inject think:false so qwen3 skips its reasoning
-          // chain — without this the model can spend minutes thinking before
-          // producing output, which exceeds the test timeout.
+          // For /api/generate, ensure think:false is set so qwen3 skips reasoning.
+          // background.js now sets it directly, but the proxy guarantees it even
+          // if the background request omits it for some reason.
           if (url.pathname === '/api/generate' && postBody) {
             try {
               const json = JSON.parse(postBody.toString());
+              const hadThink = 'think' in json;
               json.think = false;
               postBody = Buffer.from(JSON.stringify(json));
+              const opts = json.options || {};
+              console.log(
+                `[proxy] /api/generate | model:${json.model} | think_was_set:${hadThink}(${json.think}) | ` +
+                `num_ctx:${opts.num_ctx ?? '?'} | num_predict:${opts.num_predict ?? '?'} | prompt_len:${json.prompt?.length ?? 0}`
+              );
             } catch { /* leave body unchanged if not valid JSON */ }
+          } else {
+            console.log(`[proxy] ${req.method()} ${url.pathname}`);
           }
 
+          const t0 = Date.now();
           const responseData = await new Promise((resolve) => {
             const options = {
               hostname: '127.0.0.1',
@@ -482,6 +490,10 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
             if (postBody) proxyReq.write(postBody);
             proxyReq.end();
           });
+
+          if (url.pathname === '/api/generate') {
+            console.log(`[proxy] ← ${responseData.status} in ${((Date.now() - t0) / 1000).toFixed(1)}s | resp_len:${responseData.body.length}`);
+          }
 
           await route.fulfill({
             status: responseData.status,

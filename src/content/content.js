@@ -1038,6 +1038,34 @@ async function processSingleContentBlock() {
   }
 }
 
+/** Dialogue marker patterns — any paragraph matching at least one is sent to the LLM. */
+const DIALOGUE_PATTERNS = [
+  /"[^"]{3,}"/,                         // Western double-quoted speech (≥3 chars)
+  /「[^」]+」/,                          // CJK corner brackets
+  /『[^』]+』/,                          // CJK double corner brackets
+  /\u2014[^.!?\n]{5,}/,                 // em-dash followed by 5+ chars
+  /^\s*[A-Z][a-zA-Z ]{1,30}:\s*\S/m,   // "Name: speech" at line start
+];
+
+function paragraphHasDialogue(text) {
+  return DIALOGUE_PATTERNS.some((re) => re.test(text));
+}
+
+/**
+ * Partition paragraphs into those that need LLM enhancement (contain dialogue)
+ * and those that can pass through unchanged (pure narration).
+ * @param {string[]} texts
+ * @return {{ toSend: string[], toSendIdx: number[], passthrough: Map<number,string> }}
+ */
+function partitionParagraphs(texts) {
+  const toSend = [], toSendIdx = [], passthrough = new Map();
+  texts.forEach((t, i) => {
+    if (paragraphHasDialogue(t)) { toSend.push(t); toSendIdx.push(i); }
+    else                          { passthrough.set(i, t); }
+  });
+  return { toSend, toSendIdx, passthrough };
+}
+
 /**
  * Processes all paragraphs in a single LLM call
  * @param {NodeList} paragraphs - The paragraphs to process
@@ -1057,10 +1085,22 @@ async function processMultipleParagraphs(paragraphs) {
 
   const batchStartTime = performance.now();
   const originalTexts = Array.from(paragraphs).map((p) => p.textContent);
-  const fullText = originalTexts.join("\n\n");
+
+  // Filter: only send dialogue-containing paragraphs to the LLM.
+  // Pure narration paragraphs pass through unchanged, saving tokens and time.
+  const { toSend, toSendIdx, passthrough } = partitionParagraphs(originalTexts);
+  // Fallback: if the chapter has zero dialogue, send everything (don't skip enhancement).
+  const textsForLLM = toSend.length > 0 ? toSend : originalTexts;
+  const idxForLLM   = toSend.length > 0 ? toSendIdx : originalTexts.map((_, i) => i);
+
+  console.log(
+    `Dialogue filter: ${textsForLLM.length}/${totalParagraphs} paragraphs sent to LLM` +
+    (passthrough.size > 0 ? ` (${passthrough.size} narration-only skipped)` : "")
+  );
+  toaster.showLoading(`Enhancing ${textsForLLM.length} dialogue paragraphs…`);
 
   try {
-    const enhancedText = await contentEnhancerIntegration.enhanceText(fullText);
+    const enhancedText = await contentEnhancerIntegration.enhanceText(textsForLLM.join("\n\n"));
 
     if (terminateRequested) {
       toaster.showWarning("Enhancement terminated by user");
@@ -1070,24 +1110,28 @@ async function processMultipleParagraphs(paragraphs) {
     const enhancedParagraphs = enhancedText.split("\n\n");
     let successfulUpdates = 0;
 
-    for (let j = 0; j < paragraphs.length; j++) {
-      const enhanced = enhancedParagraphs[j] ?? originalTexts[j];
+    // Map enhanced results back to their original paragraph positions.
+    for (let slot = 0; slot < idxForLLM.length; slot++) {
+      const origIdx  = idxForLLM[slot];
+      const enhanced = enhancedParagraphs[slot] ?? originalTexts[origIdx]; // fallback on count mismatch
       try {
-        paragraphs[j].innerHTML = DOMPurify.sanitize(enhanced);
-
+        paragraphs[origIdx].innerHTML = DOMPurify.sanitize(enhanced);
         const updateVerified = verifyAndHandleDOMUpdate(
-          paragraphs[j],
-          originalTexts[j],
+          paragraphs[origIdx],
+          originalTexts[origIdx],
           enhanced
         );
         if (updateVerified) successfulUpdates++;
       } catch (updateError) {
-        console.error(`Failed to update paragraph ${j}:`, updateError);
+        console.error(`Failed to update paragraph ${origIdx}:`, updateError);
         try {
-          paragraphs[j].innerHTML = DOMPurify.sanitize(originalTexts[j]);
+          paragraphs[origIdx].innerHTML = DOMPurify.sanitize(originalTexts[origIdx]);
         } catch (_) {}
       }
     }
+
+    // Narration paragraphs are preserved as-is; count them as successful.
+    successfulUpdates += passthrough.size;
 
     toaster.updateProgress(1, 1);
 

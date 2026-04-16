@@ -20,7 +20,7 @@ export const Constants = {
     TIMEOUT: 300,
     TEMPERATURE: 0.4,
     TOP_P: 0.9,
-    CONTEXT_SIZE: 32768,
+    CONTEXT_SIZE: 8192,
     EXTENSION_PAUSED: false,
     PRESERVE_NAMES: true,
     FIX_PRONOUNS: true
