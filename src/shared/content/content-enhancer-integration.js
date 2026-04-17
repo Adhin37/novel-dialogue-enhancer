@@ -300,7 +300,6 @@ export class ContentEnhancerIntegration {
       const prompt = this.promptGenerator.createEnhancementPrompt(
         text,
         characterSummary,
-        "",
         novelInfo
       );
 

@@ -232,7 +232,7 @@ function init() {
                       "AI service available, starting auto-enhancement"
                     );
 
-                    const enhanceResult = await enhancePage();
+                    const enhanceResult = await enhancePage({ silent: true });
 
                     if (enhanceResult) {
                       logger.success(
@@ -849,14 +849,21 @@ function findLargestTextBlock() {
  * Main function to enhance the page content using LLM
  * @return {boolean} - Whether enhancement was successful
  */
-async function enhancePage() {
+/**
+ * @param {object} [opts]
+ * @param {boolean} [opts.silent=false]  When true (auto/observer calls), suppress
+ *   "content not found" error toasts and the catch-block error handler.
+ *   The content script will retry automatically via MutationObserver once the
+ *   page's JS has finished injecting the chapter paragraphs.
+ */
+async function enhancePage({ silent = false } = {}) {
   console.log("Novel Dialogue Enhancer: Starting enhancement process");
   console.time("enhancePage");
 
   if (isEnhancing) {
     pendingEnhancement = true;
     console.log("Enhancement already in progress, queuing request");
-    toaster.showInfo("Enhancement already in progress, queued for later");
+    if (!silent) toaster.showInfo("Enhancement already in progress, queued for later");
     return false;
   }
 
@@ -868,8 +875,6 @@ async function enhancePage() {
   terminateRequested = false;
   let enhancementSuccessful = false;
 
-  toaster.showLoading("Starting enhancement process...");
-
   if (typeof observer !== "undefined" && observer) {
     observer.disconnect();
   }
@@ -877,15 +882,23 @@ async function enhancePage() {
   contentElement = findContentElement();
 
   if (!contentElement) {
-    const contentError = new Error(
-      "Couldn't find content element for enhancement"
-    );
-    errorHandler.handleError(contentError, "content_detection");
-    toaster.showError("Couldn't find content to enhance");
+    if (silent) {
+      // Auto-triggered: content may not be rendered yet — observer will retry.
+      console.log("Auto-enhancement: content element not ready yet, waiting for observer retry");
+    } else {
+      const contentError = new Error(
+        "Couldn't find content element for enhancement"
+      );
+      errorHandler.handleError(contentError, "content_detection");
+      toaster.showError("Couldn't find content to enhance");
+    }
     isEnhancing = false;
     console.timeEnd("enhancePage");
     return false;
   }
+
+  // Content element found — safe to show the loading toast for all callers.
+  toaster.showLoading("Starting enhancement process...");
 
   try {
     const ollamaStatus = await getOllamaClient().checkOllamaAvailability();
@@ -940,11 +953,16 @@ async function enhancePage() {
 
     return enhancementSuccessful;
   } catch (error) {
-    errorHandler.handleEnhancementError(error, {
-      enhancementId: `enh_${Date.now()}`,
-      currentChunk: 0,
-      totalChunks: 0
-    });
+    if (silent) {
+      // Auto-triggered failure: log but don't spam the user with error toasts.
+      console.warn("Auto-enhancement failed:", error.message);
+    } else {
+      errorHandler.handleEnhancementError(error, {
+        enhancementId: `enh_${Date.now()}`,
+        currentChunk: 0,
+        totalChunks: 0
+      });
+    }
     return false;
   } finally {
     if (typeof observer !== "undefined" && observer) {
@@ -1463,7 +1481,7 @@ const observer = new MutationObserver((mutations) => {
     if (newContentAdded) {
       console.log("New content detected, scheduling enhancement");
       clearTimeout(window.enhancementTimer);
-      window.enhancementTimer = setTimeout(enhancePage, 500);
+      window.enhancementTimer = setTimeout(() => enhancePage({ silent: true }), 500);
     }
   }
 });

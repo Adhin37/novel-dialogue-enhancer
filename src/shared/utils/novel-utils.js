@@ -711,9 +711,6 @@ export class NovelUtils {
       return "";
     }
 
-    let summary =
-      "CHARACTER INFORMATION (to help maintain proper pronouns and gender references):\n";
-
     const sortedCharacters = [...characters].sort(
       (a, b) => (b.appearances || 0) - (a.appearances || 0)
     );
@@ -725,23 +722,18 @@ export class NovelUtils {
         ? significantCharacters.slice(0, 10)
         : sortedCharacters.slice(0, 10);
 
-    displayCharacters.forEach((char) => {
-      const expandedGender = SharedUtils.expandGender(char.gender);
-      const pronounInfo =
-        expandedGender === Constants.GENDER.MALE_FULL
-          ? "he/him/his"
-          : expandedGender === Constants.GENDER.FEMALE_FULL
-          ? "she/her/her"
-          : "unknown pronouns";
-
-      summary += `- ${
-        char.name
-      }: ${expandedGender} (${pronounInfo}), appeared ${
-        char.appearances || "unknown"
-      } times\n`;
-    });
-
-    return summary;
+    return displayCharacters
+      .map((char) => {
+        const expandedGender = SharedUtils.expandGender(char.gender);
+        const pronouns =
+          expandedGender === Constants.GENDER.MALE_FULL
+            ? "he/him"
+            : expandedGender === Constants.GENDER.FEMALE_FULL
+            ? "she/her"
+            : "unknown";
+        return `- ${char.name}: ${pronouns}`;
+      })
+      .join("\n");
   }
 
   /**

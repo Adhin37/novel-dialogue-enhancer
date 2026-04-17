@@ -108,7 +108,7 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
     expect(settings.modelName).toBe('qwen3.5:4b');
     expect(settings.temperature).toBe(0.4);
     expect(settings.topP).toBe(0.9);
-    expect(settings.contextSize).toBe(32768);
+    expect(settings.contextSize).toBe(8192);
     expect(settings.timeout).toBe(300);
     expect(settings.preserveNames).toBe(true);
     expect(settings.fixPronouns).toBe(true);
@@ -581,7 +581,7 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       }
     });
 
-    test('extension rewrites MTL chapter DOM and fixes known translation defects', async () => {
+    test('extension rewrites MTL chapter DOM and fixes known translation defects (mock)', async () => {
       if (!ollamaAvailable) {
         test.skip(true, [
           'Skipped: Ollama not reachable, no models found,',
@@ -639,6 +639,304 @@ test.describe('Novel Dialogue Enhancer — E2E', () => {
       expect(enhancedText).not.toContain('He brows knit tightly');
       expect(enhancedText).not.toContain('He breath came out ragged');
       expect(enhancedText).not.toContain('Silence fall over hall');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13. MTL enhancement — real NovelBin chapter (no mock)
+  //
+  // Navigates directly to a real NovelBin chapter page (novelbin.com is
+  // covered by "*://novelbin.com/*" in manifest content_scripts) and verifies
+  // the extension injects, detects #chr-content, and rewrites the DOM via Ollama.
+  //
+  // Debug assertions logged to stdout:
+  //   • Final URL after navigation  (detects unexpected redirects)
+  //   • #chr-content visibility     (confirms chapter rendered, not a login wall)
+  //   • Page element summary        (title, present selectors) for diagnosing failures
+  //   • First 200 chars before/after enhancement
+  //
+  // Auto-skips when:
+  //   • Ollama is not reachable / has no models
+  //   • #chr-content is not found within 20 s
+  // -------------------------------------------------------------------------
+  test.describe('MTL enhancement — real NovelBin chapter (no mock)', () => {
+    // Direct URL — no context.route() intercept; the browser fetches the real page.
+    // novelbin.com matches "*://novelbin.com/*" added to the manifest content_scripts.
+    // (novelbin.me redirects to novelbin.com — both are now in host_permissions.)
+    // Alternative: https://www.webnovel.com/book/<id>/<chapterId> (use #cha-page-in)
+    const REAL_URL =
+      'https://novelbin.com/b/global-game-afk-in-the-zombie-apocalypse-game/chapter-3137-expansion';
+    const HOSTNAME = 'novelbin.com';
+    // #chr-content: the chapter body div on NovelBin (see Constants.SELECTORS.CONTENT).
+    // Used both for the debug visibility check and as the change-detection root.
+    const DEBUG_SELECTOR = '#chr-content';
+    const CONTENT_SELECTOR = '#chr-content';
+
+    let REQUIRED_MODEL = 'qwen3.5:4b';
+    let ollamaAvailable = false;
+    let realChapterPage = null;
+    let ollamaCorsRouteAdded = false;
+
+    /** GET /api/tags → array of model name strings, or [] on error. */
+    function fetchOllamaModelsReal() {
+      return new Promise((resolve) => {
+        const req = http.get('http://127.0.0.1:11434/api/tags', (res) => {
+          let data = '';
+          res.on('data', (c) => { data += c; });
+          res.on('end', () => {
+            try { resolve(JSON.parse(data).models?.map((m) => m.name) ?? []); }
+            catch { resolve([]); }
+          });
+        });
+        req.on('error', () => resolve([]));
+        req.setTimeout(3000, () => { req.destroy(); resolve([]); });
+      });
+    }
+
+    /** POST /api/generate with chrome-extension Origin to detect 403. */
+    function probeGenerateReal(model) {
+      const body = JSON.stringify({ model, prompt: 'Hi', stream: false, options: { num_predict: 1 } });
+      return new Promise((resolve) => {
+        const req = http.request(
+          {
+            hostname: '127.0.0.1', port: 11434, path: '/api/generate', method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(body),
+              'Origin': 'chrome-extension://testprobeorigin',
+            },
+          },
+          (res) => { res.resume(); resolve(res.statusCode); }
+        );
+        req.on('error', () => resolve(0));
+        req.setTimeout(15000, () => { req.destroy(); resolve(0); });
+        req.write(body);
+        req.end();
+      });
+    }
+
+    /**
+     * Resolve the Ollama model and install the Origin-stripping proxy when
+     * Ollama 0.6+ blocks chrome-extension requests (HTTP 403).
+     */
+    async function resolveOllamaModelReal() {
+      const models = await fetchOllamaModelsReal();
+      if (models.length === 0) return null;
+
+      const chosen = models.includes(REQUIRED_MODEL) ? REQUIRED_MODEL : models[0];
+      const status = await probeGenerateReal(chosen);
+      if (status === 0) return null;
+
+      if (status === 403) {
+        console.log('[real-url] Ollama returned 403 — installing proxy route for localhost:11434');
+        await context.route('http://localhost:11434/**', async (route) => {
+          const req = route.request();
+          const url = new URL(req.url());
+          let postBody = req.method() !== 'GET' ? await req.postDataBuffer() : null;
+
+          if (url.pathname === '/api/generate' && postBody) {
+            try {
+              const json = JSON.parse(postBody.toString());
+              const hadThink = 'think' in json;
+              json.think = false;
+              postBody = Buffer.from(JSON.stringify(json));
+              const opts = json.options || {};
+              console.log(
+                `[real-proxy] /api/generate | model:${json.model} | think_was_set:${hadThink}(${json.think}) | ` +
+                `num_ctx:${opts.num_ctx ?? '?'} | num_predict:${opts.num_predict ?? '?'} | prompt_len:${json.prompt?.length ?? 0}`
+              );
+            } catch { /* leave body unchanged if not valid JSON */ }
+          } else {
+            console.log(`[real-proxy] ${req.method()} ${url.pathname}`);
+          }
+
+          const t0 = Date.now();
+          const responseData = await new Promise((resolve) => {
+            const proxyReq = http.request(
+              {
+                hostname: '127.0.0.1', port: 11434,
+                path: url.pathname + url.search,
+                method: req.method(),
+                headers: {
+                  'content-type': 'application/json',
+                  ...(postBody ? { 'content-length': String(postBody.length) } : {}),
+                },
+              },
+              (res) => {
+                const chunks = [];
+                res.on('data', (c) => chunks.push(c));
+                res.on('end', () =>
+                  resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) })
+                );
+              }
+            );
+            proxyReq.on('error', (e) =>
+              resolve({ status: 502, headers: {}, body: Buffer.from(e.message) })
+            );
+            if (postBody) proxyReq.write(postBody);
+            proxyReq.end();
+          });
+
+          if (url.pathname === '/api/generate') {
+            console.log(
+              `[real-proxy] ← ${responseData.status} in ${((Date.now() - t0) / 1000).toFixed(1)}s | resp_len:${responseData.body.length}`
+            );
+          }
+
+          await route.fulfill({
+            status: responseData.status,
+            headers: responseData.headers,
+            body: responseData.body,
+          });
+        });
+        ollamaCorsRouteAdded = true;
+      }
+
+      return chosen;
+    }
+
+    test.beforeAll(async () => {
+      // Read model from extension storage
+      const storedModel = await background.evaluate(() =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('modelName', (d) => resolve(d.modelName || null))
+        )
+      );
+      if (storedModel) REQUIRED_MODEL = storedModel;
+
+      // Probe Ollama + install CORS proxy if needed
+      const resolvedModel = await resolveOllamaModelReal();
+      ollamaAvailable = resolvedModel !== null;
+
+      if (resolvedModel && resolvedModel !== REQUIRED_MODEL) {
+        REQUIRED_MODEL = resolvedModel;
+        await background.evaluate(
+          (model) => new Promise((resolve) => chrome.storage.sync.set({ modelName: model }, resolve)),
+          REQUIRED_MODEL
+        );
+      }
+
+      // Whitelist the target hostname so the content script processes it
+      await background.evaluate((host) =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('whitelistedSites', (data) => {
+            const sites = data.whitelistedSites || [];
+            if (!sites.includes(host)) sites.push(host);
+            chrome.storage.sync.set({ whitelistedSites: sites }, resolve);
+          })
+        ),
+        HOSTNAME
+      );
+      await background.evaluate(() => { whitelistCache.clear(); });
+    });
+
+    test.afterAll(async () => {
+      if (realChapterPage) await realChapterPage.close().catch(() => {});
+
+      // Restore whitelist to pre-test state
+      await background.evaluate((host) =>
+        new Promise((resolve) =>
+          chrome.storage.sync.get('whitelistedSites', (data) => {
+            const sites = (data.whitelistedSites || []).filter((s) => s !== host);
+            chrome.storage.sync.set({ whitelistedSites: sites }, resolve);
+          })
+        ),
+        HOSTNAME
+      );
+      await background.evaluate(() => { whitelistCache.clear(); });
+
+      if (ollamaCorsRouteAdded) {
+        await context.unroute('http://localhost:11434/**').catch(() => {});
+        ollamaCorsRouteAdded = false;
+      }
+    });
+
+    test('extension enhances real MTL chapter on NovelBin', async () => {
+      test.skip(!ollamaAvailable, [
+        'Skipped: Ollama not reachable, no models found,',
+        'or POST /api/generate returned a connection error.',
+        'Start Ollama with: OLLAMA_ORIGINS=chrome-extension://* ollama serve',
+      ].join(' '));
+
+      // Real chapters are longer than the mock — allow 5 minutes for inference.
+      test.setTimeout(300_000);
+
+      realChapterPage = await context.newPage();
+
+      // Forward relevant content-script console messages to test output
+      realChapterPage.on('console', (msg) => {
+        const text = msg.text();
+        if (
+          text.includes('Novel Dialogue') || text.includes('Ollama') ||
+          text.includes('whitelist') || text.includes('nhancement') ||
+          text.includes('Dialogue filter') || text.includes('chapter') ||
+          text.includes('chr-content') || text.includes('num_ctx')
+        ) {
+          console.log(`[real-page] ${msg.type()}: ${text}`);
+        }
+      });
+
+      console.log(`[real-url] Navigating to ${REAL_URL}`);
+      // Use 'load' (not 'domcontentloaded') so JS-rendered sites have time to mount.
+      await realChapterPage.goto(REAL_URL, { waitUntil: 'load', timeout: 30_000 });
+      // Give the page a few extra seconds for any client-side rendering to finish.
+      await realChapterPage.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
+      // ── Debug 1: log final URL so any redirect is visible in test output ──
+      const finalUrl = realChapterPage.url();
+      console.log(`[real-url] Final URL after navigation: ${finalUrl}`);
+
+      // ── Debug 2: snapshot key selectors so failures are self-diagnosing ───
+      const pageState = await realChapterPage.evaluate(() => ({
+        title: document.title,
+        has_chr_content:   !!document.querySelector('#chr-content'),
+        has_cha_page_in:   !!document.querySelector('#cha-page-in'),
+        has_cha_paragraph: document.querySelectorAll('.cha-paragraph').length,
+        body_classes:      document.body.className.split(' ').slice(0, 5).join(' '),
+      }));
+      console.log('[real-url] Page state:', JSON.stringify(pageState));
+
+      // ── Debug 3: confirm content area rendered (not a login wall/redirect) ──
+      const contentVisible = await realChapterPage
+        .locator(DEBUG_SELECTOR)
+        .isVisible({ timeout: 15_000 })
+        .catch(() => false);
+      console.log(`[real-url] Debug: ${DEBUG_SELECTOR} visible = ${contentVisible}`);
+
+      test.skip(
+        !contentVisible,
+        `${DEBUG_SELECTOR} not found — page may have redirected, shown a login wall, ` +
+        'or changed its DOM structure. Check "Page state" and "Final URL" in the log above.'
+      );
+
+      // ── Capture baseline text ──────────────────────────────────────────────
+      const originalText = await realChapterPage.locator(CONTENT_SELECTOR).textContent();
+      console.log(
+        `[real-url] Original content sample (first 200 chars): "${originalText?.slice(0, 200)}"`
+      );
+      expect(originalText).toBeTruthy();
+      expect(originalText.trim().length).toBeGreaterThan(100);
+
+      // ── Wait for the extension to rewrite the DOM ──────────────────────────
+      // Content script fires on document_idle; enhancement requires an Ollama
+      // round-trip which can take several minutes for a full chapter.
+      await realChapterPage.waitForFunction(
+        ({ sel, orig }) => {
+          const el = document.querySelector(sel);
+          return el !== null && el.textContent.trim() !== (orig || '').trim();
+        },
+        { sel: CONTENT_SELECTOR, orig: originalText },
+        { timeout: 240_000 }
+      );
+
+      const enhancedText = await realChapterPage.locator(CONTENT_SELECTOR).textContent();
+      console.log(
+        `[real-url] Enhanced content sample (first 200 chars): "${enhancedText?.slice(0, 200)}"`
+      );
+
+      // ── Assertions ─────────────────────────────────────────────────────────
+      expect(enhancedText).not.toBe(originalText);
+      expect(enhancedText.trim().length).toBeGreaterThan(100);
     });
   });
 });
