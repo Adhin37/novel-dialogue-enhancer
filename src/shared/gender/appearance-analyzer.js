@@ -4,6 +4,7 @@
  * Identifies physical descriptions and features that indicate gender
  */
 import { BaseAnalyzer } from "./base-analyzer.js";
+import { SharedUtils } from "../utils/shared-utils.js";
 
 export class AppearanceAnalyzer extends BaseAnalyzer {
   /**

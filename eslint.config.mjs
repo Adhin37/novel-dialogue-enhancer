@@ -4,40 +4,17 @@ import { defineConfig } from "eslint/config";
 
 export default defineConfig([
   {
+    ignores: ["**/*.min.js", "src/shared/lib/**"],
+  },
+  {
     files: ["**/*.{js,mjs,cjs}"],
     plugins: { js },
     extends: ["js/recommended"],
     languageOptions: {
+      sourceType: "module",
       globals: {
         ...globals.browser,
         chrome: "readonly",
-        darkModeManager: "readonly",
-        module: "readonly",
-        GenderUtils: "readonly",
-        NovelUtils: "readonly",
-        StatsUtils: "readonly",
-        OllamaClient: "readonly",
-        ContentEnhancerIntegration: "readonly",
-        TextProcessor: "readonly",
-        PromptGenerator: "readonly",
-        DOMPurify: "readonly",
-        CulturalAnalyzer: "readonly",
-        NameAnalyzer: "readonly",
-        PronounAnalyzer: "readonly",
-        RelationshipAnalyzer: "readonly",
-        AppearanceAnalyzer: "readonly",
-        NovelStyleAnalyzer: "readonly",
-        NovelCharacterExtractor: "readonly",
-        NovelChapterDetector: "readonly",
-        NovelIdGenerator: "readonly",
-        SharedUtils: "readonly",
-        Constants: "readonly",
-        BaseGenderAnalyzer: "readonly",
-        ContentElementCache: "readonly",
-        MultiCharacterContextAnalyzer: "readonly",
-        ErrorHandler: "readonly",
-        Logger: "readonly",
-        Toaster: "readonly"
       }
     },
     rules: {
