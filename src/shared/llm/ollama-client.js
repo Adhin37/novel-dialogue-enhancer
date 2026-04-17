@@ -17,16 +17,24 @@ export class OllamaClient {
     this.isCheckingAvailability = false;
     this.lastAvailabilityCheckTime = null;
     this.cachedAvailabilityStatus = null;
+    this._checkPromise = null;
+    this._resolveCheck = null;
     this.logger = logger;
 
     this.logger.debug("Novel Dialogue Enhancer: Ollama Client initialized");
   }
 
-  async checkOllamaAvailability() {
-    const CACHE_TTL = 30000; // 30 seconds
-    const CHECK_TIMEOUT = 15000; // 15 seconds timeout
+  #withTimeout(promise, ms, message) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms))
+    ]);
+  }
 
-    // Return cached result if it's recent enough
+  async checkOllamaAvailability() {
+    const CACHE_TTL = 30000;
+    const CHECK_TIMEOUT = 15000;
+
     const isCacheValid =
       this.lastAvailabilityCheckTime &&
       Date.now() - this.lastAvailabilityCheckTime < CACHE_TTL &&
@@ -36,57 +44,23 @@ export class OllamaClient {
       return this.cachedAvailabilityStatus;
     }
 
-    // If a check is already in progress, don't start another one
     if (this.isCheckingAvailability) {
-      this.logger.info(
-        "Ollama availability check already in progress, waiting..."
-      );
-
+      this.logger.info("Ollama availability check already in progress, waiting...");
       try {
-        // Wait for the existing check to complete with a timeout
-        const result = await Promise.race([
-          // Wait for the check to complete
-          new Promise((resolve) => {
-            const checkInterval = setInterval(() => {
-              if (!this.isCheckingAvailability) {
-                clearInterval(checkInterval);
-                resolve(this.cachedAvailabilityStatus);
-              }
-            }, 100);
-          }),
-          // Timeout after 5 seconds of waiting
-          new Promise((_, reject) =>
-            setTimeout(
-              () =>
-                reject(new Error("Timed out waiting for availability check")),
-              5000
-            )
-          )
-        ]);
-
+        const result = await this.#withTimeout(this._checkPromise, 5000, "Timed out waiting for availability check");
         return result || { available: false, reason: "Check failed" };
       } catch (error) {
         this.logger.warn("Waiting for Ollama check timed out:", error);
-        // Reset the flag if we timed out waiting
         this.isCheckingAvailability = false;
         return { available: false, reason: "Check timeout" };
       }
     }
 
-    // Set checking flag and clear it in case of errors
     this.isCheckingAvailability = true;
+    this._checkPromise = new Promise(resolve => { this._resolveCheck = resolve; });
     this.logger.debug("Checking Ollama availability...");
 
     try {
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error("Ollama check timed out")),
-          CHECK_TIMEOUT
-        );
-      });
-
-      // Create the actual check promise
       const checkPromise = new Promise((resolve) => {
         chrome.runtime.sendMessage(
           { action: "checkOllamaAvailability" },
@@ -96,25 +70,21 @@ export class OllamaClient {
                 "Ollama check communication error:",
                 chrome.runtime.lastError
               );
-
               const result = {
                 available: false,
                 reason: chrome.runtime.lastError.message
               };
-
               this.cachedAvailabilityStatus = result;
               resolve(result);
               return;
             }
-
             this.cachedAvailabilityStatus = response;
             resolve(response);
           }
         );
       });
 
-      // Race the promises
-      const result = await Promise.race([checkPromise, timeoutPromise]);
+      const result = await this.#withTimeout(checkPromise, CHECK_TIMEOUT, "Ollama check timed out");
       this.lastAvailabilityCheckTime = Date.now();
       return result;
     } catch (err) {
@@ -123,7 +93,7 @@ export class OllamaClient {
       this.cachedAvailabilityStatus = result;
       return result;
     } finally {
-      // Always reset the checking flag when we're done
+      this._resolveCheck?.(this.cachedAvailabilityStatus);
       this.isCheckingAvailability = false;
     }
   }
@@ -141,16 +111,6 @@ export class OllamaClient {
    */
   async processWithLLM(model, prompt, options = {}) {
     const timeoutDuration = options.timeout || 60;
-
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(
-        () =>
-          reject(
-            new Error(`LLM request timed out after ${timeoutDuration} seconds`)
-          ),
-        timeoutDuration * 1000
-      );
-    });
 
     const requestPromise = new Promise((resolve, reject) => {
       const requestData = {
@@ -193,7 +153,7 @@ export class OllamaClient {
       );
     });
 
-    return Promise.race([requestPromise, timeoutPromise]);
+    return this.#withTimeout(requestPromise, timeoutDuration * 1000, `LLM request timed out after ${timeoutDuration} seconds`);
   }
 
   /**

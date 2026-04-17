@@ -7,6 +7,89 @@ import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
 import { SharedUtils } from "../utils/shared-utils.js";
 
 export class CulturalAnalyzer extends BaseGenderAnalyzer {
+  static #NAME_PATTERNS = {
+    chinese: [
+      /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao|Cao|Deng|Xu|Cheng|Wei|Shen|Luo|Jiang|Ye|Shi|Yan)/i,
+      /^(?:Sect Master|Young Master|Elder|Ancestor|Grandmaster|Immortal|Dao Lord|Sovereign|Venerable|Imperial|Heavenly|Divine|Martial)/i,
+      /^(?:Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi)/i,
+      /(?:Xiang|Tian|Jiang|Pan|Wei|Ye|Yuan|Lu|Deng|Yao|Peng|Cao|Zou|Xiong|Qian|Dai|Fu|Ding|Jiang)/i
+    ],
+    japanese: [
+      /^(?:Sato|Suzuki|Takahashi|Tanaka|Watanabe|Ito|Yamamoto|Nakamura|Kobayashi|Kato|Yoshida|Yamada|Sasaki|Yamaguchi|Matsumoto|Inoue|Kimura|Hayashi|Shimizu|Yamazaki|Mori|Abe|Ikeda|Hashimoto|Ishikawa)/i,
+      /(?:Akira|Yuki|Haruto|Soma|Yuma|Ren|Haru|Sora|Haruki|Ayumu|Riku|Taiyo|Hinata|Yamato|Minato|Yuto|Sota|Yui|Hina|Koharu|Mei|Mio|Rin|Miyu|Kokona|Hana|Yuna|Sakura|Saki|Ichika|Akari|Himari)/i,
+      /(?:-san|-kun|-chan|-sama|-sensei|-senpai|-dono)$/i
+    ],
+    korean: [
+      /^(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
+      /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
+    ]
+  };
+
+  static #CONTEXT_CLUES = {
+    chinese: [
+      /Shanghai|Beijing|Guangzhou|Chinese|China|Mandarin|Cantonese|Dynasty|Emperor|Immortal|Cultivation|Dao|Qi|Taoist|Daoist|Wuxia|Xianxia|Jianghu/gi,
+      /Master|Shizun|Shifu|Shidi|Shixiong|Shimei|Shijie|Gongzi|Gongsun|Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi/gi
+    ],
+    japanese: [
+      /Tokyo|Osaka|Kyoto|Japanese|Japan|Senpai|Sensei|Sama|Kun|Chan|San|Dono|Hakase|Sushi|Ramen|Katana|Shinobi|Ninja|Samurai|Shogun|Daimyo|Ronin/gi,
+      /Onee|Onii|Nee|Nii|Imouto|Otouto|Oba|Oji|Okaa|Otou|Obaa|Ojii|-san|-kun|-chan|-sama|-dono|-sensei/gi
+    ],
+    korean: [
+      /Seoul|Busan|Incheon|Korean|Korea|Hangul|Hanbok|Kimchi|Chaebol|Manhwa|Webtoon|Noona|Hyung|Oppa|Unnie|Sunbae|Hoobae|Ahjussi|Ahjumma/gi,
+      /Hyung|Noona|Oppa|Unnie|Sunbae|Hoobae|Dongsaeng|Chingu|Ahjussi|Ahjumma|Halmeoni|Harabeoji/gi
+    ]
+  };
+
+  static #CULTURAL_INDICATORS = {
+    chinese: {
+      male: [
+        "shixiong", "shidi", "gege", "dage", "tangge", "shushu", "bobo",
+        "yeye", "shifu", "gongzi", "laoye", "wangye", "shizi", "langjun",
+        "xiansheng", "xiong", "shaoye", "xianzhu", "fuma", "shizun",
+        "dizi", "men", "nanren", "xiongdi", "shishu", "shibo", "shiye",
+        "fuqin", "guan"
+      ],
+      female: [
+        "shijie", "shimei", "jiejie", "meimei", "tangjie", "tangmei",
+        "ayi", "nainai", "guniang", "xiaojie", "furen", "taitai", "wangfei",
+        "gongzhu", "niangniang", "guifei", "gupo", "shitai", "shiniang",
+        "dimei", "nu", "nuren", "jiemei", "nunu", "niangzi", "niangchan"
+      ]
+    },
+    japanese: {
+      male: [
+        "otoko", "shounen", "danshi", "oniisan", "otouto", "ojisan",
+        "ojiisan", "otousan", "danna", "shujin", "otto", "senpai", "kohai",
+        "sensei", "kun", "bocchama", "dono", "tono", "-kun", "-dono",
+        "-sama", "-san", "ani", "nii"
+      ],
+      female: [
+        "onna", "shoujo", "joshi", "oneesan", "imouto", "obasan",
+        "obaasan", "okaasan", "tsuma", "okusan", "kanai", "senpai", "kohai",
+        "sensei", "chan", "ojousama", "hime", "-chan", "-san", "-sama",
+        "ane", "nee"
+      ]
+    },
+    korean: {
+      male: [
+        "namja", "sonyeon", "abeoji", "hyeong", "oppa", "ajussi",
+        "harabeoji", "abeoji", "nampyeon", "yeobo", "sunbae", "hubae",
+        "seonsaengnim", "gun", "ssi"
+      ],
+      female: [
+        "yeoja", "sonyeo", "eomeoni", "unni", "eonni", "ajumma",
+        "halmeoni", "eomeoni", "anae", "yeobo", "sunbae", "hubae",
+        "seonsaengnim", "yang", "ssi"
+      ]
+    }
+  };
+
+  static #CHINESE_PATTERN = /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i;
+
+  static #JAPANESE_PATTERN = /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i;
+
+  static #KOREAN_PATTERN = /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i;
+
   /**
    * Creates a new CulturalAnalyzer instance
    */
@@ -39,10 +122,9 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     }
 
     // Priority 2: Name pattern recognition (non-western only)
-    const namePatterns = this.#getNamePatterns();
     const nameScores = { chinese: 0, japanese: 0, korean: 0 };
 
-    for (const [culture, patterns] of Object.entries(namePatterns)) {
+    for (const [culture, patterns] of Object.entries(CulturalAnalyzer.#NAME_PATTERNS)) {
       for (const pattern of patterns) {
         if (pattern.test(name)) {
           nameScores[culture] += 2;
@@ -51,13 +133,12 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     }
 
     // Priority 3: Context analysis
-    const contextClues = this.#getContextClues();
     const contextScores = { chinese: 0, japanese: 0, korean: 0 };
 
     const nameProximityText = this._getProximityText(name, text, 200);
     const combinedText = nameProximityText.join(" ");
 
-    for (const [culture, patterns] of Object.entries(contextClues)) {
+    for (const [culture, patterns] of Object.entries(CulturalAnalyzer.#CONTEXT_CLUES)) {
       for (const pattern of patterns) {
         const matches = combinedText.match(pattern) || [];
         contextScores[culture] += matches.length * 2;
@@ -96,53 +177,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
   }
 
   /**
-   * Get name patterns for non-western cultures only
-   * @return {object} - Object with name patterns for each culture
-   * @private
-   */
-  #getNamePatterns() {
-    return {
-      chinese: [
-        /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao|Cao|Deng|Xu|Cheng|Wei|Shen|Luo|Jiang|Ye|Shi|Yan)/i,
-        /^(?:Sect Master|Young Master|Elder|Ancestor|Grandmaster|Immortal|Dao Lord|Sovereign|Venerable|Imperial|Heavenly|Divine|Martial)/i,
-        /^(?:Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi)/i,
-        /(?:Xiang|Tian|Jiang|Pan|Wei|Ye|Yuan|Lu|Deng|Yao|Peng|Cao|Zou|Xiong|Qian|Dai|Fu|Ding|Jiang)/i
-      ],
-      japanese: [
-        /^(?:Sato|Suzuki|Takahashi|Tanaka|Watanabe|Ito|Yamamoto|Nakamura|Kobayashi|Kato|Yoshida|Yamada|Sasaki|Yamaguchi|Matsumoto|Inoue|Kimura|Hayashi|Shimizu|Yamazaki|Mori|Abe|Ikeda|Hashimoto|Ishikawa)/i,
-        /(?:Akira|Yuki|Haruto|Soma|Yuma|Ren|Haru|Sora|Haruki|Ayumu|Riku|Taiyo|Hinata|Yamato|Minato|Yuto|Sota|Yui|Hina|Koharu|Mei|Mio|Rin|Miyu|Kokona|Hana|Yuna|Sakura|Saki|Ichika|Akari|Himari)/i,
-        /(?:-san|-kun|-chan|-sama|-sensei|-senpai|-dono)$/i
-      ],
-      korean: [
-        /^(?:Kim|Lee|Park|Choi|Jung|Kang|Cho|Yoon|Jang|Lim|Han|Oh|Seo|Shin|Kwon|Hwang|Ahn|Song|Yoo|Hong|Jeon|Moon|Baek|Chung|Bae|Ryu)/i,
-        /(?:Min|Seung|Hyun|Sung|Young|Jin|Soo|Jun|Ji|Hye|Joon|Woo|Dong|Kyung|Jae|Eun|Yong|In|Ho|Chang|Hee|Hyung|Cheol|Kwang|Tae|Yeon)/i
-      ]
-    };
-  }
-
-  /**
-   * Get context clues for non-western cultures only
-   * @return {object} - Object with cultural context patterns
-   * @private
-   */
-  #getContextClues() {
-    return {
-      chinese: [
-        /Shanghai|Beijing|Guangzhou|Chinese|China|Mandarin|Cantonese|Dynasty|Emperor|Immortal|Cultivation|Dao|Qi|Taoist|Daoist|Wuxia|Xianxia|Jianghu/gi,
-        /Master|Shizun|Shifu|Shidi|Shixiong|Shimei|Shijie|Gongzi|Gongsun|Xiao|Lao|Da|Er|San|Si|Wu|Liu|Qi|Ba|Jiu|Shi/gi
-      ],
-      japanese: [
-        /Tokyo|Osaka|Kyoto|Japanese|Japan|Senpai|Sensei|Sama|Kun|Chan|San|Dono|Hakase|Sushi|Ramen|Katana|Shinobi|Ninja|Samurai|Shogun|Daimyo|Ronin/gi,
-        /Onee|Onii|Nee|Nii|Imouto|Otouto|Oba|Oji|Okaa|Otou|Obaa|Ojii|-san|-kun|-chan|-sama|-dono|-sensei/gi
-      ],
-      korean: [
-        /Seoul|Busan|Incheon|Korean|Korea|Hangul|Hanbok|Kimchi|Chaebol|Manhwa|Webtoon|Noona|Hyung|Oppa|Unnie|Sunbae|Hoobae|Ahjussi|Ahjumma/gi,
-        /Hyung|Noona|Oppa|Unnie|Sunbae|Hoobae|Dongsaeng|Chingu|Ahjussi|Ahjumma|Halmeoni|Harabeoji/gi
-      ]
-    };
-  }
-
-  /**
    * Analyze linguistic patterns for non-western cultures only
    * @param {string} text - Text to analyze
    * @return {object} - Linguistic pattern scores
@@ -150,34 +184,9 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
    */
   #analyzeLinguisticPatterns(text) {
     const scores = { chinese: 0, japanese: 0, korean: 0 };
-
-    // Chinese-specific patterns
-    if (
-      /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i.test(
-        text
-      )
-    ) {
-      scores.chinese += 3;
-    }
-
-    // Japanese-specific patterns
-    if (
-      /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i.test(
-        text
-      )
-    ) {
-      scores.japanese += 3;
-    }
-
-    // Korean-specific patterns
-    if (
-      /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i.test(
-        text
-      )
-    ) {
-      scores.korean += 3;
-    }
-
+    if (CulturalAnalyzer.#CHINESE_PATTERN.test(text)) scores.chinese += 3;
+    if (CulturalAnalyzer.#JAPANESE_PATTERN.test(text)) scores.japanese += 3;
+    if (CulturalAnalyzer.#KOREAN_PATTERN.test(text)) scores.korean += 3;
     return scores;
   }
 
@@ -189,7 +198,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
    * @return {object} - Gender scores with evidence
    */
   checkCulturalSpecificIndicators(name, text, culturalOrigin) {
-    const culturalIndicators = this.#getCulturalIndicators();
     const exactIndicators = this.#getExactIndicators(name);
     const specificCultureIndicators =
       exactIndicators[culturalOrigin] || exactIndicators.western;
@@ -213,7 +221,9 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
 
     // Check cultural specific indicators in proximity
     const cultureSpecific =
-      culturalIndicators[culturalOrigin] || culturalIndicators.western;
+      CulturalAnalyzer.#CULTURAL_INDICATORS[culturalOrigin] ||
+      CulturalAnalyzer.#CULTURAL_INDICATORS.western ||
+      { male: [], female: [] };
 
     const proximityResult = this._analyzePatterns(
       [combinedProximityText],
@@ -269,167 +279,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     }
 
     return this._createResult(0, 0, null);
-  }
-
-  /**
-   * Get cultural indicators for non-western cultures only
-   * @return {object} - Object with cultural indicators
-   * @private
-   */
-  #getCulturalIndicators() {
-    return {
-      chinese: {
-        male: [
-          "shixiong",
-          "shidi",
-          "gege",
-          "dage",
-          "tangge",
-          "shushu",
-          "bobo",
-          "yeye",
-          "shifu",
-          "gongzi",
-          "laoye",
-          "wangye",
-          "shizi",
-          "langjun",
-          "xiansheng",
-          "xiong",
-          "shaoye",
-          "xianzhu",
-          "fuma",
-          "shizun",
-          "dizi",
-          "men",
-          "nanren",
-          "xiongdi",
-          "dizi",
-          "shishu",
-          "shibo",
-          "shiye",
-          "fuqin",
-          "guan"
-        ],
-        female: [
-          "shijie",
-          "shimei",
-          "jiejie",
-          "meimei",
-          "tangjie",
-          "tangmei",
-          "ayi",
-          "nainai",
-          "guniang",
-          "xiaojie",
-          "furen",
-          "taitai",
-          "wangfei",
-          "gongzhu",
-          "niangniang",
-          "guifei",
-          "gupo",
-          "shitai",
-          "shiniang",
-          "shitai",
-          "dimei",
-          "nu",
-          "nuren",
-          "jiemei",
-          "nunu",
-          "niangzi",
-          "niangchan"
-        ]
-      },
-      japanese: {
-        male: [
-          "otoko",
-          "shounen",
-          "danshi",
-          "oniisan",
-          "otouto",
-          "ojisan",
-          "ojiisan",
-          "otousan",
-          "danna",
-          "shujin",
-          "otto",
-          "senpai",
-          "kohai",
-          "sensei",
-          "kun",
-          "bocchama",
-          "dono",
-          "tono",
-          "-kun",
-          "-dono",
-          "-sama",
-          "-san",
-          "ani",
-          "nii"
-        ],
-        female: [
-          "onna",
-          "shoujo",
-          "joshi",
-          "oneesan",
-          "imouto",
-          "obasan",
-          "obaasan",
-          "okaasan",
-          "tsuma",
-          "okusan",
-          "kanai",
-          "senpai",
-          "kohai",
-          "sensei",
-          "chan",
-          "ojousama",
-          "hime",
-          "-chan",
-          "-san",
-          "-sama",
-          "ane",
-          "nee"
-        ]
-      },
-      korean: {
-        male: [
-          "namja",
-          "sonyeon",
-          "abeoji",
-          "hyeong",
-          "oppa",
-          "ajussi",
-          "harabeoji",
-          "abeoji",
-          "nampyeon",
-          "yeobo",
-          "sunbae",
-          "hubae",
-          "seonsaengnim",
-          "gun",
-          "ssi"
-        ],
-        female: [
-          "yeoja",
-          "sonyeo",
-          "eomeoni",
-          "unni",
-          "eonni",
-          "ajumma",
-          "halmeoni",
-          "eomeoni",
-          "anae",
-          "yeobo",
-          "sunbae",
-          "hubae",
-          "seonsaengnim",
-          "yang",
-          "ssi"
-        ]
-      }
-    };
   }
 
   /**
@@ -549,7 +398,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
         new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-san\\b`, "i"),
         new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-kun\\b`, "i"),
 
-        // Common positional references
         /\bhe cultivated\b/i,
         /\bhis cultivation\b/i,
         /\bhis martial arts\b/i,
@@ -571,7 +419,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
         /\bdisciple sister\b/i,
         new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-chan\\b`, "i"),
 
-        // Common positional references
         /\bher fairy\b/i,
         /\bher beauty\b/i,
         /\bher cultivation\b/i,
@@ -595,15 +442,9 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     let femaleScore = 0;
     let evidence = null;
 
-    const dialogPatterns = [new RegExp(`"[^"]*\\b(${name})\\b[^"]*"`, "gi")];
-
-    let dialogText = "";
-    for (const pattern of dialogPatterns) {
-      const matches = text.match(pattern) || [];
-      matches.forEach((match) => {
-        dialogText += match + " ";
-      });
-    }
+    const dialogPattern = new RegExp(`"[^"]*\\b(${name})\\b[^"]*"`, "gi");
+    const matches = text.match(dialogPattern) || [];
+    const dialogText = matches.join(" ");
 
     if (dialogText) {
       const maleAddressTerms = {
@@ -652,5 +493,3 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     return { maleScore, femaleScore, evidence };
   }
 }
-
-

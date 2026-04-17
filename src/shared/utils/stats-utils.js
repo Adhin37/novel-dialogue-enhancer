@@ -16,25 +16,20 @@ export class StatsUtils {
     this.compressionRatio = 1.0;
     this.errorCount = 0;
     this.logger = logger;
-    this.logger.debug("Novel Dialogue Enhancer: Stats Utils initialized");
   }
 
-  /**
-   * Set total number of words processed
-   * @param {number} wordsProcessed - New count value
-   */
-  setTotalWordsProcessed(wordsProcessed) {
-    if (!SharedUtils.isValidNumber(wordsProcessed)) {
-      this.logger.error("Invalid wordsProcessed value");
+  #set(prop, value, label) {
+    if (!SharedUtils.isValidNumber(value)) {
+      this.logger.error(`Invalid ${label} value`);
       return;
     }
-    this.totalWordsProcessed += wordsProcessed;
+    this[prop] += value;
   }
 
-  /**
-   * Set compression ratio
-   * @param {number} ratio - New compression ratio value
-   */
+  setTotalWordsProcessed(wordsProcessed) {
+    this.#set("totalWordsProcessed", wordsProcessed, "wordsProcessed");
+  }
+
   setCompressionRatio(ratio) {
     if (!SharedUtils.isValidNumber(ratio)) {
       this.logger.error("Invalid compressionRatio value");
@@ -43,40 +38,16 @@ export class StatsUtils {
     this.compressionRatio = ratio;
   }
 
-  /**
-   * Set total number of dialogues enhanced
-   * @param {number} dialoguesEnhanced - New count value
-   */
   setTotalDialoguesEnhanced(dialoguesEnhanced) {
-    if (!SharedUtils.isValidNumber(dialoguesEnhanced)) {
-      this.logger.error("Invalid dialoguesEnhanced value");
-      return;
-    }
-    this.totalDialoguesEnhanced += dialoguesEnhanced;
+    this.#set("totalDialoguesEnhanced", dialoguesEnhanced, "dialoguesEnhanced");
   }
 
-  /**
-   * Set total number of characters detected
-   * @param {number} charactersDetected - New count value
-   */
   setTotalCharactersDetected(charactersDetected) {
-    if (!SharedUtils.isValidNumber(charactersDetected)) {
-      this.logger.error("Invalid charactersDetected value");
-      return;
-    }
-    this.totalCharactersDetected += charactersDetected;
+    this.#set("totalCharactersDetected", charactersDetected, "charactersDetected");
   }
 
-  /**
-   * Set total processing time
-   * @param {number} processingTime - New processing time in milliseconds
-   */
   setProcessingTime(processingTime) {
-    if (!SharedUtils.isValidNumber(processingTime)) {
-      this.logger.error("Invalid processingTime value");
-      return;
-    }
-    this.processingTime += processingTime;
+    this.#set("processingTime", processingTime, "processingTime");
   }
 
   /**
