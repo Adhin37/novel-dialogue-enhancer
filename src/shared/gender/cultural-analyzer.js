@@ -92,10 +92,6 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
       return dominantCulture;
     }
 
-    // Default fallback to western
-    console.log(
-      `Cultural detection uncertain for ${name}, defaulting to western`
-    );
     return "western";
   }
 

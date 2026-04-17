@@ -80,23 +80,6 @@ export class StatsUtils {
   }
 
   /**
-   * Set all statistics from an object
-   * @param {Object} stats - Statistics object containing:
-   *   - totalDialoguesEnhanced
-   *   - totalCharactersDetected
-   *   - processingTime
-   */
-  setStats(stats) {
-    if (!stats || Object.keys(stats).length === 0) {
-      this.logger.error("Invalid statistics object");
-      return;
-    }
-    this.totalDialoguesEnhanced = stats.totalDialoguesEnhanced || 0;
-    this.totalCharactersDetected = stats.totalCharactersDetected || 0;
-    this.processingTime = stats.processingTime || 0;
-  }
-
-  /**
    * Increment error count
    */
   incrementErrorCount() {
@@ -118,28 +101,5 @@ export class StatsUtils {
     };
   }
 
-  /**
-   * Get total number of dialogues enhanced
-   * @return {number} Total dialogues enhanced
-   */
-  getTotalDialoguesEnhanced() {
-    return this.totalDialoguesEnhanced;
-  }
-
-  /**
-   * Get total number of characters detected
-   * @return {number} Total characters detected
-   */
-  getTotalCharactersDetected() {
-    return this.totalCharactersDetected;
-  }
-
-  /**
-   * Get total processing time
-   * @return {number} Total processing time in milliseconds
-   */
-  getProcessingTime() {
-    return this.processingTime;
-  }
 }
 

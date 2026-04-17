@@ -236,7 +236,7 @@ export class OllamaClient {
         },
         (data) => {
           if (chrome.runtime.lastError) {
-            console.error(
+            this.logger.error(
               "Error getting LLM settings:",
               chrome.runtime.lastError
             );
