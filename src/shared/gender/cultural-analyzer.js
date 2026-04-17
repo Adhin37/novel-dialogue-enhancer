@@ -5,6 +5,7 @@
  */
 import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
 import { SharedUtils } from "../utils/shared-utils.js";
+import { CULTURAL_GENDER_TERMS } from "../utils/cultural-terms.js";
 
 export class CulturalAnalyzer extends BaseGenderAnalyzer {
   static #NAME_PATTERNS = {
@@ -40,55 +41,23 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
     ]
   };
 
-  static #CULTURAL_INDICATORS = {
-    chinese: {
-      male: [
-        "shixiong", "shidi", "gege", "dage", "tangge", "shushu", "bobo",
-        "yeye", "shifu", "gongzi", "laoye", "wangye", "shizi", "langjun",
-        "xiansheng", "xiong", "shaoye", "xianzhu", "fuma", "shizun",
-        "dizi", "men", "nanren", "xiongdi", "shishu", "shibo", "shiye",
-        "fuqin", "guan"
-      ],
-      female: [
-        "shijie", "shimei", "jiejie", "meimei", "tangjie", "tangmei",
-        "ayi", "nainai", "guniang", "xiaojie", "furen", "taitai", "wangfei",
-        "gongzhu", "niangniang", "guifei", "gupo", "shitai", "shiniang",
-        "dimei", "nu", "nuren", "jiemei", "nunu", "niangzi", "niangchan"
-      ]
-    },
-    japanese: {
-      male: [
-        "otoko", "shounen", "danshi", "oniisan", "otouto", "ojisan",
-        "ojiisan", "otousan", "danna", "shujin", "otto", "senpai", "kohai",
-        "sensei", "kun", "bocchama", "dono", "tono", "-kun", "-dono",
-        "-sama", "-san", "ani", "nii"
-      ],
-      female: [
-        "onna", "shoujo", "joshi", "oneesan", "imouto", "obasan",
-        "obaasan", "okaasan", "tsuma", "okusan", "kanai", "senpai", "kohai",
-        "sensei", "chan", "ojousama", "hime", "-chan", "-san", "-sama",
-        "ane", "nee"
-      ]
-    },
-    korean: {
-      male: [
-        "namja", "sonyeon", "abeoji", "hyeong", "oppa", "ajussi",
-        "harabeoji", "abeoji", "nampyeon", "yeobo", "sunbae", "hubae",
-        "seonsaengnim", "gun", "ssi"
-      ],
-      female: [
-        "yeoja", "sonyeo", "eomeoni", "unni", "eonni", "ajumma",
-        "halmeoni", "eomeoni", "anae", "yeobo", "sunbae", "hubae",
-        "seonsaengnim", "yang", "ssi"
-      ]
-    }
-  };
+  static #CULTURAL_INDICATORS = CULTURAL_GENDER_TERMS;
 
   static #CHINESE_PATTERN = /\b(dao|qi|cultivation|immortal|sect|martial arts|dantian|meridian|heaven|earth|profound|mystic|divine|spiritual energy|foundation establishment|core formation|nascent soul|spirit stone|pill|elixir|refining|alchemy|array|formation|tribulation|breakthrough|realm|stage|layer|level|peak|bottleneck|comprehension|enlightenment|technique|skill|art|way|path|law|rule|will|intent|aura|pressure|bloodline|physique|constitution|talent|genius|prodigy|waste|trash|cripple|mortal|cultivator|practitioner|expert|master|grandmaster|ancestor|elder|disciple|junior|senior|fellow|dao friend|brother|sister)\b/i;
 
   static #JAPANESE_PATTERN = /\b(senpai|kohai|sensei|sama|kun|chan|san|dono|baka|sugoi|kawaii|tsundere|yandere|otaku|anime|manga|ninja|samurai|katana|sakura|cherry blossom|shrine|temple|kami|yokai|oni|festival|matsuri|bento|sushi|ramen|onigiri|mochi|dojo|sensei|shihan|bushido|honor|duty|loyalty|family|clan|house|bloodline)\b/i;
 
   static #KOREAN_PATTERN = /\b(oppa|unni|hyung|dongsaeng|sunbae|hoobae|aigoo|daebak|kimchi|bulgogi|bibimbap|soju|makgeolli|hanbok|taekwondo|hallyu|k-pop|drama|chaebol|conglomerate|company|corporation|heir|successor|family|bloodline|honor|respect|hierarchy|status)\b/i;
+
+  // Genre-level vocabulary unique to East Asian fantasy writing — scanned over full chapter text.
+  // These appear even when the surface setting is medieval/western (isekai, Korean manhwa, xianxia).
+  static #EASTERN_FANTASY_MARKERS = {
+    chinese: /\b(cultivation|dantian|meridian|spirit\s*stone|pill\s*(?:refin|concoct)|wuxia|xianxia|nascent\s*soul|foundation\s*(?:establishment|building)|core\s*formation|dao\s*(?:heart|law|path|comprehension)|immortal\s*(?:realm|sect|path)|sect\s*(?:master|disciple|elder)|body\s*cultivation|sword\s*(?:cultivation|dao|intent|qi)|alchemy\s*(?:furnace|pill)|qi\s*(?:refin|cultivat|gather)|tribulation\s*(?:lightning|thunder)|demonic\s*cultivat)\b/gi,
+    korean: /\b(regression|hunter(?:'s)?\s*(?:guild|rank|association)|awakened?\s*(?:human|ability|power|hunter)|S-rank|A-rank|B-rank|gate(?:s)?\s*(?:open|appear|form|crack)|dungeon\s*(?:break|raid|clear|hunter)|chaebol|manhwa|webtoon|returner|regresser|conglomerate\s*heir|system\s*(?:window|message|notification|alert))\b/gi,
+    japanese: /\b(isekai|reincarnated?\s*(?:as|into|in)\s*a|transferred?\s*to\s*(?:another|a\s*different)\s*world|otome\s*(?:game|novel)|capture\s*target|demon\s*lord|hero(?:'s)?\s*party|job\s*class|divine\s*protection|cheat\s*(?:skill|ability)|death\s*march|dungeon\s*master\s*(?:floor|room))\b/gi,
+    // Generic RPG-panel vocab shared across Eastern fantasy — only meaningful when paired with culture-specific signals
+    generic: /\b(status\s*(?:window|screen|panel)|skill\s*(?:leveled?\s*up|points?|tree|window)|HP\b|MP\b|EXP\b|level(?:ed)?\s*up|exp\s*(?:gained?|points?)|achievement\s*(?:unlock|complet)|boss\s*(?:monster|floor|room)|floor\s*boss|quest\s*(?:complet|accept|fail|log)|respawn\s*point|game\s*(?:over|system|world))\b/gi,
+  };
 
   /**
    * Creates a new CulturalAnalyzer instance
@@ -165,6 +134,25 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
       if (finalScores[culture] > maxScore) {
         dominantCulture = culture;
         maxScore = finalScores[culture];
+      }
+    }
+
+    // Priority 5: Eastern-authored fantasy genre detection.
+    // Scans the full chapter text for genre-level vocabulary (cultivation, isekai, regression/hunter)
+    // that persists even when the surface setting is medieval/western.
+    // This handles Korean manhwa, Japanese isekai, and Chinese xianxia set in fantasy worlds.
+    if (maxScore < 2) {
+      const genreBoosts = this.#detectEasternFantasyMarkers(text);
+      for (const culture of ["chinese", "japanese", "korean"]) {
+        finalScores[culture] += genreBoosts[culture];
+      }
+      maxScore = 0;
+      dominantCulture = "western";
+      for (const culture of ["chinese", "japanese", "korean"]) {
+        if (finalScores[culture] > maxScore) {
+          dominantCulture = culture;
+          maxScore = finalScores[culture];
+        }
       }
     }
 
@@ -427,6 +415,42 @@ export class CulturalAnalyzer extends BaseGenderAnalyzer {
         /\bher fragrance\b/i
       ]
     };
+  }
+
+  /**
+   * Scan full chapter text for East Asian fantasy genre vocabulary.
+   * Detects Eastern-authored stories even when the surface setting uses medieval/western trappings.
+   * Returns per-culture score boosts; generic RPG-panel vocabulary only amplifies existing signals.
+   * @param {string} text - Full chapter text
+   * @return {object} - { chinese, japanese, korean } boost values
+   * @private
+   */
+  #detectEasternFantasyMarkers(text) {
+    const boosts = { chinese: 0, japanese: 0, korean: 0 };
+    const cap = 6;
+
+    for (const culture of ["chinese", "japanese", "korean"]) {
+      const pattern = CulturalAnalyzer.#EASTERN_FANTASY_MARKERS[culture];
+      pattern.lastIndex = 0;
+      const count = (text.match(pattern) || []).length;
+      boosts[culture] = Math.min(count * 2, cap);
+    }
+
+    // Generic RPG-panel markers (status window, HP, level up…) are not culture-specific alone,
+    // but when any culture-specific marker is already present they strengthen that signal.
+    const gp = CulturalAnalyzer.#EASTERN_FANTASY_MARKERS.generic;
+    gp.lastIndex = 0;
+    const genericCount = (text.match(gp) || []).length;
+    if (genericCount > 0) {
+      const genericBoost = Math.min(genericCount, 2);
+      for (const culture of ["chinese", "japanese", "korean"]) {
+        if (boosts[culture] > 0) {
+          boosts[culture] = Math.min(boosts[culture] + genericBoost, cap);
+        }
+      }
+    }
+
+    return boosts;
   }
 
   /**

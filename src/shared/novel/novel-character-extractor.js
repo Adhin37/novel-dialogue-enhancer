@@ -1,5 +1,6 @@
 import { Constants } from "../utils/constants.js";
 import { SharedUtils } from "../utils/shared-utils.js";
+import { PRONOUN_FILTER_SET } from "../utils/pronouns.js";
 
 // novel-character-extractor.js
 /**
@@ -84,23 +85,7 @@ export class NovelCharacterExtractor {
       return null;
     }
 
-    const pronouns = [
-      "He",
-      "She",
-      "It",
-      "They",
-      "I",
-      "You",
-      "We",
-      "His",
-      "Her",
-      "Their",
-      "My",
-      "Your",
-      "Our"
-    ];
-
-    if (pronouns.includes(processedText)) {
+    if (PRONOUN_FILTER_SET.has(processedText.toLowerCase())) {
       return null;
     }
 

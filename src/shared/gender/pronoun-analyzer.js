@@ -4,6 +4,7 @@
  * Identifies and analyzes pronoun usage to determine character gender
  */
 import { SharedUtils } from "../utils/shared-utils.js";
+import { MALE_PRONOUNS, FEMALE_PRONOUNS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "../utils/pronouns.js";
 
 export class PronounAnalyzer {
   /**
@@ -44,13 +45,13 @@ export class PronounAnalyzer {
       const directMaleConnection = this.#checkDirectPronounConnection(
         name,
         followingText,
-        ["he", "him", "his"]
+        MALE_PRONOUNS
       );
 
       const directFemaleConnection = this.#checkDirectPronounConnection(
         name,
         followingText,
-        ["she", "her", "hers"]
+        FEMALE_PRONOUNS
       );
 
       if (directMaleConnection.isDirectConnection) {
@@ -144,9 +145,7 @@ export class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${SharedUtils.escapeRegExp(
-              name
-            )}'s\\b[^.!?]*\\b(wife|girlfriend|daughter|sister|mother)\\b`,
+            `\\b${SharedUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${MALE_POSSESSIVES.join("|")})\\b`,
             "i"
           )
         )
@@ -157,9 +156,7 @@ export class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${SharedUtils.escapeRegExp(
-              name
-            )}'s\\b[^.!?]*\\b(husband|boyfriend|son|brother|father)\\b`,
+            `\\b${SharedUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${FEMALE_POSSESSIVES.join("|")})\\b`,
             "i"
           )
         )
@@ -194,10 +191,10 @@ export class PronounAnalyzer {
       if (!this.#containsOtherCharacterNames(proximityText, name)) {
         // Only analyze pronouns if no other character names are present
         const isolatedMalePronouns = (
-          proximityText.match(/\b(he|him|his)\b/gi) || []
+          proximityText.match(new RegExp(MALE_PRONOUN_PATTERN, "gi")) || []
         ).length;
         const isolatedFemalePronouns = (
-          proximityText.match(/\b(she|her|hers)\b/gi) || []
+          proximityText.match(new RegExp(FEMALE_PRONOUN_PATTERN, "gi")) || []
         ).length;
 
         // Apply much lower weight for isolated pronouns

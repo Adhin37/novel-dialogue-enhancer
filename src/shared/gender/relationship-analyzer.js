@@ -4,6 +4,7 @@
  * Identifies relationship patterns and character roles that indicate gender
  */
 import { SharedUtils } from "../utils/shared-utils.js";
+import { CULTURAL_ADDRESS_TERMS } from "../utils/cultural-terms.js";
 
 export class RelationshipAnalyzer {
   /**
@@ -123,136 +124,25 @@ export class RelationshipAnalyzer {
    * @private
    */
   #getCulturalRelationshipPatterns(culturalOrigin) {
-    const patterns = {
-      western: {
-        male: [
-          "{name} was her husband",
-          "{name} was his husband",
-          "{name}'s wife",
-          "{name} was the father",
-          "{name} was the son",
-          "{name} was the brother",
-          "{name} was the uncle",
-          "{name} was the grandfather",
-          "{name} was the boyfriend",
-          "{name}, the husband",
-          "{name}, the father"
-        ],
-        female: [
-          "{name} was his wife",
-          "{name} was her wife",
-          "{name}'s husband",
-          "{name} was the mother",
-          "{name} was the daughter",
-          "{name} was the sister",
-          "{name} was the aunt",
-          "{name} was the grandmother",
-          "{name} was the girlfriend",
-          "{name}, the wife",
-          "{name}, the mother"
-        ]
-      },
-      chinese: {
-        male: [
-          "{name} was her husband",
-          "{name}'s wife",
-          "{name} was the father",
-          "{name} was the son",
-          "{name} was the elder brother",
-          "{name} was the younger brother",
-          "{name} was the uncle",
-          "{name} was the grandfather",
-          "{name}, the young master",
-          "{name}, the sect master",
-          "{name}, the patriarch",
-          "{name} dage",
-          "{name} gege",
-          "{name} shixiong",
-          "{name} shifu"
-        ],
-        female: [
-          "{name} was his wife",
-          "{name}'s husband",
-          "{name} was the mother",
-          "{name} was the daughter",
-          "{name} was the elder sister",
-          "{name} was the younger sister",
-          "{name} was the aunt",
-          "{name} was the grandmother",
-          "{name}, the young miss",
-          "{name}, the sect mistress",
-          "{name}, the matriarch",
-          "{name} jiejie",
-          "{name} meimei",
-          "{name} shijie",
-          "{name} shimei"
-        ]
-      },
-      japanese: {
-        male: [
-          "{name} was her husband",
-          "{name}'s wife",
-          "{name} was the father",
-          "{name} was the son",
-          "{name} was the older brother",
-          "{name} was the younger brother",
-          "{name} was the uncle",
-          "{name} was the grandfather",
-          "{name}-kun",
-          "{name}-sama",
-          "{name}-san",
-          "{name} oniisan",
-          "{name} otouto",
-          "{name} otousan"
-        ],
-        female: [
-          "{name} was his wife",
-          "{name}'s husband",
-          "{name} was the mother",
-          "{name} was the daughter",
-          "{name} was the older sister",
-          "{name} was the younger sister",
-          "{name} was the aunt",
-          "{name} was the grandmother",
-          "{name}-chan",
-          "{name}-sama",
-          "{name}-san",
-          "{name} oneesan",
-          "{name} imouto",
-          "{name} okaasan"
-        ]
-      },
-      korean: {
-        male: [
-          "{name} was her husband",
-          "{name}'s wife",
-          "{name} was the father",
-          "{name} was the son",
-          "{name} was the older brother",
-          "{name} was the younger brother",
-          "{name} was the uncle",
-          "{name} was the grandfather",
-          "{name} oppa",
-          "{name} hyung",
-          "{name} abeoji"
-        ],
-        female: [
-          "{name} was his wife",
-          "{name}'s husband",
-          "{name} was the mother",
-          "{name} was the daughter",
-          "{name} was the older sister",
-          "{name} was the younger sister",
-          "{name} was the aunt",
-          "{name} was the grandmother",
-          "{name} unni",
-          "{name} eonni",
-          "{name} eomeoni"
-        ]
-      }
+    const baseMale = [
+      "{name} was her husband", "{name} was his husband",
+      "{name}'s wife", "{name} was the father", "{name} was the son",
+      "{name} was the brother", "{name} was the elder brother", "{name} was the older brother",
+      "{name} was the younger brother", "{name} was the uncle", "{name} was the grandfather",
+      "{name} was the boyfriend", "{name}, the husband", "{name}, the father"
+    ];
+    const baseFemale = [
+      "{name} was his wife", "{name} was her wife",
+      "{name}'s husband", "{name} was the mother", "{name} was the daughter",
+      "{name} was the sister", "{name} was the elder sister", "{name} was the older sister",
+      "{name} was the younger sister", "{name} was the aunt", "{name} was the grandmother",
+      "{name} was the girlfriend", "{name}, the wife", "{name}, the mother"
+    ];
+    const address = CULTURAL_ADDRESS_TERMS[culturalOrigin] || { male: [], female: [] };
+    return {
+      male: [...baseMale, ...address.male.map(t => `{name} ${t}`)],
+      female: [...baseFemale, ...address.female.map(t => `{name} ${t}`)]
     };
-
-    return patterns[culturalOrigin] || patterns.western;
   }
 
   /**

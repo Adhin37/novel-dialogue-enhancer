@@ -5,6 +5,7 @@
  */
 import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
 import { SharedUtils } from "../utils/shared-utils.js";
+import { GENDER_PRONOUN_GROUPS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "../utils/pronouns.js";
 
 export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
   /**
@@ -788,10 +789,10 @@ export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
 
     if (!otherCharactersPresent) {
       const malePronouns = (
-        attributionSection.match(/\b(he|him|his)\b/gi) || []
+        attributionSection.match(new RegExp(MALE_PRONOUN_PATTERN, "gi")) || []
       ).length;
       const femalePronouns = (
-        attributionSection.match(/\b(she|her|hers)\b/gi) || []
+        attributionSection.match(new RegExp(FEMALE_PRONOUN_PATTERN, "gi")) || []
       ).length;
 
       if (malePronouns > 0) {
@@ -918,10 +919,7 @@ export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
   }
 
   #findPronounsWithPositions(sentence) {
-    const pronouns = [
-      { patterns: ["\\bhe\\b", "\\bhim\\b", "\\bhis\\b"], type: "male" },
-      { patterns: ["\\bshe\\b", "\\bher\\b", "\\bhers\\b"], type: "female" }
-    ];
+    const pronouns = GENDER_PRONOUN_GROUPS;
 
     const matches = [];
 
@@ -999,13 +997,13 @@ export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
     let femaleScore = 0;
     let evidence = null;
 
-    const malePronouns = (sentence.match(/\b(he|him|his)\b/gi) || []).length;
+    const malePronouns = (sentence.match(new RegExp(MALE_PRONOUN_PATTERN, "gi")) || []).length;
     if (malePronouns > 0) {
       maleScore += malePronouns * 2;
       evidence = `direct pronoun reference: ${malePronouns} male pronouns`;
     }
 
-    const femalePronouns = (sentence.match(/\b(she|her|hers)\b/gi) || [])
+    const femalePronouns = (sentence.match(new RegExp(FEMALE_PRONOUN_PATTERN, "gi")) || [])
       .length;
     if (femalePronouns > 0) {
       femaleScore += femalePronouns * 2;
@@ -1030,28 +1028,11 @@ export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
     for (const match of possessiveMatches) {
       const possessedItem = match[1].toLowerCase();
 
-      const maleItems = [
-        "wife",
-        "girlfriend",
-        "daughter",
-        "sister",
-        "mother",
-        "bride"
-      ];
-      const femaleItems = [
-        "husband",
-        "boyfriend",
-        "son",
-        "brother",
-        "father",
-        "groom"
-      ];
-
-      if (maleItems.includes(possessedItem)) {
+      if (MALE_POSSESSIVES.includes(possessedItem)) {
         maleScore += 3;
         evidence = `possessive: ${targetCharacter}'s ${possessedItem}`;
         break;
-      } else if (femaleItems.includes(possessedItem)) {
+      } else if (FEMALE_POSSESSIVES.includes(possessedItem)) {
         femaleScore += 3;
         evidence = `possessive: ${targetCharacter}'s ${possessedItem}`;
         break;
