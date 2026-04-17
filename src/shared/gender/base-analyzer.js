@@ -5,7 +5,7 @@ import { Constants } from "../utils/constants.js";
 /**
  * Base class for gender analyzers with shared functionality
  */
-export class BaseGenderAnalyzer {
+export class BaseAnalyzer {
   /**
    * Analyze text near character name
    * @param {string} name - Character name

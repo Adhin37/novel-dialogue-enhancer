@@ -1,11 +1,11 @@
 import DOMPurify from "../shared/lib/purify.min.js";
 import { logger } from "../shared/utils/logger.js";
 import { Constants } from "../shared/utils/constants.js";
-import { Toaster } from "../shared/utils/toaster.js";
+import { Toaster } from "../shared/ui/toaster.js";
 import { ErrorHandler } from "../shared/utils/error-handler.js";
 import { OllamaClient } from "../shared/llm/ollama-client.js";
-import { ContentElementCache } from "../shared/content/content-element-cache.js";
-import { ContentEnhancerIntegration } from "../shared/content/content-enhancer-integration.js";
+import { ElementCache } from "../shared/utils/element-cache.js";
+import { ContentEnhancer } from "../shared/content/enhancer.js";
 
 // content.js
 /**
@@ -33,7 +33,7 @@ let errorHandler;
  */
 function getElementCache() {
   if (!elementCache) {
-    elementCache = new ContentElementCache();
+    elementCache = new ElementCache();
   }
   return elementCache;
 }
@@ -868,7 +868,7 @@ async function enhancePage({ silent = false } = {}) {
   }
 
   if (!contentEnhancerIntegration) {
-    contentEnhancerIntegration = new ContentEnhancerIntegration();
+    contentEnhancerIntegration = new ContentEnhancer();
   }
 
   isEnhancing = true;

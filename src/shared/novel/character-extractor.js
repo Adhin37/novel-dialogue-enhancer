@@ -6,7 +6,7 @@ import { PRONOUN_FILTER_SET } from "../utils/pronouns.js";
 /**
  * Extracts character names from novel text
  */
-export class NovelCharacterExtractor {
+export class CharacterExtractor {
   /**
    * Extract character names from text
    * @param {string} text - Text to analyze

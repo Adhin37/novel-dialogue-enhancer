@@ -3,7 +3,7 @@ import { logger } from "../utils/logger.js";
 /**
  * Simple novel ID generator utility
  */
-export class NovelIdGenerator {
+export class IdGenerator {
   /**
    * Creates a new NovelIdGenerator instance
    */

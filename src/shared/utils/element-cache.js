@@ -4,7 +4,7 @@ import { Constants } from "../utils/constants.js";
 /**
  * Caches content elements to improve performance
  */
-export class ContentElementCache {
+export class ElementCache {
   constructor() {
     this.cache = new Map();
     this.lastCacheTime = 0;

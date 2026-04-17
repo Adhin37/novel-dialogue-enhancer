@@ -3,11 +3,11 @@
  * Specialized module for cultural origin detection and analysis
  * Identifies cultural contexts and specific cultural indicators
  */
-import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
+import { BaseAnalyzer } from "./base-analyzer.js";
 import { SharedUtils } from "../utils/shared-utils.js";
 import { CULTURAL_GENDER_TERMS } from "../utils/cultural-terms.js";
 
-export class CulturalAnalyzer extends BaseGenderAnalyzer {
+export class CulturalAnalyzer extends BaseAnalyzer {
   static #NAME_PATTERNS = {
     chinese: [
       /^(?:Wang|Li|Zhang|Liu|Chen|Yang|Zhao|Huang|Zhou|Wu|Xu|Sun|Hu|Zhu|Gao|Lin|He|Guo|Ma|Luo|Liang|Song|Zheng|Xie|Han|Tang|Feng|Yu|Dong|Xiao|Cao|Deng|Xu|Cheng|Wei|Shen|Luo|Jiang|Ye|Shi|Yan)/i,

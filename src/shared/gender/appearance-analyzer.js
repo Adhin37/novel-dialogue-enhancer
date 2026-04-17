@@ -3,9 +3,9 @@
  * Specialized module for analyzing character appearance descriptions
  * Identifies physical descriptions and features that indicate gender
  */
-import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
+import { BaseAnalyzer } from "./base-analyzer.js";
 
-export class AppearanceAnalyzer extends BaseGenderAnalyzer {
+export class AppearanceAnalyzer extends BaseAnalyzer {
   /**
    * Analyze physical or character descriptions for gender clues
    * @param {string} name - Character name

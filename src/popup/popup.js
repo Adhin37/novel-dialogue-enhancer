@@ -1,5 +1,5 @@
 import { logger } from "../shared/utils/logger.js";
-import { darkModeManager } from "../shared/utils/dark-mode-manager.js";
+import { darkModeManager } from "../shared/ui/dark-mode-manager.js";
 
 // popup/popup.js
 document.addEventListener("DOMContentLoaded", () => {

@@ -2,7 +2,7 @@
 /**
  * Detects chapter information from various sources
  */
-export class NovelChapterDetector {
+export class ChapterDetector {
     /**
      * Detect chapter information from title and content
      * @param {string} title - Page title

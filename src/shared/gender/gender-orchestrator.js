@@ -1,18 +1,18 @@
-import { logger } from "./logger.js";
-import { Constants } from "./constants.js";
-import { SharedUtils } from "./shared-utils.js";
-import { CulturalAnalyzer } from "../gender/cultural-analyzer.js";
-import { NameAnalyzer } from "../gender/name-analyzer.js";
-import { PronounAnalyzer } from "../gender/pronoun-analyzer.js";
-import { RelationshipAnalyzer } from "../gender/relationship-analyzer.js";
-import { AppearanceAnalyzer } from "../gender/appearance-analyzer.js";
-import { MultiCharacterContextAnalyzer } from "../gender/multi-character-context-analyzer.js";
+import { logger } from "../utils/logger.js";
+import { Constants } from "../utils/constants.js";
+import { SharedUtils } from "../utils/shared-utils.js";
+import { CulturalAnalyzer } from "./cultural-analyzer.js";
+import { NameAnalyzer } from "./name-analyzer.js";
+import { PronounAnalyzer } from "./pronoun-analyzer.js";
+import { RelationshipAnalyzer } from "./relationship-analyzer.js";
+import { AppearanceAnalyzer } from "./appearance-analyzer.js";
+import { MultiCharacterAnalyzer } from "./multi-character-analyzer.js";
 
 /**
  * Core gender utilities module for Novel Dialogue Enhancer
  * Coordinates other specialized modules for gender detection with enhanced multi-character analysis
  */
-export class GenderUtils {
+export class GenderOrchestrator {
   /**
    * Creates a new GenderUtils instance
    * Initializes all specialized analyzers with enhanced multi-character context integration
@@ -47,7 +47,7 @@ export class GenderUtils {
     this.appearanceAnalyzer = new AppearanceAnalyzer();
 
     // Enhanced multi-character analyzer integration
-    this.multiCharacterAnalyzer = new MultiCharacterContextAnalyzer();
+    this.multiCharacterAnalyzer = new MultiCharacterAnalyzer();
     this.lastCharacterMapHash = null;
     this.characterInteractionCache = new Map();
   }

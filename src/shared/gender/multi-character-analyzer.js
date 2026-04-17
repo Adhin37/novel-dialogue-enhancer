@@ -3,13 +3,13 @@
  * Advanced analyzer for handling multiple characters in same context
  * Enhanced integration with sophisticated analysis methods exposed
  */
-import { BaseGenderAnalyzer } from "./base-gender-analyzer.js";
+import { BaseAnalyzer } from "./base-analyzer.js";
 import { SharedUtils } from "../utils/shared-utils.js";
 import { GENDER_PRONOUN_GROUPS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "../utils/pronouns.js";
 
-export class MultiCharacterContextAnalyzer extends BaseGenderAnalyzer {
+export class MultiCharacterAnalyzer extends BaseAnalyzer {
   /**
-   * Creates a new MultiCharacterContextAnalyzer instance
+   * Creates a new MultiCharacterAnalyzer instance
    */
   constructor() {
     super();

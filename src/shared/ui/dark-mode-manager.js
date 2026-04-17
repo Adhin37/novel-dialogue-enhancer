@@ -1,5 +1,5 @@
 // darkModeManager.js - Main class for dark mode functionality
-import { logger } from "./logger.js";
+import { logger } from "../utils/logger.js";
 
 /**
  * Dark mode manager class

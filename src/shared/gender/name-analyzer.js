@@ -7,7 +7,7 @@ import { SharedUtils } from "../utils/shared-utils.js";
 import {
   WESTERN_MALE_NAMES,
   WESTERN_FEMALE_NAMES,
-} from "./western-name-database.js";
+} from "./western-names.js";
 import {
   EASTERN_MALE_NAMES,
   EASTERN_FEMALE_NAMES,
@@ -16,7 +16,7 @@ import {
   EASTERN_MALE_TITLES,
   EASTERN_FEMALE_TITLES,
   EASTERN_CULTURAL_PATTERNS,
-} from "./eastern-name-database.js";
+} from "./eastern-names.js";
 
 export class NameAnalyzer {
   /**

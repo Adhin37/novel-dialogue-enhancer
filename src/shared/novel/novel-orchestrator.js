@@ -1,16 +1,16 @@
-import { logger } from "./logger.js";
-import { Constants } from "./constants.js";
-import { SharedUtils } from "./shared-utils.js";
-import { NovelIdGenerator } from "../novel/novel-id-generator.js";
-import { NovelChapterDetector } from "../novel/novel-chapter-detector.js";
-import { NovelCharacterExtractor } from "../novel/novel-character-extractor.js";
-import { NovelStyleAnalyzer } from "../novel/novel-style-analyzer.js";
+import { logger } from "../utils/logger.js";
+import { Constants } from "../utils/constants.js";
+import { SharedUtils } from "../utils/shared-utils.js";
+import { IdGenerator } from "./id-generator.js";
+import { ChapterDetector } from "./chapter-detector.js";
+import { CharacterExtractor } from "./character-extractor.js";
+import { StyleAnalyzer } from "./style-analyzer.js";
 
 /**
  * Main orchestrator class for novel processing utilities
  * Coordinates specialized modules for different novel-related tasks
  */
-export class NovelUtils {
+export class NovelOrchestrator {
   /**
    * Creates a new NovelUtils instance
    * @param {string} url - URL of the novel page
@@ -22,10 +22,10 @@ export class NovelUtils {
     this.logger = logger;
 
     // Initialize specialized modules
-    this.idGenerator = new NovelIdGenerator();
-    this.chapterDetector = new NovelChapterDetector();
-    this.characterExtractor = new NovelCharacterExtractor();
-    this.styleAnalyzer = new NovelStyleAnalyzer();
+    this.idGenerator = new IdGenerator();
+    this.chapterDetector = new ChapterDetector();
+    this.characterExtractor = new CharacterExtractor();
+    this.styleAnalyzer = new StyleAnalyzer();
 
     // Generate initial novel ID
     this.novelId = this.updateNovelId(url, this.title);

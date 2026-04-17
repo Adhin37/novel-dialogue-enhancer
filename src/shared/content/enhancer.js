@@ -1,8 +1,8 @@
 import { logger } from "../utils/logger.js";
 import { Constants } from "../utils/constants.js";
 import { SharedUtils } from "../utils/shared-utils.js";
-import { NovelUtils } from "../utils/novel-utils.js";
-import { GenderUtils } from "../utils/gender-utils.js";
+import { NovelOrchestrator } from "../novel/novel-orchestrator.js";
+import { GenderOrchestrator } from "../gender/gender-orchestrator.js";
 import { OllamaClient } from "../llm/ollama-client.js";
 import { StatsUtils } from "../utils/stats-utils.js";
 import { TextProcessor } from "../llm/text-processor.js";
@@ -13,14 +13,14 @@ import { PromptGenerator } from "../llm/prompt-generator.js";
  * Enhanced integration module for Novel Dialogue Enhancer
  * Integrates genderUtils, novelUtils, and ollamaClient for LLM-based enhancement
  */
-export class ContentEnhancerIntegration {
+export class ContentEnhancer {
   /**
    * Creates a new ContentEnhancerIntegration instance
    */
   constructor() {
-    this.genderUtils = new GenderUtils();
+    this.genderUtils = new GenderOrchestrator();
     this.ollamaClient = new OllamaClient();
-    this.novelUtils = new NovelUtils(window.location.href, document.title);
+    this.novelUtils = new NovelOrchestrator(window.location.href, document.title);
     this.statsUtils = new StatsUtils();
     this.textProcessor = new TextProcessor();
     this.promptGenerator = new PromptGenerator();

@@ -2,7 +2,7 @@
 /**
  * Analyzes novel style and genre from text
  */
-export class NovelStyleAnalyzer {
+export class StyleAnalyzer {
     /**
      * Analyze novel style and genre from text
      * @param {string} text - Text to analyze
