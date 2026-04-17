@@ -18,6 +18,7 @@
     "alarms"
   ],
   "host_permissions": [
+    "*://webnovel.com/*",
     "*://*.webnovel.com/*",
     "*://*.fanmtl.com/*",
     "*://*.novelupdates.com/*",

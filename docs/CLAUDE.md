@@ -41,44 +41,53 @@ Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online n
 - **Popup** (`popup/`) - Whitelist management, quick enhancement controls, status display
 - **Options Page** (`options/`) - Comprehensive settings, whitelist administration, novel statistics, model configuration
 
-#### 4. Core Integration Modules
+#### 4. Content Enhancement (`shared/content/`)
 
-- `ContentEnhancerIntegration` - Main orchestrator combining all utilities and handling enhancement workflow
-- `NovelUtils` - Novel processing, metadata extraction, and character map management
-- `GenderUtils` - Character gender detection coordinator using multiple analyzers
+- `ContentEnhancer` - Main orchestrator integrating gender detection, novel processing, and LLM-based text enhancement; coordinates character analysis, text processing, and statistics tracking
 
-#### 5. Gender Analysis System (`assets/js/gender/`)
+#### 5. Gender Analysis System (`shared/gender/`)
 
-- `BaseGenderAnalyzer` - Common analysis methods and patterns for inheritance
+- `BaseAnalyzer` - Common analysis methods and patterns for inheritance
+- `GenderOrchestrator` - Coordinates all specialized analyzers and manages gender statistics
 - `CulturalAnalyzer` - Cultural origin detection (western/chinese/japanese/korean) with context awareness
 - `NameAnalyzer` - Name pattern analysis including titles, honorifics, and cultural endings
 - `PronounAnalyzer` - Pronoun usage analysis with translation error detection and correction
 - `RelationshipAnalyzer` - Character relationship and role analysis
 - `AppearanceAnalyzer` - Physical description analysis for gender indicators
+- `MultiCharacterAnalyzer` - Multi-character scene analysis with sentence/dialogue caching
+- `eastern-names.js` / `western-names.js` - Cultural name databases
 
-#### 6. LLM Integration (`assets/js/llm/`)
+#### 6. LLM Integration (`shared/llm/`)
 
 - `OllamaClient` - API communication with caching, timeout handling, and availability checking
 - `PromptGenerator` - Consistent prompt generation with character context and novel style information
 - `TextProcessor` - Text chunking, context preservation, and response cleaning
 
-#### 7. Novel Processing Modules (`assets/js/novel/`)
+#### 7. Novel Processing Modules (`shared/novel/`)
 
-- `NovelCharacterExtractor` - Character name extraction from text using multiple patterns
-- `NovelChapterDetector` - Chapter information detection from titles and content
-- `NovelIdGenerator` - Unique novel identification from URL and title
-- `NovelStorageManager` - Extends StorageManager for novel-specific operations
-- `NovelStyleAnalyzer` - Genre and style detection for better prompt context
+- `NovelOrchestrator` - Coordinates all novel processing: ID generation, chapter detection, character extraction, style analysis
+- `CharacterExtractor` - Character name extraction from text using multiple patterns
+- `ChapterDetector` - Chapter information detection from titles and content
+- `IdGenerator` - Unique novel identification from URL and title
+- `StyleAnalyzer` - Genre and style detection for better prompt context
 
-#### 8. Shared Utilities (`assets/js/utils/`)
+#### 8. UI Components (`shared/ui/`)
+
+- `Toaster` - Fixed-position toast notifications with progress indicators and auto-dismiss
+- `DarkModeManager` - Theme management with system preference detection and Chrome storage sync
+
+#### 9. Shared Utilities (`shared/utils/`)
 
 - `SharedUtils` - Common validation, sanitization, gender compression, and security functions
 - `Constants` - Centralized configuration, magic numbers, and default values
-- `StorageManager` - Base storage operations with caching and TTL management
-- `StatsUtils` - Statistics tracking across sessions
-- `DarkModeManager` - Theme management with system preference detection
+- `ElementCache` - DOM element caching by CSS selector with TTL and validity checking
+- `ErrorHandler` - Categorized error handling with severity levels and duplicate suppression
+- `StatsUtils` - Statistics tracking and aggregation across sessions
+- `cultural-terms.js` - Chinese/Japanese/Korean gender indicator term databases
+- `pronouns.js` - Pronoun pattern constants for gender detection
+- `logger.js` - Global `window.logger` singleton (see Logging System below)
 
-#### 9. Logging System (`assets/js/utils/logger.js`)
+#### 10. Logging System (`shared/utils/logger.js`)
 
 - `window.logger` — singleton `Logger` instance available globally in all browser contexts
 - Separates user-facing toast messages from technical console output
@@ -152,13 +161,12 @@ Multi-analyzer approach with cultural awareness and translation error correction
 
 ### Performance Optimizations
 
-1. **Element Caching**: DOM queries cached with 5-second TTL using ContentElementCache
-2. **Storage Caching**: Settings and whitelist cached with expiration in StorageManager
-3. **Chunked Processing**: Large texts split with context preservation using TextProcessor
-4. **Request Caching**: LLM responses cached by content hash to avoid duplicate processing
-5. **Data Compression**: Storage format optimized for size and efficiency
-6. **Lazy Loading**: Components initialized only when needed
-7. **Memory Management**: Automatic cleanup of old data and cache entries
+1. **Element Caching**: DOM queries cached with TTL using `ElementCache`
+2. **Chunked Processing**: Large texts split with context preservation using `TextProcessor`
+3. **Request Caching**: LLM responses cached by content hash to avoid duplicate processing
+4. **Data Compression**: Storage format optimized for size and efficiency
+5. **Lazy Loading**: Components initialized only when needed
+6. **Memory Management**: Automatic cleanup of old data and cache entries
 
 ### Code Organization & Standards
 
@@ -183,15 +191,15 @@ Multi-analyzer approach with cultural awareness and translation error correction
 
 - Use `SharedUtils.validateCharacterName()` for name validation
 - Use `SharedUtils.compressGender()` for storage optimization
-- Extend `BaseGenderAnalyzer` for new gender analysis methods
+- Extend `BaseAnalyzer` for new gender analysis methods
 - Use `Constants` for configuration values and thresholds
-- Use `StorageManager` for consistent data handling with caching
+- Use `ElementCache` for DOM query optimization with TTL
 
 #### Adding New Gender Analysis
 
-1. Create new class extending `BaseGenderAnalyzer` or add to existing analyzer
+1. Create new class extending `BaseAnalyzer` or add to existing analyzer
 2. Add patterns to appropriate analyzer (cultural, name, pronoun, relationship, appearance)
-3. Update confidence scoring in `GenderUtils.guessGender()`
+3. Update confidence scoring in `GenderOrchestrator`
 4. Test with diverse character names and cultural contexts
 5. Add evidence collection for transparency
 
@@ -249,7 +257,7 @@ This architecture provides a robust, scalable foundation for novel dialogue enha
 All models below use Q4_K_M quantization automatically when pulled via `ollama pull`.
 
 | Tier | Model | Pull Command | RAM | Notes |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | Ultra-fast | `qwen3:4b` | `ollama pull qwen3:4b` | ~2.5 GB | Speed-focused; good for low-RAM systems |
 | Balanced | `qwen3:8b-q4_K_M` | `ollama pull qwen3:8b-q4_K_M` | ~5 GB | Best all-around for dialogue |
 | **Balanced** | **`qwen3.5:4b`** | `ollama pull qwen3.5:4b` | ~5 GB | **Default.** Fast, high quality dialogue |

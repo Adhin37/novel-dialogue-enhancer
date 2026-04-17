@@ -59,7 +59,7 @@ A Chrome extension that improves the quality of translated web novels by enhanci
 Pre-configured sites (active by default in the extension manifest):
 
 | Site | Description |
-|---|---|
+| --- | --- |
 | **[webnovel.com](https://www.webnovel.com)** | QiDian's official English platform — CN/KR fantasy, romance, martial arts |
 | [fanmtl.com](https://www.fanmtl.com) | Fan MTL novels (Douluo, Villain, Naruto fan-fiction) |
 | [novelupdates.com](https://www.novelupdates.com) | Directory and tracker for Asian translated novels |
@@ -102,11 +102,13 @@ Any other site can be added manually via the popup or the Whitelisted Sites tab 
 ### Core Components
 
 - **Background Script**: Manages whitelist, API communication, and optimized data storage
-- **Content Script**: Orchestrates enhancement on web pages with progress feedback  
-- **Gender Analysis System**: 5 specialized analyzers for accurate character gender detection
-- **LLM Integration**: Handles chunked processing with context preservation and caching
-- **Novel Processing**: Character extraction, chapter detection, and style analysis
-- **UI Components**: Popup for quick controls and comprehensive options page
+- **Content Script**: Orchestrates enhancement on web pages with progress feedback
+- **Enhancer** (`shared/content/enhancer.js`): Core enhancement logic shared between content and background contexts
+- **Gender Analysis System**: 6 specialized analyzers (`base`, `appearance`, `cultural`, `name`, `pronoun`, `relationship`) coordinated by `gender-orchestrator`, backed by `eastern-names` and `western-names` databases
+- **LLM Integration**: Handles chunked processing with context preservation and caching via `ollama-client`, `prompt-generator`, and `text-processor`
+- **Novel Processing**: `novel-orchestrator` coordinates `character-extractor`, `chapter-detector`, `style-analyzer`, and `id-generator`
+- **UI Components**: Popup for quick controls, comprehensive options page, plus `dark-mode-manager` and `toaster` shared UI helpers
+- **Utilities**: `constants`, `shared-utils`, `logger`, `error-handler`, `element-cache`, `cultural-terms`, `pronouns`, and `stats-utils`
 
 ### Data Storage Format
 
@@ -188,18 +190,24 @@ To install: `ollama pull <model-name>` (e.g., `ollama pull gemma3:9b`)
 
 ### Project Structure
 
-```markdown
-├── manifest.json              # Extension manifest
-├── background/                 # Background service worker
-├── content/                   # Content script coordination
-├── popup/                     # Quick controls interface
-├── options/                   # Comprehensive settings page
-├── assets/js/
-│   ├── gender/               # Gender analysis system
-│   ├── llm/                  # AI integration
-│   ├── novel/                # Novel processing modules
-│   └── utils/                # Shared utilities
-└── docs/                     # Documentation
+```
+├── manifest.json
+├── src/
+│   ├── assets/icons/          # Extension icons (16/48/128 px)
+│   ├── background/            # Service worker
+│   ├── content/               # Content script entry point
+│   ├── popup/                 # Quick controls interface
+│   ├── options/               # Comprehensive settings page
+│   └── shared/
+│       ├── content/           # enhancer.js — core enhancement logic
+│       ├── gender/            # 6-analyzer gender detection system
+│       ├── lib/               # Third-party libs (DOMPurify)
+│       ├── llm/               # Ollama client, prompt generator, text processor
+│       ├── novel/             # Orchestrator, character extractor, chapter detector, style analyzer
+│       ├── ui/                # dark-mode-manager, toaster
+│       └── utils/             # constants, shared-utils, logger, error-handler,
+│                              # element-cache, cultural-terms, pronouns, stats-utils
+└── docs/                      # Documentation
 ```
 
 ### Key Design Patterns
