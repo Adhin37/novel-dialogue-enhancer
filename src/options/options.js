@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const testOllamaButton = document.getElementById("test-ollama");
   const ollamaStatus = document.getElementById("ollama-status");
   const whitelistItemsContainer = document.getElementById("whitelist-items");
+  document.getElementById("extension-version").textContent =
+    chrome.runtime.getManifest().version;
   const clearAllBtn = document.getElementById("clear-all");
   const addSiteBtn = document.getElementById("add-site");
   const modelSuggestions = document.querySelectorAll(".model-suggestion");
