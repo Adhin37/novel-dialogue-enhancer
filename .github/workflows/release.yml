@@ -68,6 +68,9 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      - name: Build extension
+        run: npm run build
+
       - name: Package extension
         run: |
           chmod +x package.sh
