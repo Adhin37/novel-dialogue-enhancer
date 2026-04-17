@@ -104,9 +104,10 @@ export class ErrorHandler {
      */
     handleEnhancementError(error, enhancementContext = {}) {
       const { currentChunk = 0, totalChunks = 0, enhancementId = 'unknown' } = enhancementContext;
-      
+
       const errorInfo = this.#analyzeError(error, 'enhancement');
       errorInfo.enhancementContext = enhancementContext;
+      console.warn(`Enhancement error [${enhancementId}] at chunk ${currentChunk}/${totalChunks}:`, error.message);
   
       // Special handling for enhancement errors
       if (errorInfo.category.severity === this.severityLevels.CRITICAL) {
@@ -250,6 +251,7 @@ export class ErrorHandler {
     #showUserFriendlyError(errorInfo, options = {}) {
       const { category, categoryName } = errorInfo;
       const duration = options.duration || this.#getErrorDisplayDuration(category.severity);
+      console.warn(`[${categoryName}] ${category.userMessage}`);
   
       // Choose appropriate toaster method based on severity
       switch (category.severity) {
@@ -326,9 +328,9 @@ export class ErrorHandler {
       const maxRetries = options.maxRetries || 3;
       const retryDelay = options.retryDelay || 2000;
       const retryFunction = options.retryFunction;
-  
+
       if (retryFunction && typeof retryFunction === 'function') {
-        console.log(`Attempting network recovery for error ${errorInfo.id}`);
+        console.log(`Attempting network recovery for error ${errorInfo.id} (max ${maxRetries} retries)`);
         
         setTimeout(() => {
           retryFunction()
@@ -349,9 +351,10 @@ export class ErrorHandler {
      * @private
      */
     #attemptTimeoutRecovery(errorInfo, options) {
+      const duration = options.duration || 6000;
       this.toaster.showInfo(
-        'Timeout occurred. Try processing smaller sections or increasing timeout in settings.',
-        6000
+        `Timeout occurred (${errorInfo.id}). Try processing smaller sections or increasing timeout in settings.`,
+        duration
       );
     }
   
@@ -362,10 +365,10 @@ export class ErrorHandler {
      * @private
      */
     #attemptProcessingRecovery(errorInfo, options) {
-      // Suggest processing in smaller chunks
+      const duration = options.duration || 5000;
       this.toaster.showInfo(
-        'Processing failed. Try enhancing a smaller section of text.',
-        5000
+        `Processing failed (${errorInfo.id}). Try enhancing a smaller section of text.`,
+        duration
       );
     }
   

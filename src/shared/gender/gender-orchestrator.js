@@ -134,6 +134,10 @@ export class GenderOrchestrator {
       evidenceList.push(`pronoun: ${pronounDisambiguation.evidence}`);
     }
 
+    const culturalBonus = this.#calculateCulturalBonus(culturalOrigin, 1);
+    totalMaleScore += culturalBonus;
+    totalFemaleScore += culturalBonus;
+
     return {
       maleScore: totalMaleScore,
       femaleScore: totalFemaleScore,
@@ -270,6 +274,7 @@ export class GenderOrchestrator {
     const analysisMetadata = {
       useAdvancedAnalysis,
       characterCount: Object.keys(characterMap).length,
+      characterMapHash,
       crossValidated: false,
       multiCharacterAnalyzed: false
     };
@@ -386,6 +391,18 @@ export class GenderOrchestrator {
     let maleScore = 0;
     let femaleScore = 0;
     const evidence = [];
+
+    const existingEntry = characterMap[name];
+    if (existingEntry && existingEntry.gender !== 'unknown') {
+      const mapBonus = (existingEntry.confidence || 0) * 3;
+      if (existingEntry.gender === 'm') {
+        maleScore += mapBonus;
+        evidence.push(`existing-map: male`);
+      } else if (existingEntry.gender === 'f') {
+        femaleScore += mapBonus;
+        evidence.push(`existing-map: female`);
+      }
+    }
 
     // Title and honorific analysis
     const titleResult = this.nameAnalyzer.checkTitlesAndHonorifics(

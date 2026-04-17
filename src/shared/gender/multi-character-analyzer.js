@@ -486,11 +486,11 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
 
     const targetContexts = text.match(targetPattern) || [];
 
-    return targetContexts.filter((context) => {
-      return !similarNames.some((similarName) =>
+    return targetContexts.filter((context) =>
+      !similarNames.some((similarName) =>
         context.toLowerCase().includes(similarName.toLowerCase())
-      );
-    });
+      )
+    );
   }
 
   /**
@@ -499,9 +499,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
    * @private
    */
   #estimateMemoryUsage() {
-    const estimateObjectSize = (obj) => {
-      return JSON.stringify(obj).length * 2; // Rough estimate: 2 bytes per character
-    };
+    const estimateObjectSize = (obj) => JSON.stringify(obj).length * 2; // Rough estimate: 2 bytes per character
 
     let totalSize = 0;
 

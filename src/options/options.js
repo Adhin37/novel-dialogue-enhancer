@@ -255,18 +255,20 @@ document.addEventListener("DOMContentLoaded", () => {
    * Updates the slider background based on its value
    */
   function updateSliderBackground(slider) {
+    const el = slider;
     const value =
-      ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
-    slider.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, var(--slider-track-bg) ${value}%, var(--slider-track-bg) 100%)`;
+      ((el.value - el.min) / (el.max - el.min)) * 100;
+    el.style.background = `linear-gradient(to right, var(--primary-color) 0%, var(--primary-color) ${value}%, var(--slider-track-bg) ${value}%, var(--slider-track-bg) 100%)`;
   }
 
   /**
    * Updates the slider background and value on input
    */
   function setupSlider(slider, valueElement) {
+    const valEl = valueElement;
     updateSliderBackground(slider);
     slider.addEventListener("input", function () {
-      valueElement.textContent = this.value;
+      valEl.textContent = this.value;
       updateSliderBackground(this);
     });
   }
@@ -484,9 +486,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
       novelItem.addEventListener("click", () => {
         if (detailsContainer.style.display === "none") {
-          document.querySelectorAll(".novel-details").forEach((el) => {
-            if (el !== detailsContainer) {
-              el.style.display = "none";
+          document.querySelectorAll(".novel-details").forEach((detailEl) => {
+            if (detailEl !== detailsContainer) {
+              const item = detailEl;
+              item.style.display = "none";
             }
           });
 
@@ -536,7 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
 
       html += `
-      <div class="character-card" data-novel-id="${novelId}" data-char-id="${charId}">
+      <div class="character-card" data-novel-id="${novelId}" data-char-id="${charId}" data-index="${index}">
         <div class="gender-badge gender-${gender}">${gender}</div>
         <div class="character-name">${escapeHtml(name)}</div>
         <div class="character-info">
@@ -580,7 +583,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     html += "</div>";
-    container.innerHTML = html;
+    const cont = container;
+    cont.innerHTML = html;
 
     // Add event listeners for gender selection changes
     container.querySelectorAll(".gender-select").forEach((select) => {

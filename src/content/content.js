@@ -1132,10 +1132,11 @@ async function processMultipleParagraphs(paragraphs) {
     for (let slot = 0; slot < idxForLLM.length; slot++) {
       const origIdx  = idxForLLM[slot];
       const enhanced = enhancedParagraphs[slot] ?? originalTexts[origIdx]; // fallback on count mismatch
+      const para = paragraphs[origIdx];
       try {
-        paragraphs[origIdx].innerHTML = DOMPurify.sanitize(enhanced);
+        para.innerHTML = DOMPurify.sanitize(enhanced);
         const updateVerified = verifyAndHandleDOMUpdate(
-          paragraphs[origIdx],
+          para,
           originalTexts[origIdx],
           enhanced
         );
@@ -1143,8 +1144,8 @@ async function processMultipleParagraphs(paragraphs) {
       } catch (updateError) {
         console.error(`Failed to update paragraph ${origIdx}:`, updateError);
         try {
-          paragraphs[origIdx].innerHTML = DOMPurify.sanitize(originalTexts[origIdx]);
-        } catch (_) {}
+          para.innerHTML = DOMPurify.sanitize(originalTexts[origIdx]);
+        } catch (restoreErr) { console.debug('Fallback DOM restore failed:', restoreErr); }
       }
     }
 
@@ -1188,6 +1189,7 @@ function handleTerminationRequest() {
           action: "terminateAllRequests"
         },
         (response) => {
+          if (response) console.log('Termination response:', response);
           if (chrome.runtime.lastError) {
             const terminationError = new Error(
               `Termination failed: ${chrome.runtime.lastError.message}`
@@ -1281,15 +1283,19 @@ function verifyTextUpdate(element, expectedText) {
  * @return {boolean} - Whether verification passed
  */
 function verifyAndHandleDOMUpdate(element, originalText, enhancedText) {
+  const el = element;
   // Pass originalText so verifyTextUpdate checks the DOM now DIFFERS from it.
-  const updateSuccessful = verifyTextUpdate(element, originalText);
+  const updateSuccessful = verifyTextUpdate(el, originalText);
 
   if (!updateSuccessful) {
-    console.warn("DOM update verification failed, attempting recovery");
+    console.warn("DOM update verification failed, attempting recovery", {
+      originalLength: originalText?.length,
+      enhancedLength: enhancedText?.length
+    });
 
     // Try to restore original text if enhancement failed
     try {
-      element.innerHTML = DOMPurify.sanitize(originalText);
+      el.innerHTML = DOMPurify.sanitize(originalText);
       console.log("Restored original text after failed enhancement");
       return false;
     } catch (restoreError) {

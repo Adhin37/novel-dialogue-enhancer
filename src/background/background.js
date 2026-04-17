@@ -1160,6 +1160,7 @@ function handleMessage(request, sender, sendResponse) {
       ([charId, charData]) => {
         const characterName = charData.name;
         response.characterMap[characterName] = {
+          id: charId,
           gender: charData.gender,
           confidence: charData.confidence,
           appearances: charData.appearances,

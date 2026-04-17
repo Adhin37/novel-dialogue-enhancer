@@ -168,15 +168,16 @@ class DarkModeManager {
       return;
     }
 
-    this.logger.debug("Syncing UI element with theme:", element.tagName, element.id || element.className);
-    
+    const el = element;
+    this.logger.debug("Syncing UI element with theme:", el.tagName, el.id || el.className);
+
     this.getCurrentTheme((isDark) => {
       try {
-        if (element.type === 'checkbox') {
-          element.checked = isDark;
+        if (el.type === 'checkbox') {
+          el.checked = isDark;
           this.logger.debug("UI element synced - checkbox set to:", isDark);
         } else {
-          this.logger.warn("Unsupported element type for theme sync:", element.type);
+          this.logger.warn("Unsupported element type for theme sync:", el.type);
         }
       } catch (error) {
         this.logger.error("Error syncing UI element with theme:", error);
