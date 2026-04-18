@@ -19,3 +19,4 @@ dist/
 src/**/*.min.js
 src/**/*.min.css
 test-results/
+.playwright-mcp/

@@ -44,11 +44,12 @@ function getElementCache() {
  */
 function findContentElement() {
   const contentSelectors = Constants.SELECTORS.CONTENT;
+  const MIN_CONTENT_LENGTH = 100;
 
   for (const selector of contentSelectors) {
     try {
       const element = getElementCache().getElement(selector);
-      if (element) {
+      if (element && (element.textContent?.length ?? 0) >= MIN_CONTENT_LENGTH) {
         return element;
       }
     } catch (error) {
@@ -897,9 +898,6 @@ async function enhancePage({ silent = false } = {}) {
     return false;
   }
 
-  // Content element found — safe to show the loading toast for all callers.
-  toaster.showLoading("Starting enhancement process...");
-
   try {
     const ollamaStatus = await getOllamaClient().checkOllamaAvailability();
 
@@ -912,18 +910,18 @@ async function enhancePage({ silent = false } = {}) {
     }
 
     const availableModels = ollamaStatus.models;
-    if (Array.isArray(availableModels)) {
-      const llmSettings = await getOllamaClient().getLLMSettings();
-      const configuredModel = llmSettings.modelName;
-      if (!availableModels.includes(configuredModel)) {
-        const msg = availableModels.length === 0
-          ? "No models installed in Ollama. Install one with: ollama pull <model-name>"
-          : `Model "${configuredModel}" is not installed. Install it with: ollama pull ${configuredModel}`;
-        toaster.showWarning(msg);
-        return false;
-      }
+    const llmSettings = await getOllamaClient().getLLMSettings();
+    const configuredModel = llmSettings.modelName;
+    if (!Array.isArray(availableModels) || !availableModels.includes(configuredModel)) {
+      const msg = !Array.isArray(availableModels) || availableModels.length === 0
+        ? "No models installed in Ollama. Install one with: ollama pull <model-name>"
+        : `Model "${configuredModel}" is not installed. Install it with: ollama pull ${configuredModel}`;
+      console.warn(`[model-guard] ${msg}`);
+      toaster.showWarning(msg);
+      return false;
     }
 
+    // Model confirmed available — safe to show progress toast.
     toaster.showLoading("Analyzing characters...");
     const contextResult =
       await contentEnhancerIntegration.setupCharacterContext();
@@ -1507,7 +1505,14 @@ const observer = new MutationObserver((mutations) => {
       }
     });
 
-    if (newContentAdded) {
+    // Also trigger enhancement when content becomes available even if no new
+    // elements were added in THIS batch (SPA replacement: removal fires here,
+    // the corresponding addition may have already been in the DOM).
+    getElementCache().clearCache();
+    const contentNowReady = !newContentAdded &&
+      (findContentElement()?.textContent?.length ?? 0) >= 500;
+
+    if (newContentAdded || contentNowReady) {
       console.log("New content detected, scheduling enhancement");
       clearTimeout(window.enhancementTimer);
       window.enhancementTimer = setTimeout(() => enhancePage({ silent: true }), 500);
@@ -1522,9 +1527,11 @@ init();
 setTimeout(() => {
   // Only set up observer if the site is whitelisted
   if (isCurrentSiteWhitelisted) {
-    const contentElement = findContentElement();
-    if (contentElement) {
-      observer.observe(contentElement, { childList: true, subtree: true });
-    }
+    // Observe the content element if found, otherwise fall back to document.body
+    // so that SPA/AJAX-loaded chapter content is detected even when the
+    // specific content selectors aren't in the DOM at script initialization time.
+    // Always observe document.body so SPA navigation that replaces the content
+    // container element is detected (observing the old element misses replacements).
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 }, 1000);

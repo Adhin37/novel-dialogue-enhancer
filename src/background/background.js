@@ -625,6 +625,7 @@ function checkOllamaAvailability(sendResponse) {
                 sendResponse({
                   available: true,
                   version: data.version,
+                  models: [],
                   reason: "Could not fetch models list"
                 });
                 return;
@@ -668,6 +669,7 @@ function checkOllamaAvailability(sendResponse) {
               sendResponse({
                 available: true,
                 version: data.version,
+                models: [],
                 reason: `Models fetch failed: ${modelError.message}`
               });
             })
