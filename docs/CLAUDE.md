@@ -182,6 +182,15 @@ Multi-analyzer approach with cultural awareness and translation error correction
 
 #### Testing Changes
 
+After modifying any source file, run the e2e test suite before reporting the task as done:
+
+```bash
+npm test
+```
+
+This builds the extension and runs all Playwright tests. Tests that require Ollama auto-skip when it is not running; the rest always run. Do not skip this step even for small changes.
+
+Manual verification steps:
 1. Load extension in Chrome: `chrome://extensions/` → "Load unpacked"
 2. Refresh extension after code changes
 3. Refresh target web page for content script changes

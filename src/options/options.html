@@ -29,7 +29,7 @@
       <div class="theme-toggle">
         <span class="theme-icon light-icon">☀️</span>
         <label class="switch">
-          <input type="checkbox" id="theme-switch" />
+          <input type="checkbox" id="theme-switch" data-testid="theme-switch" />
           <span class="slider round"></span>
         </label>
         <span class="theme-icon dark-icon">🌙</span>
@@ -37,12 +37,12 @@
 
       <div class="tabs-container">
         <div class="tabs">
-          <button class="tab-btn active" data-tab="general">General</button>
-          <button class="tab-btn" data-tab="advanced">Advanced</button>
-          <button class="tab-btn" data-tab="novels">My Novels</button>
-          <button class="tab-btn" data-tab="sites">Whitelisted Sites</button>
-          <button class="tab-btn" data-tab="stats">Statistics</button>
-          <button class="tab-btn" data-tab="about">About</button>
+          <button class="tab-btn active" data-tab="general" data-testid="tab-btn-general">General</button>
+          <button class="tab-btn" data-tab="advanced" data-testid="tab-btn-advanced">Advanced</button>
+          <button class="tab-btn" data-tab="novels" data-testid="tab-btn-novels">My Novels</button>
+          <button class="tab-btn" data-tab="sites" data-testid="tab-btn-sites">Whitelisted Sites</button>
+          <button class="tab-btn" data-tab="stats" data-testid="tab-btn-stats">Statistics</button>
+          <button class="tab-btn" data-tab="about" data-testid="tab-btn-about">About</button>
         </div>
 
         <div class="tab-content">
@@ -52,17 +52,17 @@
               <h3>Model Settings</h3>
               <div class="form-group">
                 <label for="model-name">Ollama Model Name</label>
-                <input id="model-name" type="text" placeholder="qwen3.5:4b" />
+                <input id="model-name" data-testid="model-name" type="text" placeholder="qwen3.5:4b" />
                 <div class="hint">
                   Specify which Ollama model to use for text enhancement.
                 </div>
                 <div class="model-suggestions">
-                  <span class="model-suggestion" data-model="qwen3.5:4b">qwen3.5:4b</span>
-                  <span class="model-suggestion" data-model="gemma3:9b">gemma3:9b</span>
-                  <span class="model-suggestion" data-model="qwen3:4b">qwen3:4b</span>
-                  <span class="model-suggestion" data-model="phi4:14b">phi4:14b</span>
-                  <span class="model-suggestion" data-model="qwen3:14b">qwen3:14b</span>
-                  <span class="model-suggestion" data-model="mistral-small3.1:24b">mistral-small3.1:24b</span>
+                  <span class="model-suggestion" data-model="qwen3.5:4b" data-testid="model-suggestion-qwen3.5:4b">qwen3.5:4b</span>
+                  <span class="model-suggestion" data-model="gemma3:9b" data-testid="model-suggestion-gemma3:9b">gemma3:9b</span>
+                  <span class="model-suggestion" data-model="qwen3:4b" data-testid="model-suggestion-qwen3:4b">qwen3:4b</span>
+                  <span class="model-suggestion" data-model="phi4:14b" data-testid="model-suggestion-phi4:14b">phi4:14b</span>
+                  <span class="model-suggestion" data-model="qwen3:14b" data-testid="model-suggestion-qwen3:14b">qwen3:14b</span>
+                  <span class="model-suggestion" data-model="mistral-small3.1:24b" data-testid="model-suggestion-mistral-small3.1:24b">mistral-small3.1:24b</span>
                 </div>
               </div>
             </div>
@@ -72,11 +72,12 @@
               <div class="slider-container">
                 <label for="temperature">
                   Temperature
-                  <span id="temperature-value" class="slider-value">0.4</span>
+                  <span id="temperature-value" data-testid="temperature-value" class="slider-value">0.4</span>
                 </label>
                 <input
                   type="range"
                   id="temperature"
+                  data-testid="temperature"
                   min="0.1"
                   max="1.0"
                   step="0.1"
@@ -96,11 +97,12 @@
               <div class="slider-container">
                 <label for="top-p">
                   Top P (Nucleus Sampling)
-                  <span id="top-p-value" class="slider-value">0.9</span>
+                  <span id="top-p-value" data-testid="top-p-value" class="slider-value">0.9</span>
                 </label>
                 <input
                   type="range"
                   id="top-p"
+                  data-testid="top-p"
                   min="0.1"
                   max="1.0"
                   step="0.1"
@@ -125,11 +127,12 @@
               <div class="slider-container">
                 <label for="context-size">
                   Context Window Size
-                  <span id="context-size-value" class="slider-value">32768</span>
+                  <span id="context-size-value" data-testid="context-size-value" class="slider-value">32768</span>
                 </label>
                 <input
                   type="range"
                   id="context-size"
+                  data-testid="context-size"
                   min="8192"
                   max="131072"
                   step="8192"
@@ -149,11 +152,12 @@
               <div class="slider-container">
                 <label for="timeout">
                   LLM Request Timeout
-                  <span id="timeout-value" class="slider-value">300</span>
+                  <span id="timeout-value" data-testid="timeout-value" class="slider-value">300</span>
                 </label>
                 <input
                   type="range"
                   id="timeout"
+                  data-testid="timeout"
                   min="30"
                   max="600"
                   step="30"
@@ -170,7 +174,7 @@
               </div>
               <div class="form-group">
                 <label for="debug-mode">
-                  <input type="checkbox" id="debug-mode" />
+                  <input type="checkbox" id="debug-mode" data-testid="debug-mode" />
                   Enable Debug Logging
                 </label>
                 <small class="help-text">Show detailed technical logs in browser console</small>
@@ -182,11 +186,12 @@
             <div class="card">
               <h3>Ollama Connection</h3>
               <div class="form-group">
-                <button id="test-ollama" class="button button-secondary">
+                <button id="test-ollama" data-testid="test-ollama" class="button button-secondary">
                   <span class="button-icon">🔌</span> Test Ollama Connection
                 </button>
                 <div
                   id="ollama-status"
+                  data-testid="ollama-status"
                   class="status-message"
                   style="display: none"
                 ></div>
@@ -211,12 +216,13 @@
                 <input
                   type="text"
                   id="novels-search"
+                  data-testid="novels-search"
                   placeholder="Search novels..."
                   class="search-input"
                 />
               </div>
 
-              <div id="novels-container" class="novels-container">
+              <div id="novels-container" data-testid="novels-container" class="novels-container">
                 <div class="empty-list">No novels detected yet</div>
               </div>
             </div>
@@ -231,16 +237,16 @@
                 Dialogue Enhancer.
               </div>
               <div class="whitelist-container">
-                <div id="whitelist-items">
+                <div id="whitelist-items" data-testid="whitelist-items">
                   <div class="empty-list">No sites in whitelist</div>
                 </div>
               </div>
 
-              <button id="add-site" class="button button-secondary">
+              <button id="add-site" data-testid="add-site" class="button button-secondary">
                 <span class="button-icon">➕</span> Add Site Manually
               </button>
 
-              <button id="clear-all" class="button button-danger">
+              <button id="clear-all" data-testid="clear-all" class="button button-danger">
                 <span class="button-icon">🗑️</span> Clear All Sites
               </button>
             </div>
@@ -257,32 +263,32 @@
 
               <div class="stats-grid">
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-paragraphs">0</div>
+                  <div class="stat-value" id="stat-paragraphs" data-testid="stat-paragraphs">0</div>
                   <div class="stat-label">Paragraphs Enhanced</div>
                 </div>
 
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-chapters">0</div>
+                  <div class="stat-value" id="stat-chapters" data-testid="stat-chapters">0</div>
                   <div class="stat-label">Chapters Enhanced</div>
                 </div>
 
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-novels">0</div>
+                  <div class="stat-value" id="stat-novels" data-testid="stat-novels">0</div>
                   <div class="stat-label">Unique Novels</div>
                 </div>
 
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-characters">0</div>
+                  <div class="stat-value" id="stat-characters" data-testid="stat-characters">0</div>
                   <div class="stat-label">Characters Detected</div>
                 </div>
 
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-sessions">0</div>
+                  <div class="stat-value" id="stat-sessions" data-testid="stat-sessions">0</div>
                   <div class="stat-label">Enhancement Sessions</div>
                 </div>
 
                 <div class="stat-card">
-                  <div class="stat-value" id="stat-time">0m</div>
+                  <div class="stat-value" id="stat-time" data-testid="stat-time">0m</div>
                   <div class="stat-label">Total Processing Time</div>
                 </div>
               </div>
@@ -290,19 +296,19 @@
               <div class="stats-timeline">
                 <div class="timeline-item">
                   <span class="timeline-label">First Enhancement:</span>
-                  <span id="stat-first-date" class="timeline-value">Never</span>
+                  <span id="stat-first-date" data-testid="stat-first-date" class="timeline-value">Never</span>
                 </div>
                 <div class="timeline-item">
                   <span class="timeline-label">Last Enhancement:</span>
-                  <span id="stat-last-date" class="timeline-value">Never</span>
+                  <span id="stat-last-date" data-testid="stat-last-date" class="timeline-value">Never</span>
                 </div>
               </div>
 
               <div class="stats-actions">
-                <button id="refresh-stats" class="button button-secondary">
+                <button id="refresh-stats" data-testid="refresh-stats" class="button button-secondary">
                   <span class="button-icon">🔄</span> Refresh Statistics
                 </button>
-                <button id="reset-stats" class="button button-danger">
+                <button id="reset-stats" data-testid="reset-stats" class="button button-danger">
                   <span class="button-icon">🗑️</span> Reset Statistics
                 </button>
               </div>
@@ -370,25 +376,26 @@
       </div>
 
       <div class="actions">
-        <button id="save" class="button button-primary">
+        <button id="save" data-testid="save" class="button button-primary">
           <span class="button-icon">💾</span> Save Settings
         </button>
-        <button id="reset" class="button button-secondary">
+        <button id="reset" data-testid="reset" class="button button-secondary">
           <span class="button-icon">↩️</span> Reset to Defaults
         </button>
       </div>
 
-      <div id="site-modal" class="modal">
+      <div id="site-modal" data-testid="site-modal" class="modal">
         <div class="modal-content">
           <div class="modal-header">
             <h3>Add Site to Whitelist</h3>
-            <span class="close-modal">&times;</span>
+            <span class="close-modal" data-testid="close-modal">&times;</span>
           </div>
           <div class="modal-body">
             <div class="form-group">
               <label for="site-url">Website URL</label>
               <input
                 id="site-url"
+                data-testid="site-url"
                 type="text"
                 placeholder="https://www.example.com"
               />
@@ -398,16 +405,17 @@
               </div>
               <div
                 id="modal-error"
+                data-testid="modal-error"
                 class="hint error-hint"
                 style="display: none"
               ></div>
             </div>
           </div>
           <div class="modal-footer">
-            <button id="add-site-confirm" class="button button-primary">
+            <button id="add-site-confirm" data-testid="add-site-confirm" class="button button-primary">
               <span class="button-icon">✓</span> Add Site
             </button>
-            <button id="cancel-add-site" class="button button-secondary">
+            <button id="cancel-add-site" data-testid="cancel-add-site" class="button button-secondary">
               <span class="button-icon">✕</span> Cancel
             </button>
           </div>
