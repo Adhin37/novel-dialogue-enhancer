@@ -1,6 +1,7 @@
 import { logger } from "../shared/utils/logger.js";
 import { darkModeManager } from "../shared/ui/dark-mode-manager.js";
 import { Constants } from "../shared/utils/constants.js";
+import { Toaster } from "../shared/ui/toaster.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const modelNameInput = document.getElementById("model-name");
@@ -38,6 +39,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (darkModeManager) {
     darkModeManager.init();
   }
+
+  const toaster = new Toaster();
 
   addSiteBtn.addEventListener("click", () => {
     addCurrentSiteToWhitelist();
@@ -87,6 +90,14 @@ document.addEventListener("DOMContentLoaded", () => {
     chrome.runtime.sendMessage(
       { action: "checkOllamaAvailability" },
       (response) => {
+        if (chrome.runtime.lastError || !response) {
+          const msg = chrome.runtime.lastError?.message || "No response from extension background";
+          logger.warn("Ollama connection test error", msg);
+          ollamaStatus.textContent = `Connection error: ${msg}`;
+          ollamaStatus.className = "status-message error";
+          toaster.showError("Could not reach extension background. Try reloading the page.");
+          return;
+        }
         if (response.available) {
           logger.success("Ollama connection test successful", response);
           ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
@@ -95,6 +106,7 @@ document.addEventListener("DOMContentLoaded", () => {
           logger.warn("Ollama connection test failed", response);
           ollamaStatus.textContent = `Ollama not available: ${response.reason}`;
           ollamaStatus.className = "status-message error";
+          toaster.showError("Ollama is unavailable. Please start Ollama and try again.");
         }
       }
     );
@@ -307,6 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
     sites.sort().forEach((site) => {
       const itemElement = document.createElement("div");
       itemElement.className = "whitelist-item";
+      itemElement.dataset.testid = `whitelist-item-${site}`;
 
       const siteNameElement = document.createElement("span");
       siteNameElement.textContent = site;
@@ -314,6 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const removeButton = document.createElement("button");
       removeButton.className = "remove-btn";
+      removeButton.dataset.testid = `whitelist-remove-${site}`;
       removeButton.textContent = "Remove";
       removeButton.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -463,6 +477,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const novelItem = document.createElement("div");
       novelItem.className = "novel-item";
       novelItem.dataset.novelId = novelId;
+      novelItem.dataset.testid = `novel-item-${novelId}`;
 
       novelItem.innerHTML = `
       <div class="novel-title">${displayName}</div>
@@ -587,6 +602,15 @@ document.addEventListener("DOMContentLoaded", () => {
     html += "</div>";
     const cont = container;
     cont.innerHTML = html;
+
+    // Assign data-testid attributes to dynamically created character cards
+    container.querySelectorAll(".character-card").forEach((card) => {
+      const nId = card.dataset.novelId;
+      const cId = card.dataset.charId;
+      card.dataset.testid = `character-card-${nId}-${cId}`;
+      const sel = card.querySelector(".gender-select");
+      if (sel) sel.dataset.testid = `gender-select-${nId}-${cId}`;
+    });
 
     // Add event listeners for gender selection changes
     container.querySelectorAll(".gender-select").forEach((select) => {

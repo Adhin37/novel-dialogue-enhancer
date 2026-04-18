@@ -911,6 +911,19 @@ async function enhancePage({ silent = false } = {}) {
       throw new Error(`Ollama not available: ${ollamaStatus.reason}`);
     }
 
+    const availableModels = ollamaStatus.models;
+    if (Array.isArray(availableModels)) {
+      const llmSettings = await getOllamaClient().getLLMSettings();
+      const configuredModel = llmSettings.modelName;
+      if (!availableModels.includes(configuredModel)) {
+        const msg = availableModels.length === 0
+          ? "No models installed in Ollama. Install one with: ollama pull <model-name>"
+          : `Model "${configuredModel}" is not installed. Install it with: ollama pull ${configuredModel}`;
+        toaster.showWarning(msg);
+        return false;
+      }
+    }
+
     toaster.showLoading("Analyzing characters...");
     const contextResult =
       await contentEnhancerIntegration.setupCharacterContext();
@@ -953,8 +966,18 @@ async function enhancePage({ silent = false } = {}) {
 
     return enhancementSuccessful;
   } catch (error) {
-    if (silent) {
-      // Auto-triggered failure: log but don't spam the user with error toasts.
+    const isOllamaError =
+      error.message.toLowerCase().includes("ollama") ||
+      error.message.includes("not available") ||
+      error.message.includes("Invalid Ollama");
+
+    if (isOllamaError) {
+      const reason = ollamaStatus?.reason || "";
+      const msg = reason.toLowerCase().includes("model")
+        ? "No AI models found. Please install a model using Ollama."
+        : "Ollama is unavailable. Please start Ollama and try again.";
+      toaster.showError(msg);
+    } else if (silent) {
       console.warn("Auto-enhancement failed:", error.message);
     } else {
       errorHandler.handleEnhancementError(error, {
