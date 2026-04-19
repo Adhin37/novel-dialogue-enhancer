@@ -1,6 +1,10 @@
 import { logger } from "../utils/logger.js";
-import { Constants } from "../utils/constants.js";
-import { SharedUtils } from "../utils/shared-utils.js";
+import { GenderConfig } from "../gender/gender-config.js";
+import { ExtensionConfig } from "../utils/extension-config.js";
+import { TextLimits } from "../utils/text-limits.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { GenderUtils } from "../gender/gender-utils.js";
+import { CharacterUtils } from "../utils/character-utils.js";
 import { IdGenerator } from "./id-generator.js";
 import { ChapterDetector } from "./chapter-detector.js";
 import { CharacterExtractor } from "./character-extractor.js";
@@ -154,7 +158,7 @@ export class NovelOrchestrator {
 
     // Merge extracted characters with existing character map
     Object.entries(extractedCharacters).forEach(([name, data]) => {
-      const key = SharedUtils.normalizeName(name);
+      const key = CharacterUtils.normalizeName(name);
       if (!characterMap[key]) {
         characterMap[key] = data;
       } else {
@@ -307,14 +311,14 @@ export class NovelOrchestrator {
     const existingMap = novelData.characterMap || {};
 
     const normalizedKeys = new Set(
-      Object.keys(characterMap).map(SharedUtils.normalizeName)
+      Object.keys(characterMap).map(CharacterUtils.normalizeName)
     );
     const mergedMap = {
       ...characterMap,
       ...Object.fromEntries(
         Object.entries(existingMap)
-          .filter(([name]) => !normalizedKeys.has(SharedUtils.normalizeName(name)))
-          .map(([name, data]) => [SharedUtils.normalizeName(name), data])
+          .filter(([name]) => !normalizedKeys.has(CharacterUtils.normalizeName(name)))
+          .map(([name, data]) => [CharacterUtils.normalizeName(name), data])
       )
     };
 
@@ -385,7 +389,7 @@ export class NovelOrchestrator {
   syncCharacterMap(characterMap) {
     const chapterNumber = this.chapterInfo?.chapterNumber;
     if (
-      SharedUtils.validateObject(characterMap) &&
+      StringUtils.validateObject(characterMap) &&
       Object.keys(characterMap).length > 0
     ) {
       this.logger.info("Syncing character map to background:", characterMap);
@@ -621,15 +625,15 @@ export class NovelOrchestrator {
   estimateWordCount(content) {
     if (!content) return 0;
 
-    const sampleContent = content.substring(0, 50000);
+    const sampleContent = content.substring(0, TextLimits.VALIDATION.MAX_TEXT_SAMPLE);
     const cleanContent = sampleContent.replace(/<[^>]*>/g, " ");
     const words = cleanContent
       .trim()
       .split(/\s+/)
       .filter((word) => word.length > 0);
 
-    if (content.length > 50000) {
-      return Math.round(words.length * (content.length / 50000));
+    if (content.length > TextLimits.VALIDATION.MAX_TEXT_SAMPLE) {
+      return Math.round(words.length * (content.length / TextLimits.VALIDATION.MAX_TEXT_SAMPLE));
     }
 
     return words.length;
@@ -645,14 +649,14 @@ export class NovelOrchestrator {
     const optimized = {};
 
     Object.entries(characterMap).forEach(([name, data], index) => {
-      if (SharedUtils.validateCharacterName(name)) {
+      if (CharacterUtils.validateCharacterName(name)) {
         optimized[index] = {
           name: name,
-          gender: SharedUtils.compressGender(data.gender),
-          confidence: SharedUtils.validateConfidence(data.confidence)
+          gender: GenderUtils.compressGender(data.gender),
+          confidence: CharacterUtils.validateConfidence(data.confidence)
             ? data.confidence
             : 0,
-          appearances: SharedUtils.validateAppearances(data.appearances)
+          appearances: CharacterUtils.validateAppearances(data.appearances)
             ? data.appearances
             : 1
         };
@@ -660,7 +664,7 @@ export class NovelOrchestrator {
         if (Array.isArray(data.evidence) && data.evidence.length > 0) {
           optimized[index].evidences = data.evidence.slice(
             0,
-            Constants.STORAGE.MAX_EVIDENCE_ENTRIES
+            ExtensionConfig.STORAGE.MAX_EVIDENCE_ENTRIES
           );
         }
       }
@@ -678,16 +682,16 @@ export class NovelOrchestrator {
   #optimizeCharacterMap(characterMap) {
     const optimized = {};
 
-    Object.entries(SharedUtils.deepClone(characterMap) || {}).forEach(
+    Object.entries(StringUtils.deepClone(characterMap) || {}).forEach(
       ([name, data]) => {
-        if (SharedUtils.validateCharacterName(name)) {
+        if (CharacterUtils.validateCharacterName(name)) {
           optimized[name] = {
             name: name,
-            gender: SharedUtils.compressGender(data.gender),
-            confidence: SharedUtils.validateConfidence(data.confidence)
+            gender: GenderUtils.compressGender(data.gender),
+            confidence: CharacterUtils.validateConfidence(data.confidence)
               ? data.confidence
               : 0,
-            appearances: SharedUtils.validateAppearances(data.appearances)
+            appearances: CharacterUtils.validateAppearances(data.appearances)
               ? data.appearances
               : 1,
             evidence: Array.isArray(data.evidence)
@@ -724,11 +728,11 @@ export class NovelOrchestrator {
 
     return displayCharacters
       .map((char) => {
-        const expandedGender = SharedUtils.expandGender(char.gender);
+        const expandedGender = GenderUtils.expandGender(char.gender);
         const pronouns =
-          expandedGender === Constants.GENDER.MALE_FULL
+          expandedGender === GenderConfig.CODES.MALE_FULL
             ? "he/him"
-            : expandedGender === Constants.GENDER.FEMALE_FULL
+            : expandedGender === GenderConfig.CODES.FEMALE_FULL
             ? "she/her"
             : "unknown";
         return `- ${char.name}: ${pronouns}`;

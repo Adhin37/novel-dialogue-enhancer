@@ -1,4 +1,4 @@
-import { Constants } from "../utils/constants.js";
+import { ExtensionConfig } from "../shared/utils/extension-config.js";
 
 // content-element-cache.js
 /**
@@ -8,7 +8,7 @@ export class ElementCache {
   constructor() {
     this.cache = new Map();
     this.lastCacheTime = 0;
-    this.cacheTimeout = Constants.STORAGE.CACHE_TTL_MS;
+    this.cacheTimeout = ExtensionConfig.STORAGE.CACHE_TTL_MS;
   }
 
   /**

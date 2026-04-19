@@ -4,8 +4,8 @@
  * Identifies cultural contexts and specific cultural indicators
  */
 import { BaseAnalyzer } from "./base-analyzer.js";
-import { SharedUtils } from "../utils/shared-utils.js";
-import { CULTURAL_GENDER_TERMS } from "../utils/cultural-terms.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { CULTURAL_GENDER_TERMS } from "./cultural-terms.js";
 
 export class CulturalAnalyzer extends BaseAnalyzer {
   static #NAME_PATTERNS = {
@@ -382,9 +382,9 @@ export class CulturalAnalyzer extends BaseAnalyzer {
         /\bsenior brother\b/i,
         /\bjunior brother\b/i,
         /\bdisciple brother\b/i,
-        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-sama\\b`, "i"),
-        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-san\\b`, "i"),
-        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-kun\\b`, "i"),
+        new RegExp(`\\b${StringUtils.escapeRegExp(name)}-sama\\b`, "i"),
+        new RegExp(`\\b${StringUtils.escapeRegExp(name)}-san\\b`, "i"),
+        new RegExp(`\\b${StringUtils.escapeRegExp(name)}-kun\\b`, "i"),
 
         /\bhe cultivated\b/i,
         /\bhis cultivation\b/i,
@@ -405,7 +405,7 @@ export class CulturalAnalyzer extends BaseAnalyzer {
         /\bsenior sister\b/i,
         /\bjunior sister\b/i,
         /\bdisciple sister\b/i,
-        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}-chan\\b`, "i"),
+        new RegExp(`\\b${StringUtils.escapeRegExp(name)}-chan\\b`, "i"),
 
         /\bher fairy\b/i,
         /\bher beauty\b/i,

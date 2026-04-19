@@ -1,6 +1,14 @@
 // background.js
+// background.js is not bundled (bundle:false in build.mjs), so it cannot use ES module imports.
+// These values must be kept in sync with src/shared/utils/ollama-config.js and extension-config.js.
+const DEFAULT_OLLAMA_URL   = "http://localhost:11434";
+const DEFAULT_MODEL_NAME   = "qwen3.5:4b";
+const DEFAULT_CONTEXT_SIZE = 8192;
+const DEFAULT_TIMEOUT_SEC  = 300;
+const DEFAULT_TEMPERATURE  = 0.4;
+const DEFAULT_TOP_P        = 0.9;
+
 const activeRequestControllers = new Map();
-const DEFAULT_OLLAMA_URL = "http://localhost:11434";
 let novelCharacterMaps = {};
 let isBackgroundReady = false;
 let initializationPromise = null;
@@ -315,10 +323,10 @@ function handleOllamaRequest(request, sendResponse) {
 
   chrome.storage.sync.get(
     {
-      timeout: 300,
-      temperature: 0.4,
-      topP: 0.9,
-      contextSize: 8192
+      timeout:     DEFAULT_TIMEOUT_SEC,
+      temperature: DEFAULT_TEMPERATURE,
+      topP:        DEFAULT_TOP_P,
+      contextSize: DEFAULT_CONTEXT_SIZE
     },
     (data) => {
       if (chrome.runtime.lastError) {
@@ -422,7 +430,7 @@ function prepareRequestData(requestData, settings) {
     ...requestData,
     temperature: requestData.temperature || settings.temperature,
     top_p: requestData.top_p || settings.topP,
-    num_ctx: requestData.num_ctx || settings.contextSize || 8192
+    num_ctx: requestData.num_ctx || settings.contextSize || DEFAULT_CONTEXT_SIZE
   };
 }
 
@@ -442,7 +450,7 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
   );
 
   const num_predict = parseInt(requestData.num_predict || requestData.max_tokens) || 4096;
-  const num_ctx     = parseInt(requestData.num_ctx) || 8192;
+  const num_ctx     = parseInt(requestData.num_ctx) || DEFAULT_CONTEXT_SIZE;
 
   const safeRequestData = {
     model: String(requestData.model || ""),
@@ -450,8 +458,8 @@ function processNonStreamingRequest(requestData, timeout, sendResponse) {
     stream: false,
     think: false,   // disable reasoning chain for qwen3/qwen3.5 (ignored by non-thinking models)
     options: {
-      temperature: parseFloat(requestData.temperature) || 0.4,
-      top_p: parseFloat(requestData.top_p) || 0.9,
+      temperature: parseFloat(requestData.temperature) || DEFAULT_TEMPERATURE,
+      top_p: parseFloat(requestData.top_p) || DEFAULT_TOP_P,
       num_predict,
       num_ctx
     }
@@ -1437,15 +1445,15 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.get(
     {
       isExtensionPaused: false,
-      preserveNames: true,
-      fixPronouns: true,
-      modelName: "qwen3.5:4b",
-      contextSize: 8192,
-      timeout: 300,
-      disabledPages: [],
-      temperature: 0.4,
-      topP: 0.9,
-      whitelistedSites: []
+      preserveNames:     true,
+      fixPronouns:       true,
+      modelName:         DEFAULT_MODEL_NAME,
+      contextSize:       DEFAULT_CONTEXT_SIZE,
+      timeout:           DEFAULT_TIMEOUT_SEC,
+      disabledPages:     [],
+      temperature:       DEFAULT_TEMPERATURE,
+      topP:              DEFAULT_TOP_P,
+      whitelistedSites:  []
     },
     (data) => {
       chrome.storage.sync.set(data);

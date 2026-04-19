@@ -4,8 +4,9 @@
  * Enhanced integration with sophisticated analysis methods exposed
  */
 import { BaseAnalyzer } from "./base-analyzer.js";
-import { SharedUtils } from "../utils/shared-utils.js";
-import { GENDER_PRONOUN_GROUPS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "../utils/pronouns.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { GenderUtils } from "./gender-utils.js";
+import { GENDER_PRONOUN_GROUPS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "./pronouns.js";
 
 export class MultiCharacterAnalyzer extends BaseAnalyzer {
   /**
@@ -312,13 +313,13 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
 
     for (const similarName of similarNames) {
       const pattern = new RegExp(
-        `\\b(${SharedUtils.escapeRegExp(
+        `\\b(${StringUtils.escapeRegExp(
           targetCharacter
-        )}|${SharedUtils.escapeRegExp(
+        )}|${StringUtils.escapeRegExp(
           similarName
-        )})\\b[^.!?]*\\b(${SharedUtils.escapeRegExp(
+        )})\\b[^.!?]*\\b(${StringUtils.escapeRegExp(
           targetCharacter
-        )}|${SharedUtils.escapeRegExp(similarName)})\\b`,
+        )}|${StringUtils.escapeRegExp(similarName)})\\b`,
         "gi"
       );
 
@@ -480,7 +481,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
    */
   #findUniqueCharacterContexts(targetCharacter, text, similarNames) {
     const targetPattern = new RegExp(
-      `[^.!?]*\\b${SharedUtils.escapeRegExp(targetCharacter)}\\b[^.!?]*[.!?]`,
+      `[^.!?]*\\b${StringUtils.escapeRegExp(targetCharacter)}\\b[^.!?]*[.!?]`,
       "gi"
     );
 
@@ -520,7 +521,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
 
   // Existing private methods remain unchanged
   #analyzeDialogueAttribution(targetCharacter, text, allCharacterNames) {
-    const cacheKey = `dialogue:${targetCharacter}:${SharedUtils.createHash(
+    const cacheKey = `dialogue:${targetCharacter}:${StringUtils.createHash(
       text
     )}`;
 
@@ -547,7 +548,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
           pattern === dialoguePatterns[0] ? match[2] : match[1];
 
         const targetRegex = new RegExp(
-          `\\b${SharedUtils.escapeRegExp(targetCharacter)}\\b`,
+          `\\b${StringUtils.escapeRegExp(targetCharacter)}\\b`,
           "i"
         );
         if (!targetRegex.test(speakerSection)) continue;
@@ -605,10 +606,10 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
     const interactionPatterns = [
       {
         patterns: [
-          `\\b${SharedUtils.escapeRegExp(
+          `\\b${StringUtils.escapeRegExp(
             targetCharacter
           )}\\b[^.!?]*\\b(loved|kissed|embraced|married|dating)\\b[^.!?]*\\b(\\w+)\\b`,
-          `\\b(\\w+)\\b[^.!?]*\\b(loved|kissed|embraced|married|dating)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+          `\\b(\\w+)\\b[^.!?]*\\b(loved|kissed|embraced|married|dating)\\b[^.!?]*\\b${StringUtils.escapeRegExp(
             targetCharacter
           )}\\b`
         ],
@@ -616,10 +617,10 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
       },
       {
         patterns: [
-          `\\b${SharedUtils.escapeRegExp(
+          `\\b${StringUtils.escapeRegExp(
             targetCharacter
           )}\\b[^.!?]*\\b(brother|sister|son|daughter|father|mother|husband|wife)\\b[^.!?]*\\b(\\w+)\\b`,
-          `\\b(\\w+)\\b[^.!?]*\\b(brother|sister|son|daughter|father|mother|husband|wife)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+          `\\b(\\w+)\\b[^.!?]*\\b(brother|sister|son|daughter|father|mother|husband|wife)\\b[^.!?]*\\b${StringUtils.escapeRegExp(
             targetCharacter
           )}\\b`
         ],
@@ -641,7 +642,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
             knownCharacters[otherCharacter] &&
             knownCharacters[otherCharacter].gender !== "unknown"
           ) {
-            const otherGender = SharedUtils.expandGender(
+            const otherGender = GenderUtils.expandGender(
               knownCharacters[otherCharacter].gender
             );
             const confidence = knownCharacters[otherCharacter].confidence || 0;
@@ -683,7 +684,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
     let evidence = null;
 
     const targetRegex = new RegExp(
-      `\\b${SharedUtils.escapeRegExp(targetCharacter)}\\b`,
+      `\\b${StringUtils.escapeRegExp(targetCharacter)}\\b`,
       "i"
     );
     const targetMatch = sentence.match(targetRegex);
@@ -736,7 +737,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
 
   // Keep all existing helper methods unchanged...
   #extractRelevantSentences(targetCharacter, text) {
-    const cacheKey = `${targetCharacter}:${SharedUtils.createHash(text)}`;
+    const cacheKey = `${targetCharacter}:${StringUtils.createHash(text)}`;
 
     if (this.sentenceCache.has(cacheKey)) {
       this.analysisMetrics.cacheHits++;
@@ -748,7 +749,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
     const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
     const relevantSentences = [];
     const characterRegex = new RegExp(
-      `\\b${SharedUtils.escapeRegExp(targetCharacter)}\\b`,
+      `\\b${StringUtils.escapeRegExp(targetCharacter)}\\b`,
       "i"
     );
 
@@ -780,7 +781,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
     const otherCharactersPresent = allCharacterNames.some(
       (name) =>
         name !== targetCharacter &&
-        new RegExp(`\\b${SharedUtils.escapeRegExp(name)}\\b`, "i").test(
+        new RegExp(`\\b${StringUtils.escapeRegExp(name)}\\b`, "i").test(
           attributionSection
         )
     );
@@ -863,7 +864,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
       if (characterName === targetCharacter) continue;
 
       const regex = new RegExp(
-        `\\b${SharedUtils.escapeRegExp(characterName)}\\b`,
+        `\\b${StringUtils.escapeRegExp(characterName)}\\b`,
         "i"
       );
       const match = sentence.match(regex);
@@ -1017,7 +1018,7 @@ export class MultiCharacterAnalyzer extends BaseAnalyzer {
     let evidence = null;
 
     const possessivePattern = new RegExp(
-      `\\b${SharedUtils.escapeRegExp(targetCharacter)}'s\\s+(\\w+)`,
+      `\\b${StringUtils.escapeRegExp(targetCharacter)}'s\\s+(\\w+)`,
       "gi"
     );
 

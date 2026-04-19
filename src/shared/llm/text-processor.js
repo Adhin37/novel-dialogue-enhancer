@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger.js";
-import { Constants } from "../utils/constants.js";
+import { OllamaConfig } from "./ollama-config.js";
 
 // textProcessor.js
 /**
@@ -13,7 +13,7 @@ export class TextProcessor {
    */
   constructor(options = {}) {
     this.maxChunkSize =
-      options.maxChunkSize || Constants.DEFAULTS.MAX_CHUNK_SIZE;
+      options.maxChunkSize || OllamaConfig.LLM.MAX_CHUNK_SIZE;
     this.logger = logger;
 
     this.logger.debug(

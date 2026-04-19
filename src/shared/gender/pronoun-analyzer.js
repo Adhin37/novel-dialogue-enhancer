@@ -3,8 +3,8 @@
  * Specialized module for pronoun analysis in text
  * Identifies and analyzes pronoun usage to determine character gender
  */
-import { SharedUtils } from "../utils/shared-utils.js";
-import { MALE_PRONOUNS, FEMALE_PRONOUNS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "../utils/pronouns.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { MALE_PRONOUNS, FEMALE_PRONOUNS, MALE_PRONOUN_PATTERN, FEMALE_PRONOUN_PATTERN, MALE_POSSESSIVES, FEMALE_POSSESSIVES } from "./pronouns.js";
 
 export class PronounAnalyzer {
   /**
@@ -19,12 +19,12 @@ export class PronounAnalyzer {
     let inconsistencies = 0;
 
     const nameSentenceRegex = new RegExp(
-      `[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,50}[.!?]`,
+      `[^.!?]{0,50}\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,50}[.!?]`,
       "gi"
     );
 
     const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,80}`,
+      `[^.!?]*\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,80}`,
       "gi"
     );
 
@@ -105,13 +105,13 @@ export class PronounAnalyzer {
     for (const pronoun of pronouns) {
       // Very close connection (within 15 characters)
       const directPattern = new RegExp(
-        `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,15}\\b${pronoun}\\b`,
+        `\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,15}\\b${pronoun}\\b`,
         "i"
       );
 
       // Close proximity (within 40 characters)
       const proximityPattern = new RegExp(
-        `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,40}\\b${pronoun}\\b`,
+        `\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,40}\\b${pronoun}\\b`,
         "i"
       );
 
@@ -145,7 +145,7 @@ export class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${SharedUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${MALE_POSSESSIVES.join("|")})\\b`,
+            `\\b${StringUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${MALE_POSSESSIVES.join("|")})\\b`,
             "i"
           )
         )
@@ -156,7 +156,7 @@ export class PronounAnalyzer {
       if (
         proximityText.match(
           new RegExp(
-            `\\b${SharedUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${FEMALE_POSSESSIVES.join("|")})\\b`,
+            `\\b${StringUtils.escapeRegExp(name)}'s\\b[^.!?]*\\b(${FEMALE_POSSESSIVES.join("|")})\\b`,
             "i"
           )
         )
@@ -166,14 +166,14 @@ export class PronounAnalyzer {
 
       // Check for dialogue attribution patterns (more restrictive)
       const dialogueMalePattern = new RegExp(
-        `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
+        `"[^"]*"\\s*,?\\s*${StringUtils.escapeRegExp(
           name
         )}\\s+(?:said|replied|asked|shouted|whispered|exclaimed|muttered|responded|commented)[^.!?]{0,20}\\b(he|his)\\b`,
         "i"
       );
 
       const dialogueFemalePattern = new RegExp(
-        `"[^"]*"\\s*,?\\s*${SharedUtils.escapeRegExp(
+        `"[^"]*"\\s*,?\\s*${StringUtils.escapeRegExp(
           name
         )}\\s+(?:said|replied|asked|shouted|whispered|exclaimed|muttered|responded|commented)[^.!?]{0,20}\\b(she|her)\\b`,
         "i"
@@ -248,19 +248,19 @@ export class PronounAnalyzer {
     let femaleScore = 0;
 
     const maleArchetypes = [
-      `\\b${SharedUtils.escapeRegExp(
+      `\\b${StringUtils.escapeRegExp(
         name
       )}\\b[^.!?]*\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b`,
-      `\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+      `\\b(young master|male lead|hero|protagonist|cultivator|master|patriarch)\\b[^.!?]*\\b${StringUtils.escapeRegExp(
         name
       )}\\b`
     ];
 
     const femaleArchetypes = [
-      `\\b${SharedUtils.escapeRegExp(
+      `\\b${StringUtils.escapeRegExp(
         name
       )}\\b[^.!?]*\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b`,
-      `\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+      `\\b(young miss|young lady|female lead|heroine|maiden|matriarch)\\b[^.!?]*\\b${StringUtils.escapeRegExp(
         name
       )}\\b`
     ];
@@ -360,9 +360,9 @@ export class PronounAnalyzer {
       // Check for machine translation errors with alternating pronouns
       {
         pattern: new RegExp(
-          `\\b${SharedUtils.escapeRegExp(
+          `\\b${StringUtils.escapeRegExp(
             name
-          )}\\b[^.!?]{0,20}\\bhe\\b[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(
+          )}\\b[^.!?]{0,20}\\bhe\\b[^.!?]{0,50}\\b${StringUtils.escapeRegExp(
             name
           )}\\b[^.!?]{0,20}\\bshe\\b`,
           "i"
@@ -372,9 +372,9 @@ export class PronounAnalyzer {
       },
       {
         pattern: new RegExp(
-          `\\b${SharedUtils.escapeRegExp(
+          `\\b${StringUtils.escapeRegExp(
             name
-          )}\\b[^.!?]{0,20}\\bshe\\b[^.!?]{0,50}\\b${SharedUtils.escapeRegExp(
+          )}\\b[^.!?]{0,20}\\bshe\\b[^.!?]{0,50}\\b${StringUtils.escapeRegExp(
             name
           )}\\b[^.!?]{0,20}\\bhe\\b`,
           "i"
@@ -385,7 +385,7 @@ export class PronounAnalyzer {
       // Check for dialogue attribution patterns
       {
         pattern: new RegExp(
-          `"[^"]+", (he|his)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
+          `"[^"]+", (he|his)\\b[^.!?]{0,20}\\b${StringUtils.escapeRegExp(
             name
           )}\\b[^.!?]*\\bshe\\b`,
           "i"
@@ -395,7 +395,7 @@ export class PronounAnalyzer {
       },
       {
         pattern: new RegExp(
-          `"[^"]+", (she|her)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
+          `"[^"]+", (she|her)\\b[^.!?]{0,20}\\b${StringUtils.escapeRegExp(
             name
           )}\\b[^.!?]*\\bhe\\b`,
           "i"

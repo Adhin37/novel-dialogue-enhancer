@@ -4,7 +4,7 @@
  * Identifies physical descriptions and features that indicate gender
  */
 import { BaseAnalyzer } from "./base-analyzer.js";
-import { SharedUtils } from "../utils/shared-utils.js";
+import { StringUtils } from "../utils/string-utils.js";
 
 export class AppearanceAnalyzer extends BaseAnalyzer {
   /**
@@ -20,7 +20,7 @@ export class AppearanceAnalyzer extends BaseAnalyzer {
 
     // Get text segments containing character name
     const nameContext = new RegExp(
-      `\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
+      `\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
       "gi"
     );
     const contextMatches = Array.from(text.matchAll(nameContext));
@@ -36,13 +36,13 @@ export class AppearanceAnalyzer extends BaseAnalyzer {
     // Check for male descriptors
     for (const word of maleWords) {
       const regex = new RegExp(
-        `\\b${SharedUtils.escapeRegExp(
+        `\\b${StringUtils.escapeRegExp(
           name
-        )}[^.!?]*\\b${SharedUtils.escapeRegExp(
+        )}[^.!?]*\\b${StringUtils.escapeRegExp(
           word
-        )}\\b|\\b${SharedUtils.escapeRegExp(
+        )}\\b|\\b${StringUtils.escapeRegExp(
           word
-        )}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b`,
+        )}\\b[^.!?]*\\b${StringUtils.escapeRegExp(name)}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -55,13 +55,13 @@ export class AppearanceAnalyzer extends BaseAnalyzer {
     // Check for female descriptors
     for (const word of femaleWords) {
       const regex = new RegExp(
-        `\\b${SharedUtils.escapeRegExp(
+        `\\b${StringUtils.escapeRegExp(
           name
-        )}[^.!?]*\\b${SharedUtils.escapeRegExp(
+        )}[^.!?]*\\b${StringUtils.escapeRegExp(
           word
-        )}\\b|\\b${SharedUtils.escapeRegExp(
+        )}\\b|\\b${StringUtils.escapeRegExp(
           word
-        )}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b`,
+        )}\\b[^.!?]*\\b${StringUtils.escapeRegExp(name)}\\b`,
         "i"
       );
       if (regex.test(contextText)) {
@@ -83,7 +83,7 @@ export class AppearanceAnalyzer extends BaseAnalyzer {
   analyzeAppearanceDescriptions(name, text) {
     // Find appearance descriptions using regex
     const appearanceRegex = new RegExp(
-      `\\b${SharedUtils.escapeRegExp(
+      `\\b${StringUtils.escapeRegExp(
         name
       )}(?:'s)?\\b[^.!?]*(\\bappearance\\b|\\blooked\\b|\\bdressed\\b|\\bwore\\b|\\bfigure\\b|\\bface\\b|\\bhair\\b|\\bfeatures\\b)[^.!?]*[.!?]`,
       "gi"

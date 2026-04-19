@@ -3,8 +3,8 @@
  * Specialized module for analyzing character relationships
  * Identifies relationship patterns and character roles that indicate gender
  */
-import { SharedUtils } from "../utils/shared-utils.js";
-import { CULTURAL_ADDRESS_TERMS } from "../utils/cultural-terms.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { CULTURAL_ADDRESS_TERMS } from "./cultural-terms.js";
 
 export class RelationshipAnalyzer {
   /**
@@ -26,7 +26,7 @@ export class RelationshipAnalyzer {
     // Check cultural-specific male relationships
     for (const relation of culturalRelationships.male) {
       const regex = new RegExp(
-        relation.replace(/\{name\}/g, SharedUtils.escapeRegExp(name)),
+        relation.replace(/\{name\}/g, StringUtils.escapeRegExp(name)),
         "i"
       );
       if (regex.test(text)) {
@@ -40,7 +40,7 @@ export class RelationshipAnalyzer {
     if (!evidence) {
       for (const relation of culturalRelationships.female) {
         const regex = new RegExp(
-          relation.replace(/\{name\}/g, SharedUtils.escapeRegExp(name)),
+          relation.replace(/\{name\}/g, StringUtils.escapeRegExp(name)),
           "i"
         );
         if (regex.test(text)) {
@@ -163,7 +163,7 @@ export class RelationshipAnalyzer {
 
     // Check role mentions in proximity to name
     const nameProximityRegex = new RegExp(
-      `[^.!?]*\\b${SharedUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
+      `[^.!?]*\\b${StringUtils.escapeRegExp(name)}\\b[^.!?]{0,100}`,
       "gi"
     );
     const proximityMatches = Array.from(text.matchAll(nameProximityRegex));
@@ -191,9 +191,9 @@ export class RelationshipAnalyzer {
     for (const role of cultureRoles.male) {
       if (
         new RegExp(
-          `\\b${SharedUtils.escapeRegExp(
+          `\\b${StringUtils.escapeRegExp(
             name
-          )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+          )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${StringUtils.escapeRegExp(
             name
           )}\\b`,
           "i"
@@ -209,9 +209,9 @@ export class RelationshipAnalyzer {
       for (const role of cultureRoles.female) {
         if (
           new RegExp(
-            `\\b${SharedUtils.escapeRegExp(
+            `\\b${StringUtils.escapeRegExp(
               name
-            )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${SharedUtils.escapeRegExp(
+            )}\\b[^.!?]*\\b${role}\\b|\\b${role}\\b[^.!?]*\\b${StringUtils.escapeRegExp(
               name
             )}\\b`,
             "i"
@@ -268,7 +268,7 @@ export class RelationshipAnalyzer {
             const regex = new RegExp(
               femaleSidePattern.replace(
                 /\(NAME\)/g,
-                SharedUtils.escapeRegExp(charName)
+                StringUtils.escapeRegExp(charName)
               ),
               "i"
             );
@@ -287,7 +287,7 @@ export class RelationshipAnalyzer {
             const regex = new RegExp(
               maleSidePattern.replace(
                 /\(NAME\)/g,
-                SharedUtils.escapeRegExp(charName)
+                StringUtils.escapeRegExp(charName)
               ),
               "i"
             );
@@ -341,7 +341,7 @@ export class RelationshipAnalyzer {
 
     // Look for group scenes containing multiple characters
     const groupScenePattern = new RegExp(
-      `[^.!?]*\\b${SharedUtils.escapeRegExp(
+      `[^.!?]*\\b${StringUtils.escapeRegExp(
         name
       )}\\b[^.!?]*(?:\\b(and|with|alongside)\\b|,)[^.!?]*`,
       "gi"
@@ -401,13 +401,13 @@ export class RelationshipAnalyzer {
     // Patterns like "X was the emperor" or "the princess X"
     const explicitRolePatterns = [
       new RegExp(
-        `\\b${SharedUtils.escapeRegExp(
+        `\\b${StringUtils.escapeRegExp(
           name
         )}\\b[^.!?]{0,20}\\b(was|is)\\b[^.!?]{0,20}\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b`,
         "i"
       ),
       new RegExp(
-        `\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b[^.!?]{0,20}\\b${SharedUtils.escapeRegExp(
+        `\\b(the|a)\\b[^.!?]{0,10}\\b(\\w+)\\b[^.!?]{0,20}\\b${StringUtils.escapeRegExp(
           name
         )}\\b`,
         "i"

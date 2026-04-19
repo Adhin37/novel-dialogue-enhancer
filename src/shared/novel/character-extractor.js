@@ -1,6 +1,8 @@
-import { Constants } from "../utils/constants.js";
-import { SharedUtils } from "../utils/shared-utils.js";
-import { PRONOUN_FILTER_SET } from "../utils/pronouns.js";
+import { GenderConfig } from "../gender/gender-config.js";
+import { TextLimits } from "../utils/text-limits.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { CharacterUtils } from "../utils/character-utils.js";
+import { PRONOUN_FILTER_SET } from "../gender/pronouns.js";
 
 // novel-character-extractor.js
 /**
@@ -15,9 +17,9 @@ export class CharacterExtractor {
   extractCharacterNames(text) {
     const characterMap = {};
     const namePatterns = this.#getNamePatterns();
-    const maxTextLength = Constants.PROCESSING.MAX_TEXT_LENGTH;
+    const maxTextLength = TextLimits.PROCESSING.MAX_TEXT_LENGTH;
     const processedText = text.substring(0, maxTextLength);
-    const maxMatches = Constants.PROCESSING.MAX_MATCHES;
+    const maxMatches = TextLimits.PROCESSING.MAX_MATCHES;
     let totalMatches = 0;
 
     for (const pattern of namePatterns) {
@@ -27,7 +29,7 @@ export class CharacterExtractor {
       while (
         (match = pattern.exec(processedText)) !== null &&
         totalMatches < maxMatches &&
-        patternMatches < Constants.PROCESSING.MAX_PATTERN_MATCHES
+        patternMatches < TextLimits.PROCESSING.MAX_PATTERN_MATCHES
       ) {
         patternMatches++;
         totalMatches++;
@@ -36,14 +38,14 @@ export class CharacterExtractor {
 
         if (!name || name.length > 30) continue;
 
-        const sanitizedName = SharedUtils.sanitizeText(name);
+        const sanitizedName = StringUtils.sanitizeText(name);
         const rawName = this.extractCharacterName(sanitizedName);
-        const extractedName = rawName ? SharedUtils.normalizeName(rawName) : null;
+        const extractedName = rawName ? CharacterUtils.normalizeName(rawName) : null;
 
         if (extractedName) {
           if (!characterMap[extractedName]) {
             characterMap[extractedName] = {
-              gender: Constants.GENDER.UNKNOWN,
+              gender: GenderConfig.CODES.UNKNOWN,
               appearances: 1
             };
           } else {
@@ -213,7 +215,7 @@ export class CharacterExtractor {
           const potentialName = pattern === patterns[0] ? match[2] : match[1];
           const extractedName = this.extractCharacterName(potentialName);
           if (extractedName) {
-            characters.add(SharedUtils.normalizeName(extractedName));
+            characters.add(CharacterUtils.normalizeName(extractedName));
           }
           break;
         }
@@ -223,14 +225,14 @@ export class CharacterExtractor {
     dialoguePatterns.colonSeparatedDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
-        characters.add(SharedUtils.normalizeName(extractedName));
+        characters.add(CharacterUtils.normalizeName(extractedName));
       }
     });
 
     dialoguePatterns.actionDialogue.forEach((item) => {
       const extractedName = this.extractCharacterName(item.character);
       if (extractedName) {
-        characters.add(SharedUtils.normalizeName(extractedName));
+        characters.add(CharacterUtils.normalizeName(extractedName));
       }
     });
 
@@ -335,7 +337,7 @@ export class CharacterExtractor {
     // Merge any remaining case variants into a single canonical entry
     const deduped = {};
     for (const [name, data] of Object.entries(cleanedMap)) {
-      const key = SharedUtils.normalizeName(name);
+      const key = CharacterUtils.normalizeName(name);
       if (deduped[key]) {
         deduped[key].appearances += data.appearances || 0;
       } else {

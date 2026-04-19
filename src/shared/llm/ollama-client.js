@@ -1,5 +1,5 @@
 import { logger } from "../utils/logger.js";
-import { Constants } from "../utils/constants.js";
+import { OllamaConfig } from "./ollama-config.js";
 
 // ollamaClient.js
 /**
@@ -12,8 +12,8 @@ export class OllamaClient {
    * @param {object} options - Configuration options
    */
   constructor(options = {}) {
-    this.API_ENDPOINT = options.endpoint || Constants.API.OLLAMA_BASE + "/api";
-    this.CLIENT_TIMEOUT = options.timeout || Constants.API.TIMEOUT;
+    this.API_ENDPOINT = options.endpoint || OllamaConfig.API.BASE + "/api";
+    this.CLIENT_TIMEOUT = options.timeout || OllamaConfig.API.TIMEOUT;
     this.isCheckingAvailability = false;
     this.lastAvailabilityCheckTime = null;
     this.cachedAvailabilityStatus = null;
@@ -117,9 +117,9 @@ export class OllamaClient {
         model: model,
         prompt: prompt,
         num_predict: options.num_predict || options.max_tokens || 8192,
-        num_ctx: options.num_ctx || Constants.DEFAULTS.CONTEXT_SIZE,
-        temperature: options.temperature || 0.4,
-        top_p: options.top_p || 0.9,
+        num_ctx: options.num_ctx || OllamaConfig.LLM.CONTEXT_SIZE,
+        temperature: options.temperature || OllamaConfig.LLM.TEMPERATURE,
+        top_p: options.top_p || OllamaConfig.LLM.TOP_P,
         stream: false
       };
 
@@ -188,11 +188,11 @@ export class OllamaClient {
     return new Promise((resolve, reject) =>
       chrome.storage.sync.get(
         {
-          modelName: "qwen3.5:4b",
-          timeout: 300,
-          temperature: 0.4,
-          topP: 0.9,
-          contextSize: 8192
+          modelName:   OllamaConfig.LLM.MODEL_NAME,
+          timeout:     OllamaConfig.LLM.TIMEOUT,
+          temperature: OllamaConfig.LLM.TEMPERATURE,
+          topP:        OllamaConfig.LLM.TOP_P,
+          contextSize: OllamaConfig.LLM.CONTEXT_SIZE
         },
         (data) => {
           if (chrome.runtime.lastError) {

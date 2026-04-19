@@ -1,6 +1,8 @@
 import { logger } from "../utils/logger.js";
-import { Constants } from "../utils/constants.js";
-import { SharedUtils } from "../utils/shared-utils.js";
+import { ExtensionConfig } from "../utils/extension-config.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { GenderUtils } from "./gender-utils.js";
+import { CharacterUtils } from "../utils/character-utils.js";
 import { CulturalAnalyzer } from "./cultural-analyzer.js";
 import { NameAnalyzer } from "./name-analyzer.js";
 import { PronounAnalyzer } from "./pronoun-analyzer.js";
@@ -665,7 +667,7 @@ export class GenderOrchestrator {
     // Limit evidence to most important items
     const limitedEvidence = evidence
       .filter((e) => e && e.trim().length > 0)
-      .slice(0, Constants.STORAGE.MAX_EVIDENCE_ENTRIES);
+      .slice(0, ExtensionConfig.STORAGE.MAX_EVIDENCE_ENTRIES);
 
     return this.#createGenderResult(
       gender,
@@ -706,7 +708,7 @@ export class GenderOrchestrator {
    */
   #createCharacterMapHash(characterMap) {
     const names = Object.keys(characterMap).sort();
-    return SharedUtils.createHash(names.join("|"));
+    return StringUtils.createHash(names.join("|"));
   }
 
   /**
@@ -779,7 +781,7 @@ export class GenderOrchestrator {
 
   _validateAnalysisInputs(name, text) {
     return (
-      SharedUtils.validateCharacterName(name) &&
+      CharacterUtils.validateCharacterName(name) &&
       typeof text === "string" &&
       text.length > 0
     );
@@ -787,7 +789,7 @@ export class GenderOrchestrator {
 
   #createGenderResult(gender, confidence, evidence) {
     return {
-      gender: SharedUtils.compressGender(gender),
+      gender: GenderUtils.compressGender(gender),
       confidence: Math.max(0, Math.min(1, confidence || 0)),
       evidence: Array.isArray(evidence) ? evidence : [evidence || "no evidence"]
     };

@@ -1,12 +1,51 @@
 import { logger } from "../utils/logger.js";
-import { Constants } from "../utils/constants.js";
-import { SharedUtils } from "../utils/shared-utils.js";
+import { GenderConfig } from "../gender/gender-config.js";
+import { OllamaConfig } from "../llm/ollama-config.js";
+import { StringUtils } from "../utils/string-utils.js";
 import { NovelOrchestrator } from "../novel/novel-orchestrator.js";
 import { GenderOrchestrator } from "../gender/gender-orchestrator.js";
 import { OllamaClient } from "../llm/ollama-client.js";
-import { StatsUtils } from "../utils/stats-utils.js";
 import { TextProcessor } from "../llm/text-processor.js";
 import { PromptGenerator } from "../llm/prompt-generator.js";
+
+class StatsUtils {
+  constructor() {
+    this.totalDialoguesEnhanced = 0;
+    this.totalCharactersDetected = 0;
+    this.processingTime = 0;
+    this.totalWordsProcessed = 0;
+    this.compressionRatio = 1.0;
+    this.errorCount = 0;
+  }
+
+  #set(prop, value, label) {
+    if (!StringUtils.isValidNumber(value)) {
+      logger.error(`Invalid ${label} value`);
+      return;
+    }
+    this[prop] += value;
+  }
+
+  setTotalWordsProcessed(v) { this.#set("totalWordsProcessed", v, "wordsProcessed"); }
+  setTotalDialoguesEnhanced(v) { this.#set("totalDialoguesEnhanced", v, "dialoguesEnhanced"); }
+  setTotalCharactersDetected(v) { this.#set("totalCharactersDetected", v, "charactersDetected"); }
+  setProcessingTime(v) { this.#set("processingTime", v, "processingTime"); }
+  setCompressionRatio(v) {
+    if (!StringUtils.isValidNumber(v)) { logger.error("Invalid compressionRatio value"); return; }
+    this.compressionRatio = v;
+  }
+  incrementErrorCount() { this.errorCount += 1; }
+  getStats() {
+    return {
+      totalDialoguesEnhanced: this.totalDialoguesEnhanced,
+      totalCharactersDetected: this.totalCharactersDetected,
+      processingTime: this.processingTime,
+      totalWordsProcessed: this.totalWordsProcessed,
+      compressionRatio: this.compressionRatio,
+      errorCount: this.errorCount
+    };
+  }
+}
 
 // content-enhancer-integration.js
 /**
@@ -42,7 +81,7 @@ export class ContentEnhancer {
     this.genderUtils.resetStats();
 
     try {
-      const sanitizedText = SharedUtils.sanitizeText(text);
+      const sanitizedText = StringUtils.sanitizeText(text);
 
       // Track word count for statistics
       const originalWordCount = this.#countWords(sanitizedText);
@@ -206,7 +245,7 @@ export class ContentEnhancer {
 
     for (const [name, data] of Object.entries(updatedCharacterMap)) {
       const needsGenderDetermination =
-        data.gender === Constants.GENDER.UNKNOWN ||
+        data.gender === GenderConfig.CODES.UNKNOWN ||
         !data.confidence ||
         data.confidence < 0.7;
 
@@ -248,7 +287,7 @@ export class ContentEnhancer {
    * @param {number} maxCtx - User-configured ceiling (default 8192)
    * @return {number}
    */
-  #computeDynamicCtx(prompt, maxCtx = 8192) {
+  #computeDynamicCtx(prompt, maxCtx = OllamaConfig.LLM.CONTEXT_SIZE) {
     const estimate = Math.ceil(prompt.length / 3.5); // input tokens
     const needed   = Math.ceil(estimate * 1.5);       // +50% for output
     for (const b of [512, 1024, 2048, 4096, 8192]) {
@@ -290,8 +329,8 @@ export class ContentEnhancer {
         novelInfo
       );
 
-      const cacheKey   = SharedUtils.createHash(text);
-      const dynamicCtx = this.#computeDynamicCtx(prompt, settings.contextSize || 8192);
+      const cacheKey   = StringUtils.createHash(text);
+      const dynamicCtx = this.#computeDynamicCtx(prompt, settings.contextSize || OllamaConfig.LLM.CONTEXT_SIZE);
 
       this.logger.info(`Enhancing chapter in one pass (${text.length} chars, num_ctx: ${dynamicCtx})`);
 

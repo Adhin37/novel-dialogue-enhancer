@@ -3,7 +3,7 @@
  * Specialized module for character name pattern analysis
  * Identifies titles, honorifics, and name patterns that indicate gender
  */
-import { SharedUtils } from "../utils/shared-utils.js";
+import { StringUtils } from "../utils/string-utils.js";
 import {
   WESTERN_MALE_NAMES,
   WESTERN_FEMALE_NAMES,
@@ -37,7 +37,7 @@ export class NameAnalyzer {
       // Check if name starts with a title
       for (const title of maleTitles[culture]) {
         const titleRegex = new RegExp(
-          `^${SharedUtils.escapeRegExp(title)}\\s+`,
+          `^${StringUtils.escapeRegExp(title)}\\s+`,
           "i"
         );
         if (titleRegex.test(name) || name === title) {
@@ -47,7 +47,7 @@ export class NameAnalyzer {
 
       for (const title of femaleTitles[culture]) {
         const titleRegex = new RegExp(
-          `^${SharedUtils.escapeRegExp(title)}\\s+`,
+          `^${StringUtils.escapeRegExp(title)}\\s+`,
           "i"
         );
         if (titleRegex.test(name) || name === title) {
@@ -58,7 +58,7 @@ export class NameAnalyzer {
       // Check if name ends with a title
       for (const title of maleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${SharedUtils.escapeRegExp(title)}$`,
+          `\\s+${StringUtils.escapeRegExp(title)}$`,
           "i"
         );
         if (titleRegex.test(name)) {
@@ -68,7 +68,7 @@ export class NameAnalyzer {
 
       for (const title of femaleTitles[culture]) {
         const titleRegex = new RegExp(
-          `\\s+${SharedUtils.escapeRegExp(title)}$`,
+          `\\s+${StringUtils.escapeRegExp(title)}$`,
           "i"
         );
         if (titleRegex.test(name)) {

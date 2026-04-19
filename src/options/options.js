@@ -1,6 +1,6 @@
 import { logger } from "../shared/utils/logger.js";
 import { darkModeManager } from "../shared/ui/dark-mode-manager.js";
-import { Constants } from "../shared/utils/constants.js";
+import { OllamaConfig } from "../shared/llm/ollama-config.js";
 import { Toaster } from "../shared/ui/toaster.js";
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -395,11 +395,11 @@ document.addEventListener("DOMContentLoaded", () => {
       confirm("Are you sure you want to reset all settings to default values?")
     ) {
       const defaultSettings = {
-        modelName: Constants.DEFAULTS.MODEL_NAME,
-        contextSize: Constants.DEFAULTS.CONTEXT_SIZE,
-        timeout: Constants.DEFAULTS.TIMEOUT,
-        temperature: Constants.DEFAULTS.TEMPERATURE,
-        topP: Constants.DEFAULTS.TOP_P
+        modelName: OllamaConfig.LLM.MODEL_NAME,
+        contextSize: OllamaConfig.LLM.CONTEXT_SIZE,
+        timeout: OllamaConfig.LLM.TIMEOUT,
+        temperature: OllamaConfig.LLM.TEMPERATURE,
+        topP: OllamaConfig.LLM.TOP_P
       };
 
       chrome.storage.sync.set(defaultSettings, () => {
@@ -1028,31 +1028,31 @@ document.addEventListener("DOMContentLoaded", () => {
           if (chrome.runtime.lastError) {
             logger.error("Error loading settings:", chrome.runtime.lastError);
             // Use fallback values
-            modelNameInput.value = Constants.DEFAULTS.MODEL_NAME;
-            contextSizeSlider.value = Constants.DEFAULTS.CONTEXT_SIZE;
-            contextSizeValue.textContent = Constants.DEFAULTS.CONTEXT_SIZE;
-            timeoutSlider.value = Constants.DEFAULTS.TIMEOUT;
-            timeoutValue.textContent = Constants.DEFAULTS.TIMEOUT;
-            temperatureSlider.value = Constants.DEFAULTS.TEMPERATURE;
-            temperatureValue.textContent = Constants.DEFAULTS.TEMPERATURE;
-            topPSlider.value = Constants.DEFAULTS.TOP_P;
-            topPValue.textContent = Constants.DEFAULTS.TOP_P;
+            modelNameInput.value = OllamaConfig.LLM.MODEL_NAME;
+            contextSizeSlider.value = OllamaConfig.LLM.CONTEXT_SIZE;
+            contextSizeValue.textContent = OllamaConfig.LLM.CONTEXT_SIZE;
+            timeoutSlider.value = OllamaConfig.LLM.TIMEOUT;
+            timeoutValue.textContent = OllamaConfig.LLM.TIMEOUT;
+            temperatureSlider.value = OllamaConfig.LLM.TEMPERATURE;
+            temperatureValue.textContent = OllamaConfig.LLM.TEMPERATURE;
+            topPSlider.value = OllamaConfig.LLM.TOP_P;
+            topPValue.textContent = OllamaConfig.LLM.TOP_P;
           } else {
             modelNameInput.value =
-              data.modelName || Constants.DEFAULTS.MODEL_NAME;
+              data.modelName || OllamaConfig.LLM.MODEL_NAME;
             contextSizeSlider.value =
-              data.contextSize || Constants.DEFAULTS.CONTEXT_SIZE;
+              data.contextSize || OllamaConfig.LLM.CONTEXT_SIZE;
             contextSizeValue.textContent =
-              data.contextSize || Constants.DEFAULTS.CONTEXT_SIZE;
-            timeoutSlider.value = data.timeout || Constants.DEFAULTS.TIMEOUT;
+              data.contextSize || OllamaConfig.LLM.CONTEXT_SIZE;
+            timeoutSlider.value = data.timeout || OllamaConfig.LLM.TIMEOUT;
             timeoutValue.textContent =
-              data.timeout || Constants.DEFAULTS.TIMEOUT;
+              data.timeout || OllamaConfig.LLM.TIMEOUT;
             temperatureSlider.value =
-              data.temperature || Constants.DEFAULTS.TEMPERATURE;
+              data.temperature || OllamaConfig.LLM.TEMPERATURE;
             temperatureValue.textContent =
-              data.temperature || Constants.DEFAULTS.TEMPERATURE;
-            topPSlider.value = data.topP || Constants.DEFAULTS.TOP_P;
-            topPValue.textContent = data.topP || Constants.DEFAULTS.TOP_P;
+              data.temperature || OllamaConfig.LLM.TEMPERATURE;
+            topPSlider.value = data.topP || OllamaConfig.LLM.TOP_P;
+            topPValue.textContent = data.topP || OllamaConfig.LLM.TOP_P;
 
             logger.success("Initial settings loaded successfully:", data);
           }
@@ -1071,7 +1071,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const topP = parseFloat(topPSlider.value);
 
       const settingsToSave = {
-        modelName: modelNameInput.value.trim() || Constants.DEFAULTS.MODEL_NAME,
+        modelName: modelNameInput.value.trim() || OllamaConfig.LLM.MODEL_NAME,
         contextSize: contextSize,
         timeout: timeout,
         temperature: temperature,

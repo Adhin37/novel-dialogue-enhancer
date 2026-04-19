@@ -1,6 +1,7 @@
 // assets/js/gender/base-analyzer.js
-import { SharedUtils } from "../utils/shared-utils.js";
-import { Constants } from "../utils/constants.js";
+import { GenderConfig } from "./gender-config.js";
+import { StringUtils } from "../utils/string-utils.js";
+import { CharacterUtils } from "../utils/character-utils.js";
 
 /**
  * Base class for gender analyzers with shared functionality
@@ -16,7 +17,7 @@ export class BaseAnalyzer {
    */
   _getProximityText(name, text, proximityRange = 100) {
     const nameRegex = new RegExp(
-      `[^.!?]{0,${proximityRange}}\\b${SharedUtils.escapeRegExp(
+      `[^.!?]{0,${proximityRange}}\\b${StringUtils.escapeRegExp(
         name
       )}\\b[^.!?]{0,${proximityRange}}`,
       "gi"
@@ -115,7 +116,7 @@ export class BaseAnalyzer {
 
     for (const phrase of maleExactPhrases) {
       if (textLower.includes(phrase.toLowerCase())) {
-        maleScore += Constants.ANALYSIS.MIN_MALE_SCORE;
+        maleScore += GenderConfig.ANALYSIS.MIN_MALE_SCORE;
         evidence = phrase;
         break;
       }
@@ -124,7 +125,7 @@ export class BaseAnalyzer {
     if (!evidence) {
       for (const phrase of femaleExactPhrases) {
         if (textLower.includes(phrase.toLowerCase())) {
-          femaleScore += Constants.ANALYSIS.MIN_FEMALE_SCORE;
+          femaleScore += GenderConfig.ANALYSIS.MIN_FEMALE_SCORE;
           evidence = phrase;
           break;
         }
@@ -143,7 +144,7 @@ export class BaseAnalyzer {
    */
   _validateAnalysisInputs(name, text) {
     return (
-      SharedUtils.validateCharacterName(name) &&
+      CharacterUtils.validateCharacterName(name) &&
       typeof text === "string" &&
       text.length > 0
     );
