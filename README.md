@@ -193,7 +193,7 @@ To install: `ollama pull <model-name>` (e.g., `ollama pull gemma3:9b`)
 ```text
 ├── manifest.json
 ├── src/
-│   ├── assets/icons/          # Extension icons (16/48/128 px)
+├── icons/                 # Extension icons (16/48/128 px)
 │   ├── background/            # Service worker
 │   ├── content/               # Content script + DOM utilities
 │   │                          # (detector, selectors, filter, sanitizer, verifier,

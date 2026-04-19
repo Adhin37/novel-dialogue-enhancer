@@ -83,8 +83,8 @@ for f in "${REQUIRED[@]}"; do
   fi
 done
 
-if [ ! -d "src/assets/icons" ]; then
-  echo "  ERROR: missing src/assets/icons/"
+if [ ! -d "icons" ]; then
+  echo "  ERROR: missing icons/"
   MISSING=$((MISSING + 1))
 fi
 

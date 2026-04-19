@@ -34,10 +34,10 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 
 ### File Structure & Organization
 
-```
+```text
 ├── manifest.json                    # Extension manifest (Manifest V3)
 ├── src/
-│   ├── assets/icons/                # Extension icons (16/48/128 px)
+├── icons/                           # Extension icons (16/48/128 px)
 │   ├── background/
 │   │   └── background.js            # Service worker: whitelist, API, storage, stats
 │   ├── content/
