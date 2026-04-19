@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function testOllamaConnection() {
     logger.debug("Testing Ollama connection from options page");
 
+    ollamaStatus.style.display = "block";
     ollamaStatus.textContent = "Testing Ollama connection...";
     ollamaStatus.className = "status-message pending";
 
@@ -102,6 +103,7 @@ document.addEventListener("DOMContentLoaded", () => {
           logger.success("Ollama connection test successful", response);
           ollamaStatus.textContent = `Connected successfully! Ollama version: ${response.version}`;
           ollamaStatus.className = "status-message success";
+          toaster.showSuccess("Ollama is connected and ready!");
         } else {
           logger.warn("Ollama connection test failed", response);
           ollamaStatus.textContent = `Ollama not available: ${response.reason}`;

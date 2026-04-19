@@ -220,23 +220,8 @@ document.addEventListener("DOMContentLoaded", () => {
         if (response.success) {
           logger.info(`Successfully added ${currentTabHostname} to whitelist`);
 
-          // Update local whitelist array and storage
           if (!whitelistedSites.includes(currentTabHostname)) {
             whitelistedSites.push(currentTabHostname);
-
-            chrome.storage.sync.set(
-              { whitelistedSites: whitelistedSites },
-              () => {
-                if (chrome.runtime.lastError) {
-                  logger.error(
-                    "Error updating local whitelist storage:",
-                    chrome.runtime.lastError
-                  );
-                } else {
-                  logger.debug(`Whitelist updated: added ${currentTabHostname}`);
-                }
-              }
-            );
           }
 
           updateWhitelistButton(true);
@@ -284,29 +269,9 @@ document.addEventListener("DOMContentLoaded", () => {
             `Successfully removed ${currentTabHostname} from whitelist`
           );
 
-          // Update local whitelist array and storage
-          const originalLength = whitelistedSites.length;
           whitelistedSites = whitelistedSites.filter(
             (site) => site !== currentTabHostname
           );
-
-          if (whitelistedSites.length < originalLength) {
-            chrome.storage.sync.set(
-              { whitelistedSites: whitelistedSites },
-              () => {
-                if (chrome.runtime.lastError) {
-                  logger.error(
-                    "Error updating local whitelist storage:",
-                    chrome.runtime.lastError
-                  );
-                } else {
-                  logger.debug(
-                    `Whitelist updated: removed ${currentTabHostname}`
-                  );
-                }
-              }
-            );
-          }
 
           updateWhitelistButton(false);
           updateEnhanceButton(false);

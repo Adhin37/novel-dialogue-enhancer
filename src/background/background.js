@@ -8,6 +8,22 @@ const DEFAULT_TIMEOUT_SEC  = 300;
 const DEFAULT_TEMPERATURE  = 0.4;
 const DEFAULT_TOP_P        = 0.9;
 
+const MANIFEST_SITES = [
+  "webnovel.com",
+  "fanmtl.com",
+  "novelupdates.com",
+  "wuxiaworld.com",
+  "royalroad.com",
+  "scribblehub.com",
+  "lightnovelworld.org",
+  "novelbin.com",
+  "novelbin.me",
+  "novelfire.net",
+  "wtr-lab.com",
+  "novelbuddy.com",
+  "novelpub.com"
+];
+
 const activeRequestControllers = new Map();
 let novelCharacterMaps = {};
 let isBackgroundReady = false;
@@ -1203,31 +1219,33 @@ function handleMessage(request, sender, sendResponse) {
     const url = request.url;
     try {
       const hostname = new URL(url).hostname;
-      chrome.storage.sync.get("whitelistedSites", async (data) => {
+      chrome.storage.sync.get("whitelistedSites", (data) => {
         try {
           const whitelistedSites = data.whitelistedSites || [];
 
           if (!whitelistedSites.includes(hostname)) {
-            const permissionGranted = await requestPermission(hostname);
-            if (permissionGranted) {
-              whitelistedSites.push(hostname);
-              chrome.storage.sync.set({ whitelistedSites }, () => {
-                whitelistCache.set(hostname, {
-                  isWhitelisted: true,
-                  timestamp: Date.now()
+            const isManifestSite = MANIFEST_SITES.includes(hostname);
+            const doAdd = isManifestSite ? Promise.resolve(true) : requestPermission(hostname);
+            doAdd.then((granted) => {
+              if (granted) {
+                whitelistedSites.push(hostname);
+                chrome.storage.sync.set({ whitelistedSites }, () => {
+                  whitelistCache.set(hostname, {
+                    isWhitelisted: true,
+                    timestamp: Date.now()
+                  });
+                  sendResponse({
+                    success: true,
+                    message: `${hostname} added to whitelist`
+                  });
                 });
-
+              } else {
                 sendResponse({
-                  success: true,
-                  message: `${hostname} added to whitelist`
+                  success: false,
+                  message: `Permission denied for ${hostname}`
                 });
-              });
-            } else {
-              sendResponse({
-                success: false,
-                message: `Permission denied for ${hostname}`
-              });
-            }
+              }
+            });
           } else {
             sendResponse({
               success: false,
@@ -1442,8 +1460,10 @@ function handleMessage(request, sender, sendResponse) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.get(
-    {
+  chrome.storage.sync.get({ whitelistedSites: [] }, (existingData) => {
+    const existing = Array.isArray(existingData.whitelistedSites) ? existingData.whitelistedSites : [];
+    const merged = [...new Set([...MANIFEST_SITES, ...existing])];
+    const defaults = {
       isExtensionPaused: false,
       preserveNames:     true,
       fixPronouns:       true,
@@ -1453,13 +1473,13 @@ chrome.runtime.onInstalled.addListener(() => {
       disabledPages:     [],
       temperature:       DEFAULT_TEMPERATURE,
       topP:              DEFAULT_TOP_P,
-      whitelistedSites:  []
-    },
-    (data) => {
-      chrome.storage.sync.set(data);
+      whitelistedSites:  merged
+    };
+    chrome.storage.sync.get(defaults, (data) => {
+      chrome.storage.sync.set({ ...data, whitelistedSites: merged });
       console.log("Extension initialized with default settings:", data);
-    }
-  );
+    });
+  });
 
   chrome.storage.local.get("globalStats", (data) => {
     if (data.globalStats) {
