@@ -1,6 +1,6 @@
 # Novel Dialogue Enhancer
 
-![Version](https://img.shields.io/badge/version-1.2.3-blue)
+![Version](https://img.shields.io/badge/version-1.2.4-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-orange)
 
