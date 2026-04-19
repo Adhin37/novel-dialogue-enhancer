@@ -31,7 +31,7 @@ Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online n
 
 - Checks whitelist status before activation
 - Orchestrates enhancement process on whitelisted pages
-- Uses ContentElementCache for DOM query optimization
+- Uses `ElementCache` (`content/element-cache.js`) for DOM query optimization
 - Handles chunked text processing with real-time progress feedback
 - Communicates with Background script for LLM processing
 - Manages MutationObserver for dynamic content detection
@@ -78,14 +78,16 @@ Novel Dialogue Enhancer is a Chrome extension that enhances dialogue in online n
 
 #### 9. Shared Utilities (`shared/utils/`)
 
-- `SharedUtils` - Common validation, sanitization, gender compression, and security functions
-- `Constants` - Centralized configuration, magic numbers, and default values
-- `ElementCache` - DOM element caching by CSS selector with TTL and validity checking
-- `ErrorHandler` - Categorized error handling with severity levels and duplicate suppression
-- `StatsUtils` - Statistics tracking and aggregation across sessions
-- `cultural-terms.js` - Chinese/Japanese/Korean gender indicator term databases
-- `pronouns.js` - Pronoun pattern constants for gender detection
+- `CharacterUtils` - Character name validation and transformation helpers
+- `ExtensionConfig` - Extension-wide defaults and `chrome.storage` key definitions
+- `StringUtils` - String manipulation helpers (regex escaping, etc.)
+- `TextLimits` - Processing limits and threshold constants (max retries, text length, etc.)
 - `logger.js` - Global `window.logger` singleton (see Logging System below)
+
+Data constants are co-located with their consumers:
+- `cultural-terms.js`, `pronouns.js`, `gender-config.js`, `gender-utils.js` → `shared/gender/`
+- `ollama-config.js` → `shared/llm/`
+- `element-cache.js`, `error-handler.js` → `content/`
 
 #### 10. Logging System (`shared/utils/logger.js`)
 
@@ -173,8 +175,8 @@ Multi-analyzer approach with cultural awareness and translation error correction
 - **ES6+ Features**: Arrow functions, destructuring, private fields (#method), template literals
 - **No Parameter Mutation**: Functions don't modify input parameters (ESLint enforced)
 - **Base Class Inheritance**: Common functionality extracted to base classes
-- **Shared Constants**: Magic numbers and configuration centralized in Constants
-- **Centralized Validation**: SharedUtils provides common validation patterns
+- **Shared Constants**: Magic numbers and limits centralized in `TextLimits` and `ExtensionConfig`
+- **Centralized Validation**: `CharacterUtils` provides common name validation patterns
 - **Error Handling**: Comprehensive error handling with user feedback via Toaster
 - **Security**: Input sanitization using DOMPurify, CSP compliance
 
@@ -198,11 +200,11 @@ Manual verification steps:
 
 #### Common Patterns
 
-- Use `SharedUtils.validateCharacterName()` for name validation
-- Use `SharedUtils.compressGender()` for storage optimization
+- Use `CharacterUtils.validateCharacterName()` for name validation
+- Use `GenderUtils.compressGender()` for storage optimization
 - Extend `BaseAnalyzer` for new gender analysis methods
-- Use `Constants` for configuration values and thresholds
-- Use `ElementCache` for DOM query optimization with TTL
+- Use `TextLimits` and `ExtensionConfig` for configuration values and thresholds
+- Use `ElementCache` (in `content/`) for DOM query optimization with TTL
 
 #### Adding New Gender Analysis
 

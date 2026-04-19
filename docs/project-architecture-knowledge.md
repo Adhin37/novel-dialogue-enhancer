@@ -12,7 +12,8 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 - LLM operations handled by dedicated classes (`OllamaClient`, `PromptGenerator`, `TextProcessor`)
 - Novel processing coordinated by `NovelOrchestrator` with 4 sub-modules
 - UI helpers separated in `shared/ui/` (`Toaster`, `DarkModeManager`)
-- Utility constants and data in `shared/utils/` (`cultural-terms.js`, `pronouns.js`)
+- Utility constants and data in `shared/utils/` (`extension-config.js`, `text-limits.js`)
+- Data constants co-located with their consumers: `cultural-terms.js` and `pronouns.js` live in `shared/gender/`; `ollama-config.js` lives in `shared/llm/`
 
 **Base Class Inheritance Pattern**: Common functionality extracted to base classes:
 
@@ -40,7 +41,16 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 │   ├── background/
 │   │   └── background.js            # Service worker: whitelist, API, storage, stats
 │   ├── content/
-│   │   └── content.js               # Content script entry point
+│   │   ├── content.js               # Content script entry point
+│   │   ├── content-detector.js      # Main content area detection
+│   │   ├── content-selectors.js     # Site-specific CSS selector definitions
+│   │   ├── dialogue-filter.js       # Dialogue node filtering
+│   │   ├── dom-sanitizer.js         # DOM output sanitization
+│   │   ├── dom-verifier.js          # DOM integrity verification
+│   │   ├── element-cache.js         # DOM element caching with TTL
+│   │   ├── enhancement-runner.js    # Enhancement execution pipeline
+│   │   ├── error-handler.js         # Content-layer error handling
+│   │   └── page-settings.js         # Per-page settings management
 │   ├── popup/
 │   │   ├── popup.html
 │   │   ├── popup.js
@@ -55,9 +65,13 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 │       ├── gender/
 │       │   ├── base-analyzer.js     # BaseAnalyzer — shared methods for all analyzers
 │       │   ├── gender-orchestrator.js
+│       │   ├── gender-config.js     # Gender codes and configuration constants
+│       │   ├── gender-utils.js      # Gender compression/decompression utilities
 │       │   ├── cultural-analyzer.js
+│       │   ├── cultural-terms.js    # Chinese/Japanese/Korean gender indicator terms
 │       │   ├── name-analyzer.js
 │       │   ├── pronoun-analyzer.js
+│       │   ├── pronouns.js          # Pronoun pattern constants
 │       │   ├── relationship-analyzer.js
 │       │   ├── appearance-analyzer.js
 │       │   ├── multi-character-analyzer.js
@@ -67,6 +81,7 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 │       │   └── purify.min.js        # DOMPurify for input sanitization
 │       ├── llm/
 │       │   ├── ollama-client.js
+│       │   ├── ollama-config.js     # Ollama API endpoints and defaults
 │       │   ├── prompt-generator.js
 │       │   └── text-processor.js
 │       ├── novel/
@@ -79,14 +94,11 @@ Novel Dialogue Enhancer is a Chrome extension that uses local AI models (via Oll
 │       │   ├── dark-mode-manager.js
 │       │   └── toaster.js
 │       └── utils/
-│           ├── constants.js
-│           ├── shared-utils.js
-│           ├── logger.js
-│           ├── error-handler.js
-│           ├── element-cache.js
-│           ├── cultural-terms.js
-│           ├── pronouns.js
-│           └── stats-utils.js
+│           ├── character-utils.js   # Character name validation and utilities
+│           ├── extension-config.js  # Extension-wide defaults and chrome.storage keys
+│           ├── logger.js            # Global window.logger singleton
+│           ├── string-utils.js      # String manipulation helpers
+│           └── text-limits.js       # Processing limits and threshold constants
 └── docs/
 ```
 

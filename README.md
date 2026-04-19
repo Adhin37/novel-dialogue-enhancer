@@ -190,23 +190,27 @@ To install: `ollama pull <model-name>` (e.g., `ollama pull gemma3:9b`)
 
 ### Project Structure
 
-```
+```text
 ├── manifest.json
 ├── src/
 │   ├── assets/icons/          # Extension icons (16/48/128 px)
 │   ├── background/            # Service worker
-│   ├── content/               # Content script entry point
+│   ├── content/               # Content script + DOM utilities
+│   │                          # (detector, selectors, filter, sanitizer, verifier,
+│   │                          #  element-cache, enhancement-runner, error-handler,
+│   │                          #  page-settings)
 │   ├── popup/                 # Quick controls interface
 │   ├── options/               # Comprehensive settings page
 │   └── shared/
 │       ├── content/           # enhancer.js — core enhancement logic
 │       ├── gender/            # 6-analyzer gender detection system
+│       │                      # + cultural-terms, pronouns, gender-config, gender-utils
 │       ├── lib/               # Third-party libs (DOMPurify)
-│       ├── llm/               # Ollama client, prompt generator, text processor
+│       ├── llm/               # ollama-client, ollama-config, prompt-generator, text-processor
 │       ├── novel/             # Orchestrator, character extractor, chapter detector, style analyzer
 │       ├── ui/                # dark-mode-manager, toaster
-│       └── utils/             # constants, shared-utils, logger, error-handler,
-│                              # element-cache, cultural-terms, pronouns, stats-utils
+│       └── utils/             # character-utils, extension-config, logger,
+│                              # string-utils, text-limits
 └── docs/                      # Documentation
 ```
 
