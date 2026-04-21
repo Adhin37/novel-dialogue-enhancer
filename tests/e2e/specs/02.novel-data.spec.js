@@ -77,6 +77,48 @@ test.describe('novel data & character management', () => {
     await background.evaluate((id) => { delete novelCharacterMaps[id]; }, freshId);
   });
 
+  test('_isProcessing flag is reset after an ollamaRequest error', async ({ extensionContext }) => {
+    const { background, msgPage } = extensionContext;
+
+    // Send a request with an empty model — triggers "Invalid model specification" inside the
+    // storage callback after _isProcessing is set to true.
+    const resp = await msgPage.evaluate(() =>
+      new Promise((resolve) =>
+        chrome.runtime.sendMessage(
+          { action: 'ollamaRequest', data: { prompt: 'hello', model: '' } },
+          resolve
+        )
+      )
+    );
+    expect(resp).toHaveProperty('error');
+
+    const flagAfterError = await background.evaluate(() => _isProcessing);
+    expect(flagAfterError).toBe(false);
+  });
+
+  test('updateNovelData trims characters to MAX_CHARS_PER_NOVEL when over the limit', async ({ extensionContext }) => {
+    const { background, msgPage } = extensionContext;
+    const send = makeSendBgMessage(msgPage);
+    const novelId = 'e2e_test__char_cap';
+
+    // 90 chars with appearances = index+1 so trimming order is deterministic
+    const chars = {};
+    for (let i = 0; i < 90; i++) {
+      chars[`char_${i}`] = { name: `Character${i}`, gender: 'm', confidence: 0.7, appearances: i + 1 };
+    }
+
+    const stored = await send({ action: 'updateNovelData', novelId, chars });
+    expect(stored.status).toBe('ok');
+
+    const retrieved = await send({ action: 'getNovelData', novelId });
+    expect(retrieved.status).toBe('ok');
+    expect(Object.keys(retrieved.characterMap).length).toBeLessThanOrEqual(80);
+    expect(retrieved.characterMap['Character89']).toBeDefined();  // appearances: 90, kept
+    expect(retrieved.characterMap['Character0']).toBeUndefined(); // appearances:  1, trimmed
+
+    await background.evaluate((id) => { delete novelCharacterMaps[id]; }, novelId);
+  });
+
   test('character gender can be manually overridden via message', async ({ extensionContext }) => {
     const { background, msgPage } = extensionContext;
     const send = makeSendBgMessage(msgPage);

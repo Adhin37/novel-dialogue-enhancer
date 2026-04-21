@@ -38,4 +38,22 @@ test.describe('service worker & bootstrap', () => {
     expect(alarm).toBeDefined();
     expect(alarm.periodInMinutes).toBe(1440);
   });
+
+  test('background.js hardcoded defaults match shared config source values', async ({ extensionContext }) => {
+    const { background } = extensionContext;
+    const defaults = await background.evaluate(() => ({
+      url:         DEFAULT_OLLAMA_URL,
+      model:       DEFAULT_MODEL_NAME,
+      contextSize: DEFAULT_CONTEXT_SIZE,
+      timeout:     DEFAULT_TIMEOUT_SEC,
+      temperature: DEFAULT_TEMPERATURE,
+      topP:        DEFAULT_TOP_P,
+    }));
+    expect(defaults.url).toBe('http://localhost:11434');
+    expect(defaults.model).toBe('qwen3.5:4b');
+    expect(defaults.contextSize).toBe(8192);
+    expect(defaults.timeout).toBe(300);
+    expect(defaults.temperature).toBe(0.4);
+    expect(defaults.topP).toBe(0.9);
+  });
 });
