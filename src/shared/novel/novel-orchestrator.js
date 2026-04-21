@@ -710,12 +710,22 @@ export class NovelOrchestrator {
    * @param {Array} characters - Array of character objects
    * @return {string} - Formatted character summary
    */
-  createCharacterSummary(characters) {
+  createCharacterSummary(characters, text = null) {
     if (!characters || !Array.isArray(characters) || characters.length === 0) {
       return "";
     }
 
-    const sortedCharacters = [...characters].sort(
+    // When text is provided, prefer characters that appear in it
+    let pool = characters;
+    if (text && text.length > 0) {
+      const textLower = text.toLowerCase();
+      const mentioned = characters.filter(
+        (c) => c.name && textLower.includes(c.name.toLowerCase())
+      );
+      if (mentioned.length > 0) pool = mentioned;
+    }
+
+    const sortedCharacters = [...pool].sort(
       (a, b) => (b.appearances || 0) - (a.appearances || 0)
     );
     const significantCharacters = sortedCharacters.filter(

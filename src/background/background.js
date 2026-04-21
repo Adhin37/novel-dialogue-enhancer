@@ -1,6 +1,13 @@
 // background.js
 // background.js is not bundled (bundle:false in build.mjs), so it cannot use ES module imports.
-// These values must be kept in sync with src/shared/utils/ollama-config.js and extension-config.js.
+// These values must be kept in sync with their counterparts in the shared config files.
+// Run `node scripts/check-config-sync.js` to verify. Mapping:
+//   DEFAULT_OLLAMA_URL   → OllamaConfig.API.BASE         (src/shared/llm/ollama-config.js)
+//   DEFAULT_MODEL_NAME   → OllamaConfig.LLM.MODEL_NAME   (src/shared/llm/ollama-config.js)
+//   DEFAULT_CONTEXT_SIZE → OllamaConfig.LLM.CONTEXT_SIZE (src/shared/llm/ollama-config.js)
+//   DEFAULT_TIMEOUT_SEC  → OllamaConfig.LLM.TIMEOUT      (src/shared/llm/ollama-config.js)
+//   DEFAULT_TEMPERATURE  → OllamaConfig.LLM.TEMPERATURE  (src/shared/llm/ollama-config.js)
+//   DEFAULT_TOP_P        → OllamaConfig.LLM.TOP_P        (src/shared/llm/ollama-config.js)
 const DEFAULT_OLLAMA_URL   = "http://localhost:11434";
 const DEFAULT_MODEL_NAME   = "qwen3.5:4b";
 const DEFAULT_CONTEXT_SIZE = 8192;
@@ -51,6 +58,46 @@ const CLEANUP_ALARM_NAME = "periodicStorageCleanup";
 const NOVEL_PURGE_AGE_MS = 90 * 24 * 60 * 60 * 1000; // 90 days (3 months)
 const CLEANUP_ALARM_PERIOD_MINUTES = 24 * 60;          // run once per day
 const MAX_NOVEL_DATA_BYTES = 100000;
+const MAX_CHARS_PER_NOVEL = 80;
+
+// Badge state
+let _isProcessing    = false;
+let _badgeClearTimer = null;
+
+function _cancelBadgeClear() {
+  if (_badgeClearTimer) {
+    clearTimeout(_badgeClearTimer);
+    _badgeClearTimer = null;
+  }
+}
+
+function _clearBadgeAfter(ms) {
+  _cancelBadgeClear();
+  _badgeClearTimer = setTimeout(() => {
+    chrome.action.setBadgeText({ text: "" });
+    _badgeClearTimer = null;
+  }, ms);
+}
+
+function setBadgeWorking() {
+  _cancelBadgeClear();
+  chrome.action.setBadgeBackgroundColor({ color: "#6366f1" });
+  chrome.action.setBadgeText({ text: "↺" });
+}
+
+function setBadgeSuccess() {
+  _cancelBadgeClear();
+  chrome.action.setBadgeBackgroundColor({ color: "#22c55e" });
+  chrome.action.setBadgeText({ text: "✓" });
+  _clearBadgeAfter(2000);
+}
+
+function setBadgeError() {
+  _cancelBadgeClear();
+  chrome.action.setBadgeBackgroundColor({ color: "#ef4444" });
+  chrome.action.setBadgeText({ text: "!" });
+  _clearBadgeAfter(6000);
+}
 
 /**
  * Initializes the background script
@@ -336,6 +383,21 @@ function handleOllamaRequest(request, sendResponse) {
     sendResponse({ error: "Invalid request data" });
     return;
   }
+
+  if (!_isProcessing) {
+    _isProcessing = true;
+    setBadgeWorking();
+  }
+
+  // Wrap sendResponse so any error reply also clears the badge flag.
+  const _origSend = sendResponse;
+  sendResponse = (resp) => {
+    if (resp && resp.error) {
+      _isProcessing = false;
+      setBadgeError();
+    }
+    _origSend(resp);
+  };
 
   chrome.storage.sync.get(
     {
@@ -1001,6 +1063,16 @@ function handleMessage(request, sender, sendResponse) {
       });
     }
 
+    // Trim excess characters (keep top N by appearances) before persisting
+    const novelEntry = novelCharacterMaps[novelId];
+    if (Object.keys(novelEntry.chars).length > MAX_CHARS_PER_NOVEL) {
+      novelEntry.chars = Object.fromEntries(
+        Object.entries(novelEntry.chars)
+          .sort(([, a], [, b]) => (b.appearances || 0) - (a.appearances || 0))
+          .slice(0, MAX_CHARS_PER_NOVEL)
+      );
+    }
+
     storeNovelCharacterMaps(novelCharacterMaps);
 
     // Add stats tracking
@@ -1299,6 +1371,10 @@ function handleMessage(request, sender, sendResponse) {
 
     updateGlobalStats(statsUpdate);
 
+    _isProcessing = false;
+    if ((finalStats.errorCount || 0) > 0) setBadgeError();
+    else setBadgeSuccess();
+
     console.log("Final enhancement stats processed:", {
       processingTime: finalStats.processingTime,
       totalDialoguesEnhanced: finalStats.totalDialoguesEnhanced,
@@ -1365,11 +1441,14 @@ function handleMessage(request, sender, sendResponse) {
 
     activeRequestControllers.clear();
 
+    _isProcessing = false;
+    setBadgeError();
+
     sendResponse({
       status: "terminated",
       count: activeRequestControllers.size
     });
-    return false; 
+    return false;
   } else if (request.action === "checkOllamaAvailability") {
     checkOllamaAvailability(sendResponse);
     return true; 

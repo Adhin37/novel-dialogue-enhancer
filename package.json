@@ -12,7 +12,8 @@
     "build:zip:windows": "powershell -Command \"if (Test-Path 'dist/novel-dialogue-enhancer.zip') { Remove-Item 'dist/novel-dialogue-enhancer.zip' -Force }; Compress-Archive -Path src/*,manifest.json,README.md -DestinationPath dist/novel-dialogue-enhancer.zip\"",
     "build:zip:linux": "bash package.sh",
     "build:zip:default": "echo 'Unsupported OS for build:zip'",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "check:sync": "node scripts/check-config-sync.js"
   },
   "repository": {
     "type": "git",

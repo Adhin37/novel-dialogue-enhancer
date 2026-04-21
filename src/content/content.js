@@ -20,6 +20,15 @@ let ollamaClient;
 let toaster;
 let isCurrentSiteWhitelisted = false;
 let errorHandler;
+let _lastEnhancedContentHash = null;
+
+function _hashText(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return h;
+}
 
 function getOllamaClient() {
   if (!ollamaClient) ollamaClient = new OllamaClient();
@@ -210,6 +219,7 @@ async function enhancePage({ silent = false } = {}) {
     }
 
     if (enhancementSuccessful) {
+      _lastEnhancedContentHash = _hashText(contentElement?.textContent ?? "");
       const finalStats = contentEnhancerIntegration.statsUtils.getStats();
       chrome.runtime.sendMessage({
         action: "updateFinalEnhancementStats",
@@ -642,6 +652,10 @@ const observer = new MutationObserver((mutations) => {
       (findContentElement()?.textContent?.length ?? 0) >= 500;
 
     if (newContentAdded || contentNowReady) {
+      const currentHash = _hashText(findContentElement()?.textContent ?? "");
+      if (currentHash !== 0 && currentHash === _lastEnhancedContentHash) {
+        return;
+      }
       console.log("New content detected, scheduling enhancement");
       clearTimeout(window.enhancementTimer);
       window.enhancementTimer = setTimeout(() => enhancePage({ silent: true }), 500);

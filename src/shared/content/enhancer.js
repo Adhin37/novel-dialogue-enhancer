@@ -108,9 +108,10 @@ export class ContentEnhancer {
         }
       }
 
-      // Create character summary for LLM context
+      // Create character summary for LLM context — filtered to characters present in this text
       const characterSummary = this.novelUtils.createCharacterSummary(
-        this.#convertCharacterMapToArray(characterMap)
+        this.#convertCharacterMapToArray(characterMap),
+        sanitizedText
       );
 
       // Check LLM availability

@@ -267,6 +267,16 @@ export class GenderOrchestrator {
       return this.#createGenderResult("unknown", 0, ["name too short"]);
     }
 
+    // Short-circuit: manual overrides bypass all analysis
+    const existingEntry = characterMap[name];
+    if (existingEntry?.manualOverride && existingEntry.gender !== "unknown") {
+      return this.#createGenderResult(
+        GenderUtils.expandGender(existingEntry.gender),
+        existingEntry.confidence || 0.99,
+        ["manual override"]
+      );
+    }
+
     const characterMapHash = this.#createCharacterMapHash(characterMap);
     const useAdvancedAnalysis = Object.keys(characterMap).length >= 2;
 
@@ -336,6 +346,12 @@ export class GenderOrchestrator {
     maleScore += traditionalAnalysisResult.maleScore;
     femaleScore += traditionalAnalysisResult.femaleScore;
     evidence.push(...traditionalAnalysisResult.evidence);
+
+    // Short-circuit: skip expensive cross-validation when one score dominates 4:1
+    const _dominant = (a, b) => a > 0 && b * 4 < a;
+    if (_dominant(maleScore, femaleScore) || _dominant(femaleScore, maleScore)) {
+      return this.#calculateFinalResult(name, maleScore, femaleScore, culturalOrigin, evidence, analysisMetadata);
+    }
 
     // Step 4: Cross-validation using multi-character analyzer (if enough characters)
     if (useAdvancedAnalysis && multiCharResult) {
