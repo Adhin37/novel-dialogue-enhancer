@@ -100,7 +100,7 @@ echo "Creating $RELEASE_ZIP..."
 mkdir -p dist
 rm -f "$RELEASE_ZIP"
 zip -r "$RELEASE_ZIP" \
-  manifest.json LICENSE README.md \
+  manifest.json LICENSE README.md POLICIES.md \
   icons/ \
   src/
 echo "  $RELEASE_ZIP created ($(du -sh "$RELEASE_ZIP" | cut -f1))"
