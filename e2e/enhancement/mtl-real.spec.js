@@ -1,7 +1,7 @@
 // tests/e2e/specs/07.mtl-real.spec.js
 // Test 13: MTL enhancement — real NovelBin chapter (no mock, live network).
 const { test, expect } = require('../fixtures/extension.fixture');
-const { ChapterPage } = require('../pages/ChapterPage');
+const { ChapterPage } = require('../pages/chapter-page');
 const { resolveOllamaModel } = require('../helpers/ollama');
 
 const REAL_URL =

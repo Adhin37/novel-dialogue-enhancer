@@ -1,7 +1,7 @@
 // tests/e2e/specs/08.model-guard.spec.js
 // Test 14: warning toaster appears and DOM is unchanged when the configured model is not installed.
 const { test, expect } = require('../fixtures/extension.fixture');
-const { ChapterPage } = require('../pages/ChapterPage');
+const { ChapterPage } = require('../pages/chapter-page');
 const { fetchOllamaModels, probeGenerate, installOllamaProxyRoute } = require('../helpers/ollama');
 
 // Public WebNovel chapter — free, no login required, 59 .cha-paragraph elements.

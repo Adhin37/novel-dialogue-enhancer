@@ -1,7 +1,7 @@
 // tests/e2e/specs/05.ui-options.spec.js
 // Test 11: options page shows default model name and temperature.
 const { test, expect } = require('../fixtures/extension.fixture');
-const { OptionsPage } = require('../pages/OptionsPage');
+const { OptionsPage } = require('../pages/options-page');
 
 test.describe('options page UI', () => {
   test('options page shows default model name and temperature', async ({ extensionContext }) => {

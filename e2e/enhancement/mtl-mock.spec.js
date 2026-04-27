@@ -1,7 +1,7 @@
 // tests/e2e/specs/06.mtl-mock.spec.js
 // Test 12: MTL enhancement — WebNovel chapter served from mock HTML.
 const { test, expect } = require('../fixtures/extension.fixture');
-const { ChapterPage } = require('../pages/ChapterPage');
+const { ChapterPage } = require('../pages/chapter-page');
 const { resolveOllamaModel } = require('../helpers/ollama');
 
 // A real chapter URL pattern so the manifest content_script rule fires.

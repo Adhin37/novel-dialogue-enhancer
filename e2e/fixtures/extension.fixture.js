@@ -3,7 +3,7 @@
 const { test: base, chromium } = require('@playwright/test');
 const path = require('path');
 
-const extensionPath = path.resolve(__dirname, '../../..');
+const extensionPath = path.resolve(__dirname, '../..');
 
 exports.test = base.extend({
   extensionContext: [async ({}, use) => {

@@ -5,7 +5,7 @@
 //   3. Popup   — reload confirms site still shows as "Whitelisted"
 
 const { test, expect } = require('../fixtures/extension.fixture');
-const { OptionsPage } = require('../pages/OptionsPage');
+const { OptionsPage } = require('../pages/options-page');
 
 // Domain absent from MANIFEST_SITES so requestPermission() always fires.
 const CUSTOM_SITE = 'customnoveltest.example.com';

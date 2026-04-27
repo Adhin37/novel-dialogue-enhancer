@@ -1,7 +1,7 @@
 // tests/e2e/specs/04.ui-popup.spec.js
 // Test 10: popup page renders with expected UI elements.
 const { test, expect } = require('../fixtures/extension.fixture');
-const { PopupPage } = require('../pages/PopupPage');
+const { PopupPage } = require('../pages/popup-page');
 
 test.describe('popup UI', () => {
   test('popup page renders with status and control elements', async ({ extensionContext }) => {
