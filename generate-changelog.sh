@@ -24,7 +24,7 @@ if [ -z "$PREV" ]; then
   COMPARE_URL=""
 else
   RANGE="$PREV..$CUR"
-  REMOTE_URL=$(git config --get remote.origin.url | sed 's/\.git$//' | sed 's/git@github\.com:/https:\/\/github.com\//')
+  REMOTE_URL=$(git config --get remote.origin.url | sed 's/https:\/\/[^@]*@/https:\/\//' | sed 's/\.git$//' | sed 's/git@github\.com:/https:\/\/github.com\//')
   COMPARE_URL="$REMOTE_URL/compare/$PREV...$CUR"
 fi
 
@@ -61,7 +61,7 @@ fi
   if [ -n "$COMPARE_URL" ]; then
     echo "* **Full Changelog:** [View Changes]($COMPARE_URL)"
   else
-    REMOTE_URL=$(git config --get remote.origin.url | sed 's/\.git$//' | sed 's/git@github\.com:/https:\/\/github.com\//')
+    REMOTE_URL=$(git config --get remote.origin.url | sed 's/https:\/\/[^@]*@/https:\/\//' | sed 's/\.git$//' | sed 's/git@github\.com:/https:\/\/github.com\//')
     echo "* **Full Changelog:** ${REMOTE_URL}/commits/${CUR}"
   fi
 
