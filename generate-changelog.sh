@@ -1,7 +1,8 @@
 #!/bin/bash
-# generate-changelog.sh - Generate a categorized changelog from git log
+# generate-changelog.sh - Generate categorized release notes from git log
 #
 # Categorizes commits by conventional commit prefix (feat/fix/chore/refactor).
+# Outputs RELEASE_NOTES.md for the current release (latest two tags).
 # Works in CI (GitHub Actions) and locally.
 #
 # Usage:
@@ -28,32 +29,32 @@ else
 fi
 
 {
-  echo "## Release $CUR ($(date +'%Y-%m-%d'))"
+  echo "## 🚀 Release $CUR ($(date +'%Y-%m-%d'))"
 
   FEATS=$(git log "$RANGE" --grep="^feat" --format="* %s (%h)" --no-merges)
   if [ -n "$FEATS" ]; then
     echo ""
-    echo "### Features"
+    echo "### ✨ Features"
     echo "$FEATS"
   fi
 
   FIXES=$(git log "$RANGE" --grep="^fix" --format="* %s (%h)" --no-merges)
   if [ -n "$FIXES" ]; then
     echo ""
-    echo "### Bug Fixes"
+    echo "### 🐛 Bug Fixes"
     echo "$FIXES"
   fi
 
   CHORES=$(git log "$RANGE" --grep="^chore\|^refactor" --format="* %s (%h)" --no-merges)
   if [ -n "$CHORES" ]; then
     echo ""
-    echo "### Maintenance"
+    echo "### ⚙️ Maintenance"
     echo "$CHORES"
   fi
 
   echo ""
   echo "---"
-  echo "### Release Stats"
+  echo "### 📊 Release Stats"
   echo "* **Total Commits:** $(git rev-list --count "$RANGE" --no-merges)"
   echo "* **Contributors:** $(git log "$RANGE" --format='%aN' --no-merges | sort -u | paste -sd ', ' -)"
 
@@ -64,4 +65,4 @@ fi
     echo "* **Full Changelog:** ${REMOTE_URL}/commits/${CUR}"
   fi
 
-} > CHANGELOG.md
+} > RELEASE_NOTES.md

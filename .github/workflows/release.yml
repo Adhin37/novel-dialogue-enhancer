@@ -54,6 +54,23 @@ jobs:
           NEW_VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           sed -i "s/version-[0-9]\+\.[0-9]\+\.[0-9]\+-blue/version-$NEW_VERSION-blue/g" README.md
 
+      - name: Generate Release Notes
+        run: |
+          chmod +x generate-changelog.sh
+          ./generate-changelog.sh
+          test -s RELEASE_NOTES.md
+
+      - name: Update Cumulative CHANGELOG.md
+        run: |
+          NEW=$(cat RELEASE_NOTES.md)
+          if [ -f CHANGELOG.md ]; then
+            HEADER=$(awk '/^## /{exit} {print}' CHANGELOG.md)
+            BODY=$(awk '/^## /{found=1} found{print}' CHANGELOG.md)
+            printf '%s\n\n%s\n\n%s\n' "$HEADER" "$NEW" "$BODY" > CHANGELOG.md
+          else
+            printf '# Changelog\n\nAll notable changes to this project will be documented in this file.\n\n%s\n' "$NEW" > CHANGELOG.md
+          fi
+
       - name: Commit and Push Version Bump
         env:
           BYPASS_TOKEN: ${{ secrets.BYPASS_TOKEN }}
@@ -61,7 +78,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:${BYPASS_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git add manifest.json package.json README.md
+          git add manifest.json package.json README.md CHANGELOG.md
           git commit -m "chore: bump version to ${{ github.ref_name }} [skip ci]"
           git push origin HEAD:main
 
@@ -76,12 +93,6 @@ jobs:
           chmod +x package.sh
           ./package.sh
           test -s dist/novel-dialogue-enhancer.zip
-
-      - name: Generate Changelog
-        run: |
-          chmod +x generate-changelog.sh
-          ./generate-changelog.sh
-          test -s CHANGELOG.md
 
       - name: Create GitHub Release
         env:
@@ -103,7 +114,7 @@ jobs:
             -d "{
               \"tag_name\": \"${TAG}\",
               \"name\": \"Release ${TAG}\",
-              \"body\": $(jq -Rs . < CHANGELOG.md),
+              \"body\": $(jq -Rs . < RELEASE_NOTES.md),
               \"prerelease\": ${IS_PRERELEASE}
             }")
 

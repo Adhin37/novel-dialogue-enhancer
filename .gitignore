@@ -10,7 +10,6 @@
 manifest.json.bak
 dist/
 build/
-CHANGELOG.md
 node_modules/
 *.zip
 .env
@@ -20,3 +19,4 @@ src/**/*.min.js
 src/**/*.min.css
 test-results/
 .playwright-mcp/
+RELEASE.md
