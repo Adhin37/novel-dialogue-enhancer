@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 🚀 Release v1.2.9 (2026-04-27)
+
+### 🐛 Bug Fixes
+* fix: release (fe51e6c)
+* fix: coffee icon in popup + readme.md (2265534)
+
+---
+### 📊 Release Stats
+* **Total Commits:** 2
+* **Contributors:** Adhin
+* **Full Changelog:** [View Changes](https://github.com/Adhin37/novel-dialogue-enhancer/compare/v1.2.8...v1.2.9)
+
 ## 🚀 Release v1.2.7 (2026-04-22)
 
 ### ✨ Features
@@ -301,4 +313,3 @@ All notable changes to this project will be documented in this file.
 ### 📊 Release Stats
 * **Total Commits:** 102
 * **Contributors:** Adhin
-
