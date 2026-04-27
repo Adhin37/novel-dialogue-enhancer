@@ -290,7 +290,7 @@ button#enhance-now-btn:active:not(:disabled) {
 /* Ko-fi button */
 .kofi-wrap { position: relative; }
 
-.kofi-btn { text-decoration: none; }
+.kofi-btn { text-decoration: none; position: relative; }
 
 .kofi-steam {
   transform-box: fill-box;
@@ -304,9 +304,9 @@ button#enhance-now-btn:active:not(:disabled) {
 
 .kofi-tooltip {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(-4px);
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
   background-color: var(--card-background);
   border: 1px solid var(--border-color);
   color: var(--text-color);
@@ -321,9 +321,20 @@ button#enhance-now-btn:active:not(:disabled) {
   z-index: 100;
 }
 
+.kofi-tooltip::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 5px solid var(--border-color);
+}
+
 .kofi-btn:hover .kofi-tooltip {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(-50%) translateX(0);
 }
 
 @keyframes steamWave {

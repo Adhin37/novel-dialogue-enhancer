@@ -3,6 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.2.7-blue)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Manifest](https://img.shields.io/badge/manifest-v3-orange)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-support_me-FF5E5B?style=flat-square&logo=kofi&logoColor=white)](https://ko-fi.com/adhin/tip)
 
 A Chrome extension that improves the quality of translated web novels by enhancing dialogues to sound more natural in English using local AI models.
 
