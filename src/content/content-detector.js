@@ -1,4 +1,4 @@
-import { ContentSelectors } from "./content-selectors.js";
+import { ContentSelectors, SiteSelectors } from "./content-selectors.js";
 import { ElementCache } from "./element-cache.js";
 
 let elementCache = null;
@@ -42,14 +42,42 @@ export function findLargestTextBlock() {
 }
 
 /**
+ * Returns site-specific selectors for the current hostname, or an empty array
+ * when the hostname isn't in SiteSelectors (user-whitelisted unknown sites).
+ * @return {string[]}
+ */
+function getSiteSpecificSelectors() {
+  const hostname = window.location.hostname.replace(/^www\./, '');
+  for (const [domain, selectors] of Object.entries(SiteSelectors)) {
+    if (hostname === domain || hostname.endsWith('.' + domain)) {
+      return selectors;
+    }
+  }
+  return [];
+}
+
+/**
  * Returns the first content element matching a known selector with ≥100 chars of text,
  * falling back to the largest text block on the page.
+ *
+ * Resolution order:
+ *   1. Site-specific selectors for the current hostname (highest confidence)
+ *   2. Generic selector list (covers unknown / user-whitelisted sites)
+ *   3. Largest text block heuristic (last resort)
+ *
  * @return {HTMLElement|null}
  */
 export function findContentElement() {
   const MIN_CONTENT_LENGTH = 100;
 
-  for (const selector of ContentSelectors.CONTENT) {
+  const siteSelectors = getSiteSpecificSelectors();
+  const seen = new Set(siteSelectors);
+  const allSelectors = [
+    ...siteSelectors,
+    ...ContentSelectors.CONTENT.filter(s => !seen.has(s)),
+  ];
+
+  for (const selector of allSelectors) {
     try {
       const element = getCache().getElement(selector);
       if (element && (element.textContent?.length ?? 0) >= MIN_CONTENT_LENGTH) {
