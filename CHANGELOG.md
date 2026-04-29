@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## 🚀 Release v1.3.0 (2026-04-29)
+
+### ✨ Features
+* feat: content selector + e2e (34f7034)
+
+### 🐛 Bug Fixes
+* fix: add changelog.md to package (318796d)
+
+### ⚙️ Maintenance
+* chore: e2e (490074e)
+* chore: bump version to v1.2.9 [skip ci] (bfbf478)
+
+---
+### 📊 Release Stats
+* **Total Commits:** 4
+* **Contributors:** Adhin,github-actions[bot]
+* **Full Changelog:** [View Changes](https://github.com/Adhin37/novel-dialogue-enhancer/compare/v1.2.9...v1.3.0)
+
 ## 🚀 Release v1.2.9 (2026-04-27)
 
 ### 🐛 Bug Fixes
